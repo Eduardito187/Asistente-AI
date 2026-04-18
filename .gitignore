@@ -1,0 +1,28 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+.env
+.venv/
+venv/
+env/
+
+# Docker volumes locales (opcional)
+data/
+ollama_data/
+postgres_data/
+mysql_data/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Logs
+*.log
+logs/
+
+.claude/

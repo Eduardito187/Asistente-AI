@@ -1,0 +1,160 @@
+services:
+  # ============================================================
+  # Modelo nativo (Ollama con GPU)
+  # ============================================================
+  ollama:
+    image: ollama/ollama:latest
+    container_name: asistente_ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_KEEP_ALIVE=24h
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  ollama-init:
+    image: ollama/ollama:latest
+    container_name: asistente_ollama_init
+    depends_on:
+      ollama:
+        condition: service_healthy
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-qwen2.5:7b-instruct-q4_K_M}
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        echo "Descargando modelo $${OLLAMA_MODEL}..."
+        ollama pull $${OLLAMA_MODEL}
+        echo "Modelo listo."
+    restart: "no"
+
+  # ============================================================
+  # BD propia del asistente (MariaDB 11)
+  # ============================================================
+  db:
+    image: mariadb:11
+    container_name: asistente_db
+    environment:
+      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD:-asistente_root}
+      MARIADB_DATABASE: ${MARIADB_DB:-asistente_db}
+      MARIADB_USER: ${MARIADB_USER:-asistente}
+      MARIADB_PASSWORD: ${MARIADB_PASSWORD:-asistente_pass}
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --innodb-ft-min-token-size=2
+      - --ft-min-word-len=2
+    volumes:
+      - mariadb_data:/var/lib/mysql
+      - ./db/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    ports:
+      - "3306:3306"
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  # ============================================================
+  # BD "real" simulada de Dismac (MySQL origen)
+  # ============================================================
+  mysql-source:
+    image: mysql:8.0
+    container_name: asistente_mysql_source
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpass}
+      MYSQL_DATABASE: ${MYSQL_DB:-dismac_erp}
+      MYSQL_USER: ${MYSQL_USER:-dismac}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-dismac_pass}
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./mysql-source/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    ports:
+      - "3307:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD:-rootpass}"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+    restart: unless-stopped
+
+  mock-api:
+    build: ./mock-api
+    container_name: asistente_mock_api
+    environment:
+      MYSQL_HOST: mysql-source
+      MYSQL_PORT: 3306
+      MYSQL_USER: ${MYSQL_USER:-dismac}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-dismac_pass}
+      MYSQL_DB: ${MYSQL_DB:-dismac_erp}
+    depends_on:
+      mysql-source:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+  ingestor:
+    build: ./ingestor
+    container_name: asistente_ingestor
+    env_file: .env
+    environment:
+      INGEST_SOURCE: ${INGEST_SOURCE:-dismac_csv}
+      INGEST_INTERVAL_SECONDS: ${INGEST_INTERVAL_SECONDS:-86400}
+      INGEST_DISMAC_CSV_PATH: /app/data/feed_meta_scz.csv
+    depends_on:
+      db:
+        condition: service_healthy
+      mysql-source:
+        condition: service_healthy
+      mock-api:
+        condition: service_started
+    volumes:
+      - ./data:/app/data:ro
+    restart: unless-stopped
+
+  backend:
+    build: ./backend
+    container_name: asistente_backend
+    env_file: .env
+    depends_on:
+      db:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    container_name: asistente_frontend
+    env_file: .env
+    depends_on:
+      - backend
+    ports:
+      - "8501:8501"
+    restart: unless-stopped
+
+volumes:
+  ollama_data:
+  mariadb_data:
+  mysql_data:
