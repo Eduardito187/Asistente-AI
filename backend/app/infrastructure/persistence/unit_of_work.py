@@ -6,9 +6,15 @@ from ...application.ports import UnitOfWork
 from .engine import SessionLocal
 from .mariadb.carrito_repositorio import MariaDbCarritoRepository
 from .mariadb.chat_repositorio import MariaDbChatRepository
+from .mariadb.conversaciones_curadas_repositorio import MariaDbConversacionesCuradasRepository
+from .mariadb.feedback_ordenes_repositorio import MariaDbFeedbackOrdenesRepository
+from .mariadb.metricas_turno_repositorio import MariaDbMetricasTurnoRepository
 from .mariadb.orden_repositorio import MariaDbOrdenRepository
+from .mariadb.perfil_sesion_repositorio import MariaDbPerfilSesionRepository
 from .mariadb.producto_repositorio import MariaDbProductoRepository
+from .mariadb.productos_embeddings_repositorio import MariaDbProductosEmbeddingsRepository
 from .mariadb.sesion_repositorio import MariaDbSesionRepository
+from .mariadb.sugerencias_catalogo_repositorio import MariaDbSugerenciasCatalogoRepository
 
 
 class SqlAlchemyUnitOfWork(UnitOfWork):
@@ -24,6 +30,12 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
         self.carritos = MariaDbCarritoRepository(self._session)
         self.ordenes = MariaDbOrdenRepository(self._session)
         self.chat = MariaDbChatRepository(self._session)
+        self.sugerencias_catalogo = MariaDbSugerenciasCatalogoRepository(self._session)
+        self.conversaciones_curadas = MariaDbConversacionesCuradasRepository(self._session)
+        self.metricas_turno = MariaDbMetricasTurnoRepository(self._session)
+        self.perfiles_sesion = MariaDbPerfilSesionRepository(self._session)
+        self.feedback_ordenes = MariaDbFeedbackOrdenesRepository(self._session)
+        self.productos_embeddings = MariaDbProductosEmbeddingsRepository(self._session)
         return self
 
     def __exit__(self, exc_type, exc, tb) -> None:

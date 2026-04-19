@@ -6,6 +6,7 @@ import logging
 from typing import Iterable
 
 from ...application.ports import SourceAdapter
+from ...domain.atributos import ExtractorAtributos
 from ...domain.clasificacion import Clasificador
 from ...domain.productos import ProductoInvalido, ProductoRaw
 from ...domain.texto import NormalizadorTexto
@@ -64,32 +65,20 @@ class DismacCsvAdapter(SourceAdapter):
         if not sku or not nombre:
             return None
 
-        precio = self._norm.precio_bob(row.get("price"))
-        sale = self._norm.precio_bob(row.get("sale_price"))
-
-        if sale and precio and sale < precio:
-            precio_bob = sale
-            precio_anterior = precio
-        else:
-            precio_bob = precio or sale
-            precio_anterior = None
-
-        if not precio_bob or precio_bob <= 0:
+        precios = self._resolver_precios(row)
+        if precios is None:
             return None
+        precio_bob, precio_anterior = precios
 
         descripcion_larga = self._norm.limpiar_html(row.get("rich_text_description"))
         descripcion_corta = self._norm.limpiar_html(row.get("description"))
         descripcion = descripcion_larga or descripcion_corta
 
-        categoria, subcategoria = self._clasificador.clasificar(
-            f"{nombre} {descripcion_corta or ''}"
-        )
         marca = self._norm.marca_normalizada(row.get("brand"))
-
-        try:
-            stock = max(0, int(row.get("quantity_to_sell_on_facebook") or 0))
-        except (TypeError, ValueError):
-            stock = 1  # 'in stock' sin cantidad → asumimos 1
+        categoria, subcategoria = self._clasificador.clasificar(
+            nombre, product_type=row.get("product_type"), marca=marca
+        )
+        atributos = ExtractorAtributos.extraer(nombre, descripcion)
 
         return ProductoRaw(
             sku=sku,
@@ -100,8 +89,28 @@ class DismacCsvAdapter(SourceAdapter):
             marca=marca,
             precio_bob=precio_bob,
             precio_anterior_bob=precio_anterior,
-            stock=stock,
+            stock=self._resolver_stock(row),
             imagen_url=(row.get("image_link") or "").strip() or None,
             url_producto=(row.get("link") or "").strip() or None,
             activo=True,
+            atributos=atributos,
         )
+
+    def _resolver_precios(self, row: dict) -> tuple[float, float | None] | None:
+        precio = self._norm.precio_bob(row.get("price"))
+        sale = self._norm.precio_bob(row.get("sale_price"))
+        if sale and precio and sale < precio:
+            precio_bob, precio_anterior = sale, precio
+        else:
+            precio_bob = precio or sale
+            precio_anterior = None
+        if not precio_bob or precio_bob <= 0:
+            return None
+        return precio_bob, precio_anterior
+
+    @staticmethod
+    def _resolver_stock(row: dict) -> int:
+        try:
+            return max(0, int(row.get("quantity_to_sell_on_facebook") or 0))
+        except (TypeError, ValueError):
+            return 1  # 'in stock' sin cantidad → asumimos 1

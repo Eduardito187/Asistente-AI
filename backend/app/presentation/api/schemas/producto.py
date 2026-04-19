@@ -16,6 +16,5 @@ class ProductoOut(BaseModel):
     marca: Optional[str] = None
     precio_bob: float
     precio_anterior_bob: Optional[float] = None
-    stock: int
     imagen_url: Optional[str] = None
     activo: bool = True

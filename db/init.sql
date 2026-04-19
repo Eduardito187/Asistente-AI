@@ -27,6 +27,18 @@ CREATE TABLE IF NOT EXISTS productos (
     descripcion_norm        TEXT         NULL,
     marca_norm              VARCHAR(120) NULL,
     categoria_norm          VARCHAR(120) NULL,
+    -- atributos estructurados extraidos del nombre/descripcion durante la ingesta.
+    -- Permiten filtros exactos (p.ej. pulgadas=85) sin depender del FULLTEXT.
+    pulgadas                DECIMAL(5,1) NULL,
+    capacidad_gb            INT          NULL,
+    ram_gb                  INT          NULL,
+    capacidad_litros        DECIMAL(7,2) NULL,
+    capacidad_kg            DECIMAL(5,1) NULL,
+    potencia_w              INT          NULL,
+    procesador              VARCHAR(50)  NULL,
+    color                   VARCHAR(40)  NULL,
+    tipo_panel              VARCHAR(20)  NULL,
+    resolucion              VARCHAR(10)  NULL,
     created_at              DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     updated_at              DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6)
                                 ON UPDATE CURRENT_TIMESTAMP(6),
@@ -35,7 +47,12 @@ CREATE TABLE IF NOT EXISTS productos (
     INDEX ix_productos_marca     (marca),
     INDEX ix_productos_precio    (precio_bob),
     INDEX ix_productos_activo    (activo, stock),
-    FULLTEXT INDEX ft_productos_busqueda (nombre_norm, descripcion_norm, marca_norm, categoria_norm)
+    INDEX ix_productos_pulgadas  (pulgadas),
+    INDEX ix_productos_capacidad (capacidad_gb),
+    FULLTEXT INDEX ft_productos_busqueda (nombre_norm, descripcion_norm, marca_norm, categoria_norm),
+    -- Indice usado por el buscador principal: excluye descripcion_norm para
+    -- evitar falsos positivos (p.ej. 'soporte de pared para tv' matcheando 'tv').
+    FULLTEXT INDEX ft_productos_nombre (nombre_norm, marca_norm, categoria_norm)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ------------------------------------------------------------
@@ -126,6 +143,121 @@ CREATE TABLE IF NOT EXISTS orden_items (
 
     INDEX ix_orden_items_orden (orden_id),
     CONSTRAINT fk_orden_items_orden FOREIGN KEY (orden_id) REFERENCES ordenes(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ------------------------------------------------------------
+-- Sugerencias de catálogo (productos reales pedidos por clientes
+-- pero aún no presentes en el catálogo).
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS sugerencias_catalogo (
+    id                      BIGINT       NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    nombre                  VARCHAR(300) NOT NULL,
+    nombre_norm             VARCHAR(300) NOT NULL,
+    categoria_estimada      VARCHAR(120) NULL,
+    marca_estimada          VARCHAR(120) NULL,
+    veces_solicitado        INT          NOT NULL DEFAULT 1,
+    primer_contexto_cliente TEXT         NULL,
+    primera_fecha           DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    ultima_fecha            DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6)
+                                ON UPDATE CURRENT_TIMESTAMP(6),
+
+    UNIQUE KEY uk_sugerencias_nombre_norm (nombre_norm),
+    INDEX ix_sugerencias_ultima_fecha (ultima_fecha),
+    INDEX ix_sugerencias_veces (veces_solicitado)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ------------------------------------------------------------
+-- Conversaciones curadas: ejemplos "buenos" usados como few-shot
+-- dinámico para mejorar el tono y la eficiencia del asistente.
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS conversaciones_curadas (
+    id                      BIGINT       NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    sesion_id               CHAR(36)     NULL,
+    etiqueta                VARCHAR(120) NULL,
+    cliente_texto           MEDIUMTEXT   NOT NULL,
+    asistente_texto         MEDIUMTEXT   NOT NULL,
+    score                   INT          NOT NULL DEFAULT 0,
+    turnos                  INT          NOT NULL DEFAULT 0,
+    llevo_a_orden           TINYINT(1)   NOT NULL DEFAULT 0,
+    activa                  TINYINT(1)   NOT NULL DEFAULT 1,
+    created_at              DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    updated_at              DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6)
+                                ON UPDATE CURRENT_TIMESTAMP(6),
+
+    UNIQUE KEY uk_conv_curada_sesion (sesion_id),
+    INDEX ix_conv_curada_activa_score (activa, score)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ------------------------------------------------------------
+-- Metricas por turno (para dashboards y ajuste de latencia).
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS metricas_turno (
+    id                      BIGINT       NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    sesion_id               CHAR(36)     NOT NULL,
+    mensaje_usuario_len     INT          NOT NULL DEFAULT 0,
+    respuesta_len           INT          NOT NULL DEFAULT 0,
+    tool_calls              INT          NOT NULL DEFAULT 0,
+    mentiras_detectadas     INT          NOT NULL DEFAULT 0,
+    productos_citados       INT          NOT NULL DEFAULT 0,
+    ruta                    VARCHAR(40)  NOT NULL DEFAULT 'agente',
+    tiempo_ms               INT          NOT NULL DEFAULT 0,
+    created_at              DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+
+    INDEX ix_metricas_sesion (sesion_id, created_at),
+    INDEX ix_metricas_ruta (ruta, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ------------------------------------------------------------
+-- Perfil de sesión: preferencias declaradas por el cliente durante el chat
+-- (presupuesto, marca favorita, categoría de interés, uso).
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS perfiles_sesion (
+    sesion_id               CHAR(36)     NOT NULL PRIMARY KEY,
+    presupuesto_max         DECIMAL(12,2) NULL,
+    marca_preferida         VARCHAR(120) NULL,
+    categoria_foco          VARCHAR(120) NULL,
+    uso_declarado           VARCHAR(200) NULL,
+    pulgadas                DECIMAL(4,1) NULL,
+    tipo_panel              VARCHAR(32)  NULL,
+    resolucion              VARCHAR(16)  NULL,
+    ultimos_skus_mostrados  TEXT         NULL,
+    precio_min_mostrado     DECIMAL(12,2) NULL,
+    precio_max_mostrado     DECIMAL(12,2) NULL,
+    updated_at              DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6)
+                                ON UPDATE CURRENT_TIMESTAMP(6),
+
+    CONSTRAINT fk_perfil_sesion FOREIGN KEY (sesion_id) REFERENCES sesiones(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ------------------------------------------------------------
+-- Feedback post-orden: rating + comentario del cliente tras cerrar.
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS feedback_ordenes (
+    id                      BIGINT       NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    orden_id                CHAR(36)     NOT NULL,
+    sesion_id               CHAR(36)     NOT NULL,
+    rating                  TINYINT      NULL,
+    comentario              TEXT         NULL,
+    created_at              DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+
+    UNIQUE KEY uk_feedback_orden (orden_id),
+    INDEX ix_feedback_sesion (sesion_id),
+    CONSTRAINT fk_feedback_orden  FOREIGN KEY (orden_id)  REFERENCES ordenes(id)  ON DELETE CASCADE,
+    CONSTRAINT fk_feedback_sesion FOREIGN KEY (sesion_id) REFERENCES sesiones(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ------------------------------------------------------------
+-- Embeddings de productos: vector serializado (float32) + modelo usado.
+-- Se consulta fuera de MariaDB (cosine similarity en memoria).
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS productos_embeddings (
+    sku                     VARCHAR(64)  NOT NULL PRIMARY KEY,
+    modelo                  VARCHAR(80)  NOT NULL,
+    `vector`                BLOB         NOT NULL,
+    updated_at              DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6)
+                                ON UPDATE CURRENT_TIMESTAMP(6),
+
+    CONSTRAINT fk_emb_producto FOREIGN KEY (sku) REFERENCES productos(sku) ON UPDATE CASCADE ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ------------------------------------------------------------

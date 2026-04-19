@@ -7,6 +7,7 @@
 """
 from __future__ import annotations
 
+import json
 import os
 from urllib.parse import quote
 
@@ -108,6 +109,44 @@ def enviar_chat(mensaje: str):
     )
 
 
+def _parsear_sse(lineas):
+    """Genera pares (evento, data) a partir de un iterable de líneas SSE."""
+    evento = None
+    for linea in lineas:
+        if not linea:
+            continue
+        if linea.startswith("event:"):
+            evento = linea.split(":", 1)[1].strip()
+        elif linea.startswith("data:"):
+            raw = linea.split(":", 1)[1].strip()
+            yield evento, (json.loads(raw) if raw else {})
+
+
+def stream_chat(mensaje: str):
+    """Consume /chat/stream y devuelve (generador_texto, meta_dict).
+
+    El generador solo emite tokens de texto para st.write_stream; el dict con
+    productos/pasos/sesion_id se llena por referencia mientras llega el SSE.
+    """
+    meta: dict = {"respuesta": "", "productos": [], "pasos": [], "sesion_id": None}
+    payload = {"mensaje": mensaje, "sesion_id": st.session_state.sesion_id}
+
+    def generador():
+        with httpx.stream("POST", f"{BACKEND_URL}/chat/stream", json=payload, timeout=180) as r:
+            r.raise_for_status()
+            for evento, data in _parsear_sse(r.iter_lines()):
+                if evento == "token":
+                    texto = data.get("texto", "")
+                    meta["respuesta"] += texto
+                    yield texto
+                elif evento == "meta":
+                    meta["productos"] = data.get("productos_citados", [])
+                    meta["pasos"] = data.get("pasos", [])
+                    meta["sesion_id"] = data.get("sesion_id")
+
+    return generador, meta
+
+
 # ------------------------------------------------------------
 # Page config + estado
 # ------------------------------------------------------------
@@ -138,7 +177,7 @@ with st.sidebar:
                 st.markdown(
                     f"**{item['nombre']}**  \n"
                     f"`{item['sku']}` · x{item['cantidad']}  \n"
-                    f"Bs {float(item['subtotal']):.2f}"
+                    f"Bs {float(item['subtotal_bob']):.2f}"
                 )
             with col2:
                 if st.button("🗑", key=f"del_{item['sku']}", help="Quitar del carrito"):
@@ -209,53 +248,161 @@ st.title("Asistente de compras Dismac")
 st.caption("Agente IA — busca, compara y arma tu carrito por voz o texto. Precios en Bs.")
 
 
+def render_dashboard():
+    with st.expander("📊 Dashboard de métricas (admin)", expanded=False):
+        dias = st.slider("Ventana (días)", min_value=1, max_value=30, value=7, key="dash_dias")
+        try:
+            data = api_get(f"/metricas/dashboard?dias={dias}")
+        except httpx.HTTPError as exc:
+            st.error(f"No pude traer métricas: {exc}")
+            return
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Turnos", data["turnos"])
+        c2.metric("Sesiones", data["sesiones"])
+        c3.metric("Cerraron orden", f"{data['pct_sesiones_cerraron']}%")
+        c4.metric("Turnos con mentiras", f"{data['pct_turnos_con_mentiras']}%")
+        l1, l2, l3 = st.columns(3)
+        l1.metric("Latencia avg", f"{data['avg_ms']:.0f} ms")
+        l2.metric("Latencia p50", f"{data['p50_ms']} ms")
+        l3.metric("Latencia p95", f"{data['p95_ms']} ms")
+        if data["por_ruta"]:
+            st.markdown("**Por ruta:**")
+            st.dataframe(data["por_ruta"], use_container_width=True, hide_index=True)
+        if st.button("🔁 Reindexar embeddings", help="Calcula embeddings faltantes para búsqueda semántica"):
+            try:
+                resp = api_post("/admin/embeddings/reindexar")
+                st.success(f"Reindexados {resp.get('reindexados', 0)} productos")
+            except httpx.HTTPError as exc:
+                st.error(f"Falló la reindexación: {exc}")
+
+
+render_dashboard()
+
+
 def render_pasos(pasos: list[dict]):
     if not pasos:
         return
-    with st.expander(f"🔧 Acciones del agente ({len(pasos)} paso{'s' if len(pasos) != 1 else ''})"):
-        for i, paso in enumerate(pasos):
-            tool = paso.get("tool", "?")
-            args = paso.get("args", {}) or {}
-            result = paso.get("result", {}) or {}
-            args_str = ", ".join(f"{k}={v!r}" for k, v in args.items()) if args else ""
-            st.markdown(f"**{i+1}.** `{tool}({args_str})`")
-            resumen = _resumen_resultado(tool, result)
-            if resumen:
-                st.caption(resumen)
+    frases = [_paso_humano(p) for p in pasos]
+    frases = [f for f in frases if f]
+    if not frases:
+        return
+    with st.expander(f"🪄 Así lo resolví ({len(frases)})"):
+        for frase in frases:
+            st.markdown(f"- {frase}")
 
 
-def _resumen_resultado(tool: str, result: dict) -> str:
+_STOPWORDS = {
+    "muestrame", "muestra", "muéstrame", "opciones", "opcion", "quiero", "dame",
+    "necesito", "buscame", "búscame", "algo", "las", "los", "del", "para", "que",
+    "más", "mas", "por", "con", "sin", "una", "uno", "esos", "esas", "estas",
+    "anteriores", "similares", "disponibles",
+}
+
+
+def _resumir_termino(args: dict) -> str:
+    """Extrae un término corto y legible para mostrar al usuario."""
+    q = (args.get("query") or "").strip().lower()
+    palabras = [p for p in q.split() if p not in _STOPWORDS and len(p) > 2][:3]
+    if palabras:
+        return " ".join(palabras)
+    return args.get("categoria") or args.get("marca") or ""
+
+
+def _humano_buscar(args: dict, result: dict) -> str:
+    termino = _resumir_termino(args)
+    n = result.get("total", 0)
+    objeto = f"«{termino}»" if termino else "en el catálogo"
+    if n == 0:
+        return f"Busqué {objeto} — sin coincidencias por ahora."
+    if n == 1:
+        return f"Busqué {objeto} — encontré 1 opción."
+    return f"Busqué {objeto} — encontré {n} opciones."
+
+
+def _humano_ver_producto(args: dict, result: dict) -> str:
+    nombre = result.get("nombre") or ""
+    sku = result.get("sku") or args.get("sku") or ""
+    if nombre:
+        return f"Abrí la ficha de {nombre} [{sku}]."
+    return f"Abrí la ficha del producto [{sku}]."
+
+
+def _humano_agregar(args: dict, result: dict) -> str:
+    cant = result.get("cantidad_agregada", 1)
+    sku = result.get("sku") or args.get("sku") or ""
+    if cant == 1:
+        return f"Sumé [{sku}] a tu carrito."
+    return f"Sumé {cant} unidades de [{sku}] a tu carrito."
+
+
+def _humano_quitar(args: dict, result: dict) -> str:
+    sku = result.get("sku") or args.get("sku") or ""
+    return f"Saqué [{sku}] del carrito."
+
+
+def _humano_ver_carrito(_args: dict, result: dict) -> str:
+    n = len(result.get("items") or [])
+    total = result.get("total_bob", 0)
+    if n == 0:
+        return "Miré tu carrito — todavía está vacío."
+    if n == 1:
+        return f"Miré tu carrito: 1 producto, total Bs {total:.0f}."
+    return f"Miré tu carrito: {n} productos, total Bs {total:.0f}."
+
+
+def _humano_confirmar(_args: dict, result: dict) -> str:
+    numero = result.get("numero_orden", "?")
+    total = result.get("total_bob", 0)
+    return f"Cerré tu orden #{numero} por Bs {total:.0f}. 🎉"
+
+
+def _humano_ver_ordenes(_args: dict, result: dict) -> str:
+    n = len(result.get("ordenes") or [])
+    if n == 0:
+        return "Revisé el historial — todavía no tenés órdenes en esta sesión."
+    if n == 1:
+        return "Revisé el historial — tenés 1 orden previa."
+    return f"Revisé el historial — tenés {n} órdenes previas."
+
+
+def _humano_comparar(args: dict, result: dict) -> str:
+    skus = args.get("skus") or []
+    n = len(result.get("productos") or skus)
+    return f"Comparé {n} productos lado a lado."
+
+
+def _humano_ausente(_args: dict, result: dict) -> str:
+    alt = result.get("alternativas", 0)
+    if result.get("sugerencia_registrada"):
+        return "No tenemos ese producto exacto — anoté tu pedido y busqué alternativas parecidas."
+    if alt == 1:
+        return "Busqué alternativas y encontré 1 que se acerca."
+    if alt > 1:
+        return f"Busqué alternativas y encontré {alt} que se acercan."
+    return "Busqué algo parecido, pero no apareció nada claro."
+
+
+PASO_HUMANIZADORES = {
+    "buscar_productos": _humano_buscar,
+    "listar_categorias": lambda _a, _r: "Repasé las categorías disponibles.",
+    "ver_producto": _humano_ver_producto,
+    "agregar_al_carrito": _humano_agregar,
+    "quitar_del_carrito": _humano_quitar,
+    "ver_carrito": _humano_ver_carrito,
+    "vaciar_carrito": lambda _a, _r: "Vacié tu carrito.",
+    "confirmar_orden": _humano_confirmar,
+    "ver_ordenes_sesion": _humano_ver_ordenes,
+    "comparar_productos": _humano_comparar,
+    "manejador_producto_ausente": _humano_ausente,
+}
+
+
+def _paso_humano(paso: dict) -> str:
+    result = paso.get("result") or {}
     if "error" in result:
-        return f"⚠️ {result['error']}"
-    if tool == "buscar_productos":
-        n = result.get("total", 0)
-        return f"{n} resultado(s): " + ", ".join(
-            p["sku"] for p in (result.get("productos") or [])[:5]
-        )
-    if tool == "listar_categorias":
-        cats = result.get("categorias") or []
-        return ", ".join(f"{c['categoria']} ({c['cantidad']})" for c in cats[:8])
-    if tool == "ver_producto":
-        return f"{result.get('sku','?')} — {result.get('nombre','')}"
-    if tool == "agregar_al_carrito":
-        return f"+{result.get('cantidad_agregada',1)} × {result.get('sku','?')}"
-    if tool == "quitar_del_carrito":
-        return f"quitado {result.get('sku','?')}"
-    if tool == "ver_carrito":
-        n = len(result.get("items") or [])
-        return f"{n} item(s), total Bs {result.get('total_bob', 0):.2f}"
-    if tool == "vaciar_carrito":
-        return "carrito vaciado"
-    if tool == "confirmar_orden":
-        return (
-            f"orden {result.get('numero_orden','?')} "
-            f"Bs {result.get('total_bob',0):.2f} · "
-            f"{result.get('items_cantidad',0)} items"
-        )
-    if tool == "ver_ordenes_sesion":
-        ordenes = result.get("ordenes") or []
-        return f"{len(ordenes)} orden(es) en esta sesión"
-    return ""
+        return f"⚠️ No pude completar la acción: {result['error']}"
+    fn = PASO_HUMANIZADORES.get(paso.get("tool", ""))
+    return fn(paso.get("args") or {}, result) if fn else ""
 
 
 def render_tarjetas(productos: list[dict], key_prefix: str):
@@ -271,17 +418,14 @@ def render_tarjetas(productos: list[dict], key_prefix: str):
                 st.markdown(f"**{p['nombre']}**")
                 st.caption(f"SKU `{p['sku']}` · {p.get('marca') or '—'}")
                 st.markdown(formato_precio(p), unsafe_allow_html=True)
-                if p["stock"] > 0:
-                    st.caption(f":green[Stock disponible ({p['stock']} uds)]")
-                else:
-                    st.caption(":red[Sin stock]")
+                if p.get("justificacion"):
+                    st.caption(f"💡 _{p['justificacion']}_")
                 b1, b2 = st.columns([2, 1])
                 with b1:
                     agregar = st.button(
                         "🛒 Agregar",
                         key=f"{key_prefix}_add_{p['sku']}",
                         use_container_width=True,
-                        disabled=p["stock"] <= 0,
                     )
                 with b2:
                     mas_info = st.button(
@@ -304,8 +448,6 @@ def render_tarjetas(productos: list[dict], key_prefix: str):
 for idx, m in enumerate(st.session_state.mensajes):
     with st.chat_message(m["rol"]):
         st.markdown(m["contenido"])
-        if m.get("pasos"):
-            render_pasos(m["pasos"])
         if m.get("productos"):
             render_tarjetas(m["productos"], key_prefix=f"m{idx}")
 
@@ -338,10 +480,45 @@ if st.session_state.pending_input:
 else:
     pregunta = st.chat_input("Ej: Busco un televisor 4K de 55 pulgadas hasta Bs 5500…")
 
+INDICADOR_PENSANDO = (
+    "<span style='color:#888'>Dismi está escribiendo"
+    "<span class='dismi-dots'>…</span></span>"
+    "<style>"
+    "@keyframes dismi-blink{0%,20%{opacity:.2}50%{opacity:1}100%{opacity:.2}}"
+    ".dismi-dots{display:inline-block;animation:dismi-blink 1.2s infinite}"
+    "</style>"
+)
+
+
+def render_turno_stream(pregunta: str):
+    """Muestra la pregunta y consume /chat/stream para pintar tokens en vivo."""
+    st.session_state.mensajes.append({"rol": "user", "contenido": pregunta})
+    with st.chat_message("user"):
+        st.markdown(pregunta)
+    with st.chat_message("assistant"):
+        placeholder = st.empty()
+        placeholder.markdown(INDICADOR_PENSANDO, unsafe_allow_html=True)
+        generador, meta = stream_chat(pregunta)
+        texto = ""
+        for tok in generador():
+            texto += tok
+            placeholder.markdown(texto + " ▌")
+        placeholder.markdown(texto or meta.get("respuesta", ""))
+    if meta.get("sesion_id"):
+        st.session_state.sesion_id = meta["sesion_id"]
+    st.session_state.mensajes.append(
+        {
+            "rol": "assistant",
+            "contenido": meta["respuesta"],
+            "productos": meta["productos"],
+            "pasos": meta["pasos"],
+        }
+    )
+    st.rerun()
+
+
 if pregunta:
-    with st.spinner("Consultando catálogo y pensando…"):
-        try:
-            enviar_chat(pregunta)
-            st.rerun()
-        except httpx.HTTPError as e:
-            st.error(f"Error contactando al backend: {e}")
+    try:
+        render_turno_stream(pregunta)
+    except httpx.HTTPError as e:
+        st.error(f"Error contactando al backend: {e}")

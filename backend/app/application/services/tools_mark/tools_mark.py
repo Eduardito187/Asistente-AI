@@ -34,7 +34,7 @@ class ToolsMark:
             if p.tool == "buscar_productos":
                 for prod in r.get("productos", []):
                     skus_info[prod["sku"]] = (
-                        f"{prod['nombre']} Bs{prod['precio_bob']} stock{prod['stock']}"
+                        f"{prod['nombre']} Bs{prod['precio_bob']}"
                     )
             elif p.tool == "ver_producto" and "sku" in r:
                 skus_info[r["sku"]] = f"{r.get('nombre','')} Bs{r.get('precio_bob','')}"

@@ -14,3 +14,16 @@ class CarritoReadModel(ABC):
         solo_con_items: bool,
         limite: int,
     ) -> list[dict]: ...
+
+
+class DashboardMetricasReadModel(ABC):
+    """Lectura agregada de metricas_turno para dashboards."""
+
+    @abstractmethod
+    def resumen_global(self, dias: int) -> dict: ...
+
+    @abstractmethod
+    def por_ruta(self, dias: int) -> list[dict]: ...
+
+    @abstractmethod
+    def latencias_ordenadas(self, dias: int) -> list[int]: ...

@@ -1,0 +1,70 @@
+[
+  {
+    "nombre": "saludo_sin_listar",
+    "descripcion": "Un simple hola no debe listar productos ni SKUs inventados.",
+    "turnos": [
+      {
+        "mensaje": "Hola",
+        "no_debe_contener": ["Bs", "[", "dolares", "$"],
+        "tools_prohibidas": ["buscar_productos"]
+      }
+    ]
+  },
+  {
+    "nombre": "buscar_laptop_basico",
+    "descripcion": "Pedir una laptop debe disparar buscar_productos y citar Bs.",
+    "turnos": [
+      {
+        "mensaje": "Muestrame laptops disponibles",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener": ["Bs"],
+        "no_debe_contener": ["dolares", "$"]
+      }
+    ]
+  },
+  {
+    "nombre": "presupuesto_respetado",
+    "descripcion": "Si el cliente declara presupuesto, la respuesta no debe sugerir nada por encima.",
+    "turnos": [
+      {
+        "mensaje": "Quiero una laptop hasta 3000 bolivianos",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener": ["Bs"]
+      }
+    ]
+  },
+  {
+    "nombre": "no_inventar_marca_inexistente",
+    "descripcion": "Pedir una marca rarisima no debe devolver productos inventados.",
+    "turnos": [
+      {
+        "mensaje": "Tienen laptops de la marca Voorhees?",
+        "no_debe_contener": ["Voorhees laptop", "Modelo X", "[000"]
+      }
+    ]
+  },
+  {
+    "nombre": "flujo_comparar",
+    "descripcion": "Tras ver opciones, pedir comparar dispara comparar_productos.",
+    "turnos": [
+      {
+        "mensaje": "Muestrame televisores 55 pulgadas",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "Comparame los dos primeros",
+        "tools_requeridas_cualquiera": ["comparar_productos", "buscar_productos"]
+      }
+    ]
+  },
+  {
+    "nombre": "locale_boliviano",
+    "descripcion": "Nunca debe usar modismos de otros paises.",
+    "turnos": [
+      {
+        "mensaje": "Que tal, necesito consejo",
+        "no_debe_contener": ["tio", "guay", "orale", "che ", "pibe"]
+      }
+    ]
+  }
+]

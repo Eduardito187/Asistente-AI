@@ -10,12 +10,16 @@ class ProductoSql:
         precio_bob, precio_anterior_bob, stock, imagen_url, url_producto,
         activo, origen,
         nombre_norm, descripcion_norm, marca_norm, categoria_norm,
+        pulgadas, capacidad_gb, ram_gb, capacidad_litros, capacidad_kg,
+        potencia_w, procesador, color, tipo_panel, resolucion,
         updated_at
     ) VALUES (
         :sku, :nombre, :descripcion, :categoria, :subcategoria, :marca,
         :precio_bob, :precio_anterior_bob, :stock, :imagen_url, :url_producto,
         :activo, :origen,
         :nombre_norm, :descripcion_norm, :marca_norm, :categoria_norm,
+        :pulgadas, :capacidad_gb, :ram_gb, :capacidad_litros, :capacidad_kg,
+        :potencia_w, :procesador, :color, :tipo_panel, :resolucion,
         NOW(6)
     )
     ON DUPLICATE KEY UPDATE
@@ -35,6 +39,16 @@ class ProductoSql:
         descripcion_norm    = VALUES(descripcion_norm),
         marca_norm          = VALUES(marca_norm),
         categoria_norm      = VALUES(categoria_norm),
+        pulgadas            = VALUES(pulgadas),
+        capacidad_gb        = VALUES(capacidad_gb),
+        ram_gb              = VALUES(ram_gb),
+        capacidad_litros    = VALUES(capacidad_litros),
+        capacidad_kg        = VALUES(capacidad_kg),
+        potencia_w          = VALUES(potencia_w),
+        procesador          = VALUES(procesador),
+        color               = VALUES(color),
+        tipo_panel          = VALUES(tipo_panel),
+        resolucion          = VALUES(resolucion),
         updated_at          = NOW(6)
     """
 

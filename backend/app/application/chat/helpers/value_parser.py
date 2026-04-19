@@ -18,6 +18,16 @@ class ValueParser:
             return None
 
     @staticmethod
+    def a_int(v: Any) -> int | None:
+        """Convierte un valor arbitrario a int (aceptando '8', 8.0, 8). Tolera decimales con truncado."""
+        if v is None or v == "":
+            return None
+        try:
+            return int(float(v))
+        except (TypeError, ValueError):
+            return None
+
+    @staticmethod
     def parse_args(raw: Any) -> dict:
         """Normaliza los arguments del tool-call a dict Python."""
         if isinstance(raw, str):

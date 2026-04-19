@@ -3,6 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Optional
 
+from .filtros_atributos import FiltrosAtributos
 from .producto import Producto
 from .sku import SKU
 
@@ -28,6 +29,7 @@ class ProductoRepository(ABC):
         marca_normalizada: Optional[str],
         precio_min: Optional[float],
         precio_max: Optional[float],
+        atributos: FiltrosAtributos,
         solo_con_stock: bool,
         limite: int,
     ) -> list[Producto]: ...

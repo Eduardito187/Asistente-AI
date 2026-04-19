@@ -5,7 +5,7 @@ from typing import Optional
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from ....domain.productos import SKU, Producto, ProductoRepository
+from ....domain.productos import SKU, FiltrosAtributos, Producto, ProductoRepository
 from .mappers import ProductoMapper
 from .sql import ProductoSql
 
@@ -47,6 +47,7 @@ class MariaDbProductoRepository(ProductoRepository):
         marca_normalizada: Optional[str],
         precio_min: Optional[float],
         precio_max: Optional[float],
+        atributos: FiltrosAtributos,
         solo_con_stock: bool,
         limite: int,
     ) -> list[Producto]:
@@ -57,6 +58,7 @@ class MariaDbProductoRepository(ProductoRepository):
             marca_normalizada=marca_normalizada,
             precio_min=precio_min,
             precio_max=precio_max,
+            atributos=atributos,
             solo_con_stock=solo_con_stock,
         )
         params["limite"] = limite

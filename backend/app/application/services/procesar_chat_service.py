@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import time
 from typing import Callable
 from uuid import UUID
 
@@ -12,18 +13,50 @@ from ..chat.agente_service import AgenteService
 from ..chat.paso_agente import PasoAgente
 from ..chat.serializers import ProductoSerializer
 from ..chat.tool_dispatcher import ToolDispatcher
+from ..commands.actualizar_perfil_sesion import ActualizarPerfilSesionHandler
 from ..commands.crear_sesion import CrearSesionCommand, CrearSesionHandler
 from ..commands.registrar_mensaje import RegistrarMensajeCommand, RegistrarMensajeHandler
+from ..commands.registrar_metrica_turno import (
+    RegistrarMetricaTurnoCommand,
+    RegistrarMetricaTurnoHandler,
+)
+from ..commands.registrar_turno_mostrado import (
+    RegistrarTurnoMostradoCommand,
+    RegistrarTurnoMostradoHandler,
+)
 from ..ports import UnitOfWork
 from ..queries.buscar_productos import BuscarProductosHandler, BuscarProductosQuery
 from ..queries.historial_chat import HistorialChatHandler, HistorialChatQuery
+from ..queries.obtener_perfil_sesion import (
+    ObtenerPerfilSesionHandler,
+    ObtenerPerfilSesionQuery,
+    ResultadoObtenerPerfilSesion,
+)
+from .aplicador_cross_sell import AplicadorCrossSell
+from .atajo_sku_directo import AtajoSkuDirecto
 from .chat_input import ChatInput
 from .chat_output import ChatOutput
+from .clasificador_intencion import ClasificadorIntencion
+from .curador_conversaciones import CuradorConversaciones
+from .detector_consulta_relativa import DetectorConsultaRelativa, TipoConsultaRelativa
+from .detector_intencion_asesoria import DetectorIntencionAsesoria
+from .detector_intencion_compra import DetectorIntencionCompra
 from .detector_mentiras import DetectorMentiras
+from .detector_pedido_detalle import DetectorPedidoDetalle
+from .extractor_perfil_mensaje import ExtractorPerfilMensaje
+from .gestor_feedback_post_orden import GestorFeedbackPostOrden
+from .manejador_producto_ausente import ManejadorProductoAusente
+from .normalizador_moneda import NormalizadorMoneda
+from .sanitizador_query_busqueda import SanitizadorQueryBusqueda
 from .tools_mark import ToolsMark
 
 SKU_PATTERN = re.compile(r"\[([A-Z0-9][A-Z0-9\-]{2,40})\]")
-RX_LISTA_PRODUCTOS = re.compile(r"(?:bs\s*[\d\.,]+|opcion(?:es)?[:.])", re.IGNORECASE)
+RX_LISTA_PRODUCTOS = re.compile(
+    r"(?:bs\s*[\d\.,]+|\bopcion(?:es)?\b|\brecomiendo\b|\bsugiero\b|\bpodrias\b|\bte ofrec|\baqui (?:van|tienes|tengo))",
+    re.IGNORECASE,
+)
+RX_LISTA_NUMERADA = re.compile(r"(?m)^\s*\d+[\.\)]\s+\S.+$")
+MARCADOR_NO_DISPONIBLE = "[no disponible]"
 MAX_HISTORIAL = 10
 
 
@@ -40,6 +73,17 @@ class ProcesarChatService:
         dispatcher: ToolDispatcher,
         buscar_productos: BuscarProductosHandler,
         detector: DetectorMentiras,
+        manejador_ausente: ManejadorProductoAusente,
+        clasificador: ClasificadorIntencion,
+        curador: CuradorConversaciones,
+        registrar_metrica: RegistrarMetricaTurnoHandler,
+        atajo_sku: AtajoSkuDirecto,
+        extractor_perfil: ExtractorPerfilMensaje,
+        actualizar_perfil: ActualizarPerfilSesionHandler,
+        obtener_perfil: ObtenerPerfilSesionHandler,
+        cross_sell: AplicadorCrossSell,
+        gestor_feedback: GestorFeedbackPostOrden,
+        registrar_turno_mostrado: RegistrarTurnoMostradoHandler,
     ) -> None:
         self._uow_factory = uow_factory
         self._crear_sesion = crear_sesion
@@ -49,8 +93,20 @@ class ProcesarChatService:
         self._dispatcher = dispatcher
         self._buscar = buscar_productos
         self._detector = detector
+        self._manejador_ausente = manejador_ausente
+        self._clasificador = clasificador
+        self._curador = curador
+        self._registrar_metrica = registrar_metrica
+        self._atajo_sku = atajo_sku
+        self._extractor_perfil = extractor_perfil
+        self._actualizar_perfil = actualizar_perfil
+        self._obtener_perfil = obtener_perfil
+        self._cross_sell = cross_sell
+        self._gestor_feedback = gestor_feedback
+        self._registrar_turno_mostrado = registrar_turno_mostrado
 
     async def procesar(self, inp: ChatInput) -> ChatOutput:
+        t0 = time.monotonic()
         sesion_id = inp.sesion_id or self._crear_sesion.ejecutar(CrearSesionCommand())
 
         if inp.sesion_id:
@@ -61,6 +117,42 @@ class ProcesarChatService:
         self._registrar.ejecutar(
             RegistrarMensajeCommand(sesion_id=sesion_id, rol=RolMensaje.USER, contenido=inp.mensaje)
         )
+
+        self._actualizar_perfil.ejecutar(
+            self._extractor_perfil.extraer(sesion_id, inp.mensaje)
+        )
+
+        cierre_feedback = self._gestor_feedback.intentar_registrar_respuesta(
+            inp.mensaje, sesion_id
+        )
+        if cierre_feedback is not None:
+            return self._responder_feedback(sesion_id, inp.mensaje, cierre_feedback, t0)
+
+        directa = self._clasificador.respuesta_directa(inp.mensaje)
+        if directa is not None:
+            self._registrar.ejecutar(
+                RegistrarMensajeCommand(
+                    sesion_id=sesion_id, rol=RolMensaje.ASSISTANT, contenido=directa.texto
+                )
+            )
+            self._registrar_metrica.ejecutar(
+                RegistrarMetricaTurnoCommand(
+                    sesion_id=sesion_id,
+                    mensaje_usuario_len=len(inp.mensaje),
+                    respuesta_len=len(directa.texto),
+                    tool_calls=0,
+                    mentiras_detectadas=0,
+                    productos_citados=0,
+                    ruta=f"atajo_{directa.intencion.value}",
+                    tiempo_ms=int((time.monotonic() - t0) * 1000),
+                )
+            )
+            return ChatOutput(sesion_id=sesion_id, respuesta=directa.texto)
+
+        sku_directo = self._atajo_sku.resolver(inp.mensaje, sesion_id)
+        if sku_directo is not None:
+            return self._responder_atajo_sku(sesion_id, inp.mensaje, sku_directo, t0)
+
         historial = [
             {"role": m.rol.value, "content": m.contenido}
             for m in self._historial.ejecutar(
@@ -68,26 +160,64 @@ class ProcesarChatService:
             )
         ]
 
-        resultado = await self._agente.conversar(sesion_id, historial)
+        contexto_turno = self._contexto_del_turno(inp.mensaje, sesion_id)
+        marca_indif = DetectorIntencionAsesoria.marca_es_indiferente(inp.mensaje)
+        resultado = await self._agente.conversar(
+            sesion_id, historial, contexto_turno, marca_indiferente=marca_indif
+        )
         respuesta = resultado.texto
         trace: list[PasoAgente] = list(resultado.trace)
         skus_tool = list(resultado.skus_tocados)
 
         tools_ok = {p.tool for p in trace if not p.result.get("error")}
         faltantes = self._detector.detectar(respuesta, tools_ok)
+        mentiras_detectadas = len(faltantes)
         if faltantes:
             respuesta, trace = self._ejecutar_fallback_acciones(
                 sesion_id, inp.mensaje, faltantes, respuesta, trace
             )
 
-        hubo_tool_util = any(not p.result.get("error") for p in trace)
-        parece_listar = bool(RX_LISTA_PRODUCTOS.search(respuesta))
-        if parece_listar and not hubo_tool_util:
-            respuesta, trace, skus_tool = self._forzar_busqueda(inp.mensaje, trace)
+        busco_productos_con_resultados = any(
+            p.tool == "buscar_productos"
+            and not p.result.get("error")
+            and (p.result.get("total") or 0) > 0
+            for p in trace
+        )
+        if self._parece_listado_productos(respuesta) and not busco_productos_con_resultados:
+            respuesta, trace, skus_tool = self._forzar_busqueda(inp.mensaje, sesion_id, trace)
 
+        respuesta = NormalizadorMoneda.normalizar(respuesta)
         respuesta, productos = self._sanear_skus_y_enriquecer(respuesta, skus_tool)
 
+        if self._necesita_manejo_ausente(respuesta, productos, trace):
+            respuesta, trace, productos = await self._delegar_a_manejador_ausente(
+                inp.mensaje, historial, trace, sesion_id
+            )
+
+        respuesta = self._cross_sell.aplicar(respuesta, trace, productos)
+
+        self._persistir_turno_mostrado(sesion_id, productos)
+
+        llevo_a_orden = any(
+            p.tool == "confirmar_orden" and not p.result.get("error") for p in trace
+        )
+        respuesta = self._gestor_feedback.anexar_pregunta_si_cerro(respuesta, llevo_a_orden)
+
         self._registrar_respuesta(sesion_id, respuesta, trace)
+        self._curar_si_cerro_sesion(sesion_id, mentiras_detectadas, llevo_a_orden)
+
+        self._registrar_metrica.ejecutar(
+            RegistrarMetricaTurnoCommand(
+                sesion_id=sesion_id,
+                mensaje_usuario_len=len(inp.mensaje),
+                respuesta_len=len(respuesta),
+                tool_calls=len(trace),
+                mentiras_detectadas=mentiras_detectadas,
+                productos_citados=len(productos),
+                ruta="agente",
+                tiempo_ms=int((time.monotonic() - t0) * 1000),
+            )
+        )
 
         return ChatOutput(
             sesion_id=sesion_id,
@@ -96,21 +226,371 @@ class ProcesarChatService:
             pasos=[{"tool": p.tool, "args": p.args, "result": p.result} for p in trace],
         )
 
+    def _contexto_del_turno(self, mensaje: str, sesion_id: UUID) -> str | None:
+        bloques = [
+            self._bloque_perfil(sesion_id),
+            self._bloque_shown_products(sesion_id),
+            self._bloque_intencion(mensaje),
+            self._bloque_consulta_relativa(mensaje),
+            self._bloque_intencion_compra(mensaje),
+            self._bloque_sku(mensaje, sesion_id),
+        ]
+        bloques_validos = [b for b in bloques if b]
+        return "\n\n".join(bloques_validos) if bloques_validos else None
+
+    @staticmethod
+    def _bloque_intencion_compra(mensaje: str) -> str | None:
+        if not DetectorIntencionCompra.tiene_intencion(mensaje):
+            return None
+        return (
+            "INTENCION DE COMPRA DETECTADA: el cliente quiere cerrar la venta. "
+            "Guialo al flujo: (1) si todavia no esta en carrito, agrega el SKU "
+            "mencionado con agregar_al_carrito; (2) pedi el nombre (y email/telefono "
+            "si los dio) y llama confirmar_orden. NO sigas listando alternativas ni "
+            "abras nuevas busquedas."
+        )
+
+    def _bloque_shown_products(self, sesion_id: UUID) -> str | None:
+        perfil = self._obtener_perfil.ejecutar(ObtenerPerfilSesionQuery(sesion_id=sesion_id))
+        skus_str = perfil.ultimos_skus_mostrados
+        if not skus_str:
+            return None
+        skus = [s for s in skus_str.split(",") if s]
+        if not skus:
+            return None
+        partes = [
+            "PRODUCTOS YA MOSTRADOS AL CLIENTE EN EL TURNO ANTERIOR (usalos como ancla, no los repitas):",
+            f"- SKUs: {', '.join(skus)}",
+        ]
+        if perfil.precio_min_mostrado is not None:
+            partes.append(f"- Precio minimo mostrado: Bs {perfil.precio_min_mostrado:.0f}")
+        if perfil.precio_max_mostrado is not None:
+            partes.append(f"- Precio maximo mostrado: Bs {perfil.precio_max_mostrado:.0f}")
+        partes.append(
+            "Si el cliente pide 'mas barato' usa precio_max POR DEBAJO del precio minimo de "
+            "arriba. Si pide 'uno mejor' / 'algo mejor', subi calidad: premium brand, panel "
+            "(MINILED/QLED/OLED), resolucion alta y precio_min POR ENCIMA del precio maximo "
+            "mostrado. Si pide 'otra opcion', EXCLUI los SKUs de arriba."
+        )
+        return "\n".join(partes)
+
+    def _persistir_turno_mostrado(self, sesion_id: UUID, productos: list[dict]) -> None:
+        if not productos:
+            return
+        skus: list[str] = []
+        precios: list[float] = []
+        for p in productos:
+            sku = p.get("sku")
+            if sku:
+                skus.append(str(sku))
+            precio = p.get("precio_bob")
+            if precio is not None:
+                try:
+                    precios.append(float(precio))
+                except (TypeError, ValueError):
+                    pass
+        if not skus:
+            return
+        self._registrar_turno_mostrado.ejecutar(
+            RegistrarTurnoMostradoCommand(
+                sesion_id=sesion_id,
+                skus=tuple(skus),
+                precios=tuple(precios),
+            )
+        )
+
+    @staticmethod
+    def _bloque_consulta_relativa(mensaje: str) -> str | None:
+        consulta = DetectorConsultaRelativa.detectar(mensaje)
+        if consulta is None:
+            return None
+        partes = ["FOLLOW-UP RELATIVO AL CONTEXTO PREVIO (no abras categoria nueva):"]
+        if consulta.tipo is TipoConsultaRelativa.MAS_BARATO:
+            partes.append(
+                "- El cliente pidio algo MAS BARATO que lo ya mostrado. Reusa los "
+                "filtros del perfil (categoria, marca, pulgadas, panel, resolucion) "
+                "y llama buscar_productos BAJANDO el precio_max por debajo del "
+                "precio minimo de los productos mostrados en el turno anterior. "
+                "NO vuelvas a preguntar categoria/tamanio."
+            )
+        elif consulta.tipo is TipoConsultaRelativa.MAS_CARO:
+            partes.append(
+                "- El cliente pidio algo MAS PREMIUM / MAS CARO. Reusa los filtros "
+                "del perfil y llama buscar_productos usando precio_min por encima "
+                "del precio maximo de los productos mostrados en el turno anterior, "
+                "priorizando panel premium (MINILED/QLED), resolucion alta (4K/8K) "
+                "y marcas top. NO vuelvas a preguntar categoria."
+            )
+        elif consulta.tipo is TipoConsultaRelativa.OTRA_OPCION:
+            partes.append(
+                "- El cliente pide OTRA OPCION / ALTERNATIVA. Reusa los filtros del "
+                "perfil y llama buscar_productos EXCLUYENDO los SKUs que ya mostraste "
+                "en el turno anterior (mira el historial). Mantene categoria, marca, "
+                "presupuesto y atributos tecnicos — NO los vuelvas a preguntar."
+            )
+        elif consulta.tipo is TipoConsultaRelativa.COMPARAR_MOSTRADOS:
+            partes.append(
+                "- El cliente quiere COMPARAR los productos que ya mostraste. Lee "
+                "los SKUs entre corchetes del turno anterior y llama comparar_productos "
+                "con esos SKUs. NO abras una busqueda nueva."
+            )
+        return "\n".join(partes)
+
+    @staticmethod
+    def _bloque_intencion(mensaje: str) -> str | None:
+        asesor = DetectorIntencionAsesoria.es_modo_asesor(mensaje)
+        marca_indif = DetectorIntencionAsesoria.marca_es_indiferente(mensaje)
+        if not asesor and not marca_indif:
+            return None
+        partes = ["SENIALES DE ESTE TURNO (detectadas en el mensaje del cliente):"]
+        if asesor:
+            partes.append(
+                "- MODO ASESOR: el cliente pide recomendacion, no busqueda puntual. "
+                "Si te falta algun dato clave (uso, presupuesto, tamanio), haz 1-3 "
+                "preguntas breves ANTES de listar productos. Luego aplica la plantilla "
+                "de asesor: opcion principal + 1-2 alternativas + por que + pregunta de cierre."
+            )
+        if marca_indif:
+            partes.append(
+                "- MARCA INDIFERENTE: el cliente declaro que no le importa la marca. "
+                "NO pases 'marca' al llamar buscar_productos aunque la tengas en el "
+                "perfil previo. Recomienda por calidad/precio, no por marca."
+            )
+        return "\n".join(partes)
+
+    def _bloque_perfil(self, sesion_id: UUID) -> str | None:
+        perfil = self._obtener_perfil.ejecutar(ObtenerPerfilSesionQuery(sesion_id=sesion_id))
+        if perfil.esta_vacio():
+            return None
+        return self._formatear_perfil(perfil)
+
+    @staticmethod
+    def _formatear_perfil(perfil: ResultadoObtenerPerfilSesion) -> str:
+        partes = ["PERFIL DECLARADO POR EL CLIENTE (no vuelvas a preguntarle esto):"]
+        if perfil.presupuesto_max:
+            partes.append(f"- Presupuesto maximo: Bs {perfil.presupuesto_max:.0f}")
+        if perfil.marca_preferida:
+            partes.append(f"- Marca preferida: {perfil.marca_preferida}")
+        if perfil.categoria_foco:
+            partes.append(f"- Categoria de interes: {perfil.categoria_foco}")
+        if perfil.uso_declarado:
+            partes.append(f"- Uso declarado: {perfil.uso_declarado}")
+        if perfil.pulgadas:
+            partes.append(f"- Pulgadas: {perfil.pulgadas:g}\"")
+        if perfil.tipo_panel:
+            partes.append(f"- Tipo de panel: {perfil.tipo_panel}")
+        if perfil.resolucion:
+            partes.append(f"- Resolucion: {perfil.resolucion}")
+        partes.append(
+            "Al llamar buscar_productos, usa estos campos como filtros implicitos "
+            "SIEMPRE, aunque el mensaje actual no los repita. Si el cliente dice "
+            "'mas barato', 'otra opcion', 'cual me conviene' o cualquier follow-up "
+            "sin categoria nueva, MANTENE estos filtros y solo ajusta precio_max u "
+            "ordena distinto — NO vuelvas a preguntar categoria ni tamanio."
+        )
+        return "\n".join(partes)
+
+    def _bloque_sku(self, mensaje: str, sesion_id: UUID) -> str | None:
+        ficha = self._atajo_sku.ficha_si_existe(mensaje, sesion_id)
+        if not ficha:
+            return None
+        partes = [
+            "CONTEXTO DE ESTE TURNO (datos ya verificados por el sistema, usalos sin volver a buscar):",
+            f"- SKU: {ficha.get('sku')}",
+            f"- Nombre: {ficha.get('nombre')}",
+        ]
+        if ficha.get("marca"):
+            partes.append(f"- Marca: {ficha.get('marca')}")
+        if ficha.get("categoria"):
+            partes.append(f"- Categoria: {ficha.get('categoria')}")
+        if ficha.get("precio_bob") is not None:
+            partes.append(f"- Precio: Bs {ficha['precio_bob']:.0f}")
+        if ficha.get("precio_anterior_bob"):
+            partes.append(f"- Precio anterior: Bs {ficha['precio_anterior_bob']:.0f}")
+        if ficha.get("descripcion"):
+            partes.append(f"- Descripcion: {ficha.get('descripcion')}")
+        partes.append(
+            "INSTRUCCION: el cliente ya escribio el SKU en su mensaje. NO le pidas el "
+            "SKU de vuelta ni llames ver_producto: los datos de arriba son verificados."
+        )
+        if DetectorPedidoDetalle.es_pedido_detalle(mensaje):
+            partes.append(
+                "El cliente pidio DETALLES/ESPECIFICACIONES. Enumera de forma completa "
+                "TODAS las caracteristicas que encuentres en la descripcion: procesador, "
+                "memoria RAM, almacenamiento, pantalla (tamanio + resolucion + tipo/panel), "
+                "teclado (iluminacion/layout), GPU/grafica, bateria, puertos, conectividad, "
+                "sistema operativo, peso y cualquier otra spec relevante. No resumas en "
+                "3 bullets — si la descripcion trae 8 datos, lista los 8. Si un dato NO "
+                "esta en la descripcion, no lo inventes: decilo explicitamente (ej: 'no "
+                "tengo ese dato en la ficha'). Cierra con una pregunta que avance la venta."
+            )
+        return "\n".join(partes)
+
+    def _responder_atajo_sku(
+        self,
+        sesion_id: UUID,
+        mensaje_usuario: str,
+        directa,
+        t0: float,
+    ) -> ChatOutput:
+        self._registrar.ejecutar(
+            RegistrarMensajeCommand(
+                sesion_id=sesion_id, rol=RolMensaje.ASSISTANT, contenido=directa.texto
+            )
+        )
+        self._registrar_metrica.ejecutar(
+            RegistrarMetricaTurnoCommand(
+                sesion_id=sesion_id,
+                mensaje_usuario_len=len(mensaje_usuario),
+                respuesta_len=len(directa.texto),
+                tool_calls=1,
+                mentiras_detectadas=0,
+                productos_citados=1,
+                ruta="atajo_sku",
+                tiempo_ms=int((time.monotonic() - t0) * 1000),
+            )
+        )
+        return ChatOutput(
+            sesion_id=sesion_id,
+            respuesta=directa.texto,
+            productos_citados=[directa.producto] if directa.producto else [],
+        )
+
+    def _responder_feedback(
+        self,
+        sesion_id: UUID,
+        mensaje_usuario: str,
+        texto_cierre: str,
+        t0: float,
+    ) -> ChatOutput:
+        self._registrar.ejecutar(
+            RegistrarMensajeCommand(
+                sesion_id=sesion_id, rol=RolMensaje.ASSISTANT, contenido=texto_cierre
+            )
+        )
+        self._registrar_metrica.ejecutar(
+            RegistrarMetricaTurnoCommand(
+                sesion_id=sesion_id,
+                mensaje_usuario_len=len(mensaje_usuario),
+                respuesta_len=len(texto_cierre),
+                tool_calls=0,
+                mentiras_detectadas=0,
+                productos_citados=0,
+                ruta="feedback_post_orden",
+                tiempo_ms=int((time.monotonic() - t0) * 1000),
+            )
+        )
+        return ChatOutput(sesion_id=sesion_id, respuesta=texto_cierre)
+
+    def _curar_si_cerro_sesion(
+        self, sesion_id: UUID, mentiras_detectadas: int, llevo_a_orden: bool
+    ) -> None:
+        if not llevo_a_orden:
+            return
+        mensajes = self._historial.ejecutar(
+            HistorialChatQuery(sesion_id=sesion_id, limite=200)
+        )
+        self._curador.evaluar_y_guardar(
+            sesion_id=sesion_id,
+            mensajes=mensajes,
+            mentiras_detectadas=mentiras_detectadas,
+            llevo_a_orden=llevo_a_orden,
+        )
+
+    def _parece_listado_productos(self, respuesta: str) -> bool:
+        if RX_LISTA_PRODUCTOS.search(respuesta):
+            return True
+        return len(RX_LISTA_NUMERADA.findall(respuesta)) >= 2
+
+    def _necesita_manejo_ausente(
+        self, respuesta: str, productos: list[dict], trace: list[PasoAgente]
+    ) -> bool:
+        if MARCADOR_NO_DISPONIBLE in respuesta:
+            return True
+        busco_con_resultados = any(
+            p.tool == "buscar_productos"
+            and not p.result.get("error")
+            and (p.result.get("total") or 0) > 0
+            for p in trace
+        )
+        if busco_con_resultados:
+            return False
+        busco_vacio = any(
+            p.tool == "buscar_productos"
+            and not p.result.get("error")
+            and (p.result.get("total") or 0) == 0
+            for p in trace
+        )
+        if busco_vacio and not productos:
+            return True
+        return bool(self._parece_listado_productos(respuesta) and not productos)
+
+    async def _delegar_a_manejador_ausente(
+        self,
+        mensaje: str,
+        historial: list[dict],
+        trace: list[PasoAgente],
+        sesion_id: UUID,
+    ) -> tuple[str, list[PasoAgente], list[dict]]:
+        contexto = self._contexto_textual(historial, mensaje)
+        perfil = self._obtener_perfil.ejecutar(
+            ObtenerPerfilSesionQuery(sesion_id=sesion_id)
+        )
+        res = await self._manejador_ausente.manejar(
+            mensaje, contexto, categoria_activa=perfil.categoria_foco or None
+        )
+        trace.append(
+            PasoAgente(
+                tool="manejador_producto_ausente",
+                args={"mensaje": mensaje},
+                result={
+                    "sugerencia_registrada": res.sugerencia_registrada,
+                    "alternativas": len(res.productos_alternativos),
+                },
+                fallback=True,
+            )
+        )
+        return res.texto, trace, res.productos_alternativos
+
+    @staticmethod
+    def _contexto_textual(historial: list[dict], mensaje_actual: str) -> str:
+        ultimos = historial[-6:] if len(historial) > 6 else historial
+        partes = [f"{m['role']}: {m['content']}" for m in ultimos]
+        partes.append(f"user: {mensaje_actual}")
+        return "\n".join(partes)[:2000]
+
     def _forzar_busqueda(
-        self, mensaje: str, trace: list[PasoAgente]
+        self, mensaje: str, sesion_id: UUID, trace: list[PasoAgente]
     ) -> tuple[str, list[PasoAgente], list[str]]:
-        mensaje_norm = NormalizadorTexto.normalizar(mensaje)
-        if not TokensConsulta.hay_terminos(mensaje_norm):
+        perfil = self._obtener_perfil.ejecutar(ObtenerPerfilSesionQuery(sesion_id=sesion_id))
+        mensaje_limpio = SanitizadorQueryBusqueda.sanitizar(mensaje)
+        mensaje_norm = NormalizadorTexto.normalizar(mensaje_limpio or "")
+        tiene_terminos = bool(mensaje_limpio) and TokensConsulta.hay_terminos(mensaje_norm)
+        query = BuscarProductosQuery(
+            query=mensaje_limpio if tiene_terminos else None,
+            categoria=perfil.categoria_foco or None,
+            marca=perfil.marca_preferida or None,
+            precio_max=perfil.presupuesto_max,
+            pulgadas=perfil.pulgadas,
+            tipo_panel=perfil.tipo_panel,
+            resolucion=perfil.resolucion,
+        )
+        if not tiene_terminos and not perfil.categoria_foco and not perfil.pulgadas:
             return (
                 "Necesito un poco mas de contexto para buscar — decime el producto "
                 "(ej. 'laptop', 'freidora', 'celular') y si tenes marca o presupuesto.",
                 trace,
                 [],
             )
-        productos = self._buscar.ejecutar(BuscarProductosQuery(query=mensaje))
+        productos = self._buscar.ejecutar(query)
+        args = {k: v for k, v in {
+            "query": query.query, "categoria": query.categoria, "marca": query.marca,
+            "precio_max": query.precio_max, "pulgadas": query.pulgadas,
+            "tipo_panel": query.tipo_panel, "resolucion": query.resolucion,
+        }.items() if v is not None}
         resultado = {"productos": [ProductoSerializer.resumen(p) for p in productos], "total": len(productos)}
         trace.append(
-            PasoAgente(tool="buscar_productos", args={"query": mensaje}, result=resultado, fallback=True)
+            PasoAgente(tool="buscar_productos", args=args, result=resultado, fallback=True)
         )
         if not productos:
             return (
@@ -122,8 +602,7 @@ class ProcesarChatService:
         lineas = ["Mira lo que tengo para vos!"]
         for p in productos[:3]:
             extra = f" (antes Bs {p.precio_anterior.monto:.0f})" if p.precio_anterior else ""
-            stock_txt = f"stock: {p.stock}" if p.stock else "sin stock"
-            lineas.append(f"- [{p.sku}] {p.nombre} — Bs {p.precio.monto:.0f}{extra}, {stock_txt}")
+            lineas.append(f"- {p.nombre} — Bs {p.precio.monto:.0f}{extra} [{p.sku}]")
         lineas.append("Queres que te lo agregue al carrito o te muestro mas opciones?")
         return "\n".join(lineas), trace, [str(p.sku) for p in productos[:3]]
 
@@ -187,6 +666,10 @@ class ProcesarChatService:
     def _sanear_skus_y_enriquecer(
         self, respuesta: str, skus_tool: list[str]
     ) -> tuple[str, list[dict]]:
+        """Valida los SKUs del texto y devuelve SOLO los productos que el LLM cita
+        explicitamente entre corchetes. `skus_tool` se usa unicamente para validar
+        (sanear SKUs inventados), nunca para enriquecer la UI — asi el cliente solo
+        ve lo que el asistente efectivamente recomendo."""
         skus_texto = [m.group(1) for m in SKU_PATTERN.finditer(respuesta)]
         candidatos = list({*skus_texto, *skus_tool})
         if not candidatos:
@@ -196,7 +679,7 @@ class ProcesarChatService:
             existentes = uow.productos.existen_skus(candidatos)
             orden: list[str] = []
             vistos: set[str] = set()
-            for s in [*skus_texto, *skus_tool]:
+            for s in skus_texto:
                 if s in existentes and s not in vistos:
                     vistos.add(s)
                     orden.append(s)
@@ -208,7 +691,7 @@ class ProcesarChatService:
             return match.group(0) if match.group(1) in existentes else "[no disponible]"
 
         respuesta = SKU_PATTERN.sub(_sub, respuesta)
-        return respuesta, [ProductoSerializer.resumen(p) for p in productos_orden]
+        return respuesta, [ProductoSerializer.detalle(p) for p in productos_orden]
 
     def _registrar_respuesta(self, sesion_id: UUID, respuesta: str, trace: list[PasoAgente]) -> None:
         contenido = ToolsMark.wrap(respuesta, ToolsMark.resumir(trace))

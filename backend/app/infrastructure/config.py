@@ -12,6 +12,7 @@ class Settings(BaseSettings):
 
     ollama_host: str = "http://ollama:11434"
     ollama_model: str = "qwen2.5:7b-instruct-q4_K_M"
+    ollama_embed_model: str = "nomic-embed-text"
 
     app_locale: str = "es_BO"
     app_currency: str = "BOB"

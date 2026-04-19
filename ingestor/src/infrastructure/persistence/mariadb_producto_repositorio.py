@@ -21,6 +21,7 @@ class MariaDbProductoRepositorio(ProductoRepository):
         descripcion_norm = NormalizadorTexto.sin_acentos((producto.descripcion or "").lower()) or None
         marca_norm = NormalizadorTexto.sin_acentos((producto.marca or "").lower()) or None
         categoria_norm = NormalizadorTexto.sin_acentos((producto.categoria or "").lower()) or None
+        atr = producto.atributos
 
         with self._engine.begin() as conn:
             conn.execute(
@@ -43,6 +44,16 @@ class MariaDbProductoRepositorio(ProductoRepository):
                     "descripcion_norm": descripcion_norm,
                     "marca_norm": marca_norm,
                     "categoria_norm": categoria_norm,
+                    "pulgadas": atr.pulgadas,
+                    "capacidad_gb": atr.capacidad_gb,
+                    "ram_gb": atr.ram_gb,
+                    "capacidad_litros": atr.capacidad_litros,
+                    "capacidad_kg": atr.capacidad_kg,
+                    "potencia_w": atr.potencia_w,
+                    "procesador": atr.procesador,
+                    "color": atr.color,
+                    "tipo_panel": atr.tipo_panel,
+                    "resolucion": atr.resolucion,
                 },
             )
 

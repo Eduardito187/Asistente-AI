@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 
+from ..atributos import AtributosProducto
 from .errors import ProductoInvalido
 
 
@@ -26,6 +27,7 @@ class ProductoRaw:
     imagen_url: Optional[str]
     url_producto: Optional[str]
     activo: bool = True
+    atributos: AtributosProducto = field(default_factory=AtributosProducto)
 
     def __post_init__(self) -> None:
         if not (self.sku or "").strip():

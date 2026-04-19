@@ -18,7 +18,6 @@ class ProductoApiMapper:
             marca=p.marca,
             precio_bob=p.precio.monto,
             precio_anterior_bob=p.precio_anterior.monto if p.precio_anterior else None,
-            stock=p.stock,
             imagen_url=p.imagen_url,
             activo=p.activo,
         )

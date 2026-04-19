@@ -4,6 +4,7 @@ import json
 from uuid import UUID
 
 from ..ports.llm_port import LLMPort
+from ..services.inyector_fewshot import InyectorFewShot
 from .helpers import SkuExtractor, ValueParser
 from .paso_agente import PasoAgente
 from .respuesta_agente import RespuestaAgente
@@ -19,14 +20,29 @@ class AgenteService:
         self,
         llm: LLMPort,
         dispatcher: ToolDispatcher,
-        max_iter: int = 6,
+        inyector_fewshot: InyectorFewShot,
+        max_iter: int = 3,
     ) -> None:
         self._llm = llm
         self._dispatcher = dispatcher
+        self._inyector = inyector_fewshot
         self._max_iter = max_iter
 
-    async def conversar(self, sesion_id: UUID, historial: list[dict]) -> RespuestaAgente:
-        mensajes: list[dict] = [{"role": "system", "content": SYSTEM_PROMPT}, *historial]
+    async def conversar(
+        self,
+        sesion_id: UUID,
+        historial: list[dict],
+        contexto_turno: str | None = None,
+        marca_indiferente: bool = False,
+    ) -> RespuestaAgente:
+        bloque_fewshot = self._inyector.bloque()
+        partes = [SYSTEM_PROMPT]
+        if bloque_fewshot:
+            partes.append(bloque_fewshot)
+        if contexto_turno:
+            partes.append(contexto_turno)
+        system_content = "\n\n".join(partes)
+        mensajes: list[dict] = [{"role": "system", "content": system_content}, *historial]
         trace: list[PasoAgente] = []
         skus: list[str] = []
 
@@ -45,7 +61,9 @@ class AgenteService:
                 fn = tc.get("function") or {}
                 nombre = fn.get("name", "")
                 args = ValueParser.parse_args(fn.get("arguments"))
-                resultado = self._dispatcher.ejecutar(nombre, args, sesion_id)
+                resultado = self._dispatcher.ejecutar(
+                    nombre, args, sesion_id, marca_indiferente=marca_indiferente
+                )
 
                 trace.append(PasoAgente(tool=nombre, args=args, result=resultado))
                 skus.extend(SkuExtractor.extraer(resultado))

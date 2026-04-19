@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from typing import Optional
 
-from ....domain.shared.tokens_consulta import TokensConsulta
+from .....domain.productos import FiltrosAtributos
+from .....domain.shared.tokens_consulta import TokensConsulta
 
 
 class ProductoSql:
@@ -23,14 +24,34 @@ class ProductoSql:
     )
 
     _MATCH_EXPR = (
-        "MATCH(nombre_norm, descripcion_norm, marca_norm, categoria_norm) "
+        "MATCH(nombre_norm, marca_norm, categoria_norm) "
         "AGAINST (:q IN BOOLEAN MODE)"
     )
 
-    @staticmethod
-    def tokens_boolean(query_normalizada: str) -> str:
-        """Convierte 'laptop disponibles' en '+laptop*' filtrando stopwords y tokens cortos."""
-        return " ".join(f"+{t}*" for t in TokensConsulta.significativos(query_normalizada))
+    LONGITUD_MINIMA_PREFIJO = 5
+
+    @classmethod
+    def _raiz_para_like(cls, token: str) -> str:
+        """Reduce plurales simples para LIKE: 'televisores' -> 'televisor'.
+        Evita que el boost por nombre se pierda por singular/plural."""
+        for sufijo in ("es", "s"):
+            if len(token) > cls.LONGITUD_MINIMA_PREFIJO and token.endswith(sufijo):
+                return token[: -len(sufijo)]
+        return token
+
+    @classmethod
+    def tokens_boolean(cls, query_normalizada: str) -> str:
+        """Convierte 'laptop acer' en '+laptop* +acer' filtrando stopwords.
+
+        Tokens cortos (<5 chars) se buscan exactos para evitar falsos positivos
+        por prefijo (ej. 'acer' no debe matchear 'acero'). Tokens largos
+        mantienen el wildcard para aceptar plurales/variantes.
+        """
+        partes = []
+        for t in TokensConsulta.significativos(query_normalizada):
+            sufijo = "*" if len(t) >= cls.LONGITUD_MINIMA_PREFIJO else ""
+            partes.append(f"+{t}{sufijo}")
+        return " ".join(partes)
 
     @staticmethod
     def por_skus_in(n: int) -> str:
@@ -51,6 +72,7 @@ class ProductoSql:
         marca_normalizada: Optional[str],
         precio_min: Optional[float],
         precio_max: Optional[float],
+        atributos: FiltrosAtributos,
         solo_con_stock: bool,
     ) -> tuple[str, dict]:
         """Construye SELECT dinamico para buscar productos. Devuelve (sql, params)."""
@@ -64,6 +86,19 @@ class ProductoSql:
         if q_boolean:
             clauses.append(cls._MATCH_EXPR)
             params["q"] = q_boolean
+            tokens_largos = [
+                t for t in TokensConsulta.significativos(query_normalizada)
+                if len(t) >= cls.LONGITUD_MINIMA_PREFIJO
+            ]
+            if tokens_largos:
+                likes = []
+                for i, t in enumerate(tokens_largos):
+                    key = f"tokn{i}"
+                    likes.append(f"nombre_norm LIKE :{key}")
+                    params[key] = f"%{cls._raiz_para_like(t)}%"
+                order_parts.append(
+                    f"(CASE WHEN {' OR '.join(likes)} THEN 1 ELSE 0 END) DESC"
+                )
             order_parts.append(f"{cls._MATCH_EXPR} DESC")
         if categoria:
             clauses.append("LOWER(categoria) LIKE :cat")
@@ -80,6 +115,7 @@ class ProductoSql:
         if precio_max is not None:
             clauses.append("precio_bob <= :pmax")
             params["pmax"] = precio_max
+        cls._agregar_filtros_atributos(clauses, params, atributos)
 
         order_parts.append("precio_bob ASC")
         sql = (
@@ -87,3 +123,52 @@ class ProductoSql:
             f"ORDER BY {', '.join(order_parts)} LIMIT :limite"
         )
         return sql, params
+
+    @staticmethod
+    def _agregar_filtros_atributos(
+        clauses: list, params: dict, a: FiltrosAtributos
+    ) -> None:
+        """Anade WHERE sobre columnas estructuradas (pulgadas, GB, etc.).
+
+        Tolerancia de +/-0.5 en pulgadas exactas: '55 pulgadas' debe aceptar 55.0 o 55.5.
+        """
+        if a.pulgadas is not None:
+            clauses.append("pulgadas BETWEEN :pul_lo AND :pul_hi")
+            params["pul_lo"] = a.pulgadas - 0.5
+            params["pul_hi"] = a.pulgadas + 0.5
+        if a.pulgadas_min is not None:
+            clauses.append("pulgadas >= :pul_min")
+            params["pul_min"] = a.pulgadas_min
+        if a.pulgadas_max is not None:
+            clauses.append("pulgadas <= :pul_max")
+            params["pul_max"] = a.pulgadas_max
+        if a.capacidad_gb_min is not None:
+            clauses.append("capacidad_gb >= :cap_gb_min")
+            params["cap_gb_min"] = a.capacidad_gb_min
+        if a.ram_gb_min is not None:
+            clauses.append("ram_gb >= :ram_min")
+            params["ram_min"] = a.ram_gb_min
+        if a.capacidad_litros_min is not None:
+            clauses.append("capacidad_litros >= :lt_min")
+            params["lt_min"] = a.capacidad_litros_min
+        if a.capacidad_kg_min is not None:
+            clauses.append("capacidad_kg >= :kg_min")
+            params["kg_min"] = a.capacidad_kg_min
+        if a.potencia_w_min is not None:
+            clauses.append("potencia_w >= :pw_min")
+            params["pw_min"] = a.potencia_w_min
+        if a.potencia_w_max is not None:
+            clauses.append("potencia_w <= :pw_max")
+            params["pw_max"] = a.potencia_w_max
+        if a.procesador:
+            clauses.append("LOWER(procesador) = :proc")
+            params["proc"] = a.procesador.lower()
+        if a.tipo_panel:
+            clauses.append("UPPER(tipo_panel) = :panel")
+            params["panel"] = a.tipo_panel.upper()
+        if a.resolucion:
+            clauses.append("UPPER(resolucion) = :resol")
+            params["resol"] = a.resolucion.upper()
+        if a.color:
+            clauses.append("LOWER(color) = :col")
+            params["col"] = a.color.lower()

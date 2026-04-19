@@ -13,12 +13,22 @@ from ..commands.confirmar_orden import ConfirmarOrdenCommand, ConfirmarOrdenHand
 from ..commands.quitar_del_carrito import QuitarDelCarritoCommand, QuitarDelCarritoHandler
 from ..commands.vaciar_carrito import VaciarCarritoCommand, VaciarCarritoHandler
 from ..queries.buscar_productos import BuscarProductosHandler, BuscarProductosQuery
+from ..queries.comparar_productos import CompararProductosHandler, CompararProductosQuery
 from ..queries.listar_categorias import ListarCategoriasHandler, ListarCategoriasQuery
+from ..queries.obtener_perfil_sesion import (
+    ObtenerPerfilSesionHandler,
+    ObtenerPerfilSesionQuery,
+)
 from ..queries.ver_carrito import VerCarritoHandler, VerCarritoQuery
 from ..queries.ver_ordenes_sesion import VerOrdenesSesionHandler, VerOrdenesSesionQuery
 from ..queries.ver_producto import VerProductoHandler, VerProductoQuery
+from ..services.buscador_semantico import BuscadorSemantico
+from ..services.generador_justificacion import GeneradorJustificacion
+from ..services.reranker_por_perfil import ReRankerPorPerfil
+from ..services.sanitizador_query_busqueda import SanitizadorQueryBusqueda
 from .helpers import ValueParser
-from .serializers import CarritoSerializer, OrdenSerializer, ProductoSerializer
+from .serializers import CarritoSerializer, ComparacionSerializer, OrdenSerializer, ProductoSerializer
+from .validador_filtros_duros import ValidadorFiltrosDuros
 
 log = logging.getLogger("tool_dispatcher")
 
@@ -36,12 +46,26 @@ class ToolDispatcher:
     quitar: QuitarDelCarritoHandler
     vaciar: VaciarCarritoHandler
     confirmar: ConfirmarOrdenHandler
+    comparar: CompararProductosHandler
+    obtener_perfil: ObtenerPerfilSesionHandler
+    buscador_semantico: BuscadorSemantico
+    reranker: ReRankerPorPerfil
 
-    def ejecutar(self, nombre: str, args: dict, sesion_id: UUID) -> dict:
+    MIN_RESULTADOS_FULLTEXT = 3
+
+    def ejecutar(
+        self,
+        nombre: str,
+        args: dict,
+        sesion_id: UUID,
+        marca_indiferente: bool = False,
+    ) -> dict:
         handler = self._ruta(nombre)
         if handler is None:
             return {"error": f"herramienta desconocida: {nombre}"}
         try:
+            if nombre == "buscar_productos":
+                return self._buscar(args, sesion_id, marca_indiferente=marca_indiferente)
             return handler(args, sesion_id)
         except DomainError as exc:
             return {"error": str(exc)}
@@ -60,18 +84,13 @@ class ToolDispatcher:
             "quitar_del_carrito": self._quitar,
             "vaciar_carrito": self._vaciar,
             "confirmar_orden": self._confirmar,
+            "comparar_productos": self._comparar,
         }.get(nombre)
 
-    def _buscar(self, a: dict, _sid: UUID) -> dict:
-        query = (a.get("query") or "").strip()
-        categoria = (a.get("categoria") or "").strip()
-        subcategoria = (a.get("subcategoria") or "").strip()
-        marca = (a.get("marca") or "").strip()
-        precio_min = ValueParser.a_float(a.get("precio_min"))
-        precio_max = ValueParser.a_float(a.get("precio_max"))
-        query_utiles = TokensConsulta.hay_terminos(NormalizadorTexto.normalizar(query)) if query else False
-        tiene_filtro_estructurado = any([categoria, subcategoria, marca, precio_min, precio_max])
-        if not query_utiles and not tiene_filtro_estructurado:
+    def _buscar(self, a: dict, sid: UUID, *, marca_indiferente: bool = False) -> dict:
+        perfil = self.obtener_perfil.ejecutar(ObtenerPerfilSesionQuery(sesion_id=sid))
+        filtros = self._filtros_enriquecidos(a, perfil, marca_indiferente=marca_indiferente)
+        if self._filtros_vacios(filtros):
             return {
                 "error": (
                     "buscar_productos necesita un termino real del producto. El `query` recibido "
@@ -82,18 +101,99 @@ class ToolDispatcher:
                 "productos": [],
                 "total": 0,
             }
-        productos = self.buscar.ejecutar(
-            BuscarProductosQuery(
-                query=query or None,
-                categoria=categoria or None,
-                subcategoria=subcategoria or None,
-                marca=marca or None,
-                precio_min=precio_min,
-                precio_max=precio_max,
-                solo_con_stock=bool(a.get("solo_con_stock", True)),
-            )
+        productos = self.buscar.ejecutar(BuscarProductosQuery(**filtros))
+        if filtros["query"] and len(productos) < self.MIN_RESULTADOS_FULLTEXT:
+            productos = self._agregar_candidatos_semanticos(filtros["query"], productos)
+        productos = [p for p in productos if ValidadorFiltrosDuros.cumple(p, filtros)]
+        productos = self.reranker.reordenar(
+            list(productos), perfil, marca_indiferente=marca_indiferente
         )
-        return {"productos": [ProductoSerializer.resumen(p) for p in productos], "total": len(productos)}
+        return {
+            "productos": [self._proyectar(p, perfil) for p in productos],
+            "total": len(productos),
+        }
+
+    @staticmethod
+    def _proyectar(p, perfil) -> dict:
+        base = ProductoSerializer.resumen(p)
+        justificacion = GeneradorJustificacion.para(p, perfil)
+        if justificacion:
+            base["justificacion"] = justificacion
+        return base
+
+    _CAMPOS_ESTRUCTURADOS = (
+        "categoria", "subcategoria", "marca",
+        "pulgadas", "pulgadas_min", "pulgadas_max",
+        "capacidad_gb_min", "ram_gb_min",
+        "capacidad_litros_min", "capacidad_kg_min",
+        "potencia_w_min", "potencia_w_max", "procesador",
+        "tipo_panel", "resolucion", "color",
+    )
+
+    @classmethod
+    def _filtros_enriquecidos(cls, a: dict, perfil, *, marca_indiferente: bool = False) -> dict:
+        marca_arg = cls._texto(a, "marca")
+        marca_final = marca_arg if marca_indiferente else (marca_arg or perfil.marca_preferida or None)
+        return {
+            "query": SanitizadorQueryBusqueda.sanitizar(cls._texto(a, "query")),
+            "categoria": cls._texto(a, "categoria") or perfil.categoria_foco or None,
+            "subcategoria": cls._texto(a, "subcategoria"),
+            "marca": marca_final,
+            "precio_min": ValueParser.a_float(a.get("precio_min")),
+            "precio_max": cls._precio_max(a, perfil),
+            "pulgadas": ValueParser.a_float(a.get("pulgadas")) or perfil.pulgadas,
+            "pulgadas_min": ValueParser.a_float(a.get("pulgadas_min")),
+            "pulgadas_max": ValueParser.a_float(a.get("pulgadas_max")),
+            "capacidad_gb_min": ValueParser.a_int(a.get("capacidad_gb_min")),
+            "ram_gb_min": ValueParser.a_int(a.get("ram_gb_min")),
+            "capacidad_litros_min": ValueParser.a_float(a.get("capacidad_litros_min")),
+            "capacidad_kg_min": ValueParser.a_float(a.get("capacidad_kg_min")),
+            "potencia_w_min": ValueParser.a_int(a.get("potencia_w_min")),
+            "potencia_w_max": ValueParser.a_int(a.get("potencia_w_max")),
+            "procesador": cls._texto(a, "procesador", transform=str.lower),
+            "tipo_panel": cls._texto(a, "tipo_panel", transform=str.upper) or perfil.tipo_panel,
+            "resolucion": cls._texto(a, "resolucion", transform=str.upper) or perfil.resolucion,
+            "color": cls._texto(a, "color", transform=str.lower),
+            "solo_con_stock": True,
+        }
+
+    @staticmethod
+    def _texto(a: dict, clave: str, transform=None) -> str | None:
+        valor = (a.get(clave) or "").strip()
+        if not valor:
+            return None
+        return transform(valor) if transform else valor
+
+    @staticmethod
+    def _precio_max(a: dict, perfil) -> float | None:
+        explicito = ValueParser.a_float(a.get("precio_max"))
+        return explicito if explicito is not None else (perfil.presupuesto_max or None)
+
+    @classmethod
+    def _filtros_vacios(cls, filtros: dict) -> bool:
+        query = filtros.get("query") or ""
+        query_utiles = TokensConsulta.hay_terminos(NormalizadorTexto.normalizar(query)) if query else False
+        estructurados = any(filtros.get(k) for k in cls._CAMPOS_ESTRUCTURADOS)
+        return not query_utiles and not estructurados
+
+    def _agregar_candidatos_semanticos(self, query: str, base: list) -> list:
+        """Incorpora candidatos semanticos a la lista base sin filtrar aqui.
+
+        El filtrado por atributos duros se hace una sola vez, afuera, contra
+        toda la lista final — asi el criterio es uniforme para cualquier fuente
+        (fulltext o semantica) y no se degrada a un parche por caso."""
+        skus_semantica = self.buscador_semantico.buscar_skus(query)
+        if not skus_semantica:
+            return base
+        vistos = {str(p.sku) for p in base}
+        extras = [s for s in skus_semantica if s not in vistos]
+        if not extras:
+            return base
+        try:
+            resultado = self.comparar.ejecutar(CompararProductosQuery(skus=tuple(extras)))
+        except Exception:
+            return base
+        return list(base) + list(resultado.productos)
 
     def _listar_cats(self, _a: dict, _sid: UUID) -> dict:
         return {"categorias": self.listar_cats.ejecutar(ListarCategoriasQuery())}
@@ -154,3 +254,13 @@ class ToolDispatcher:
             "cliente_email": res.cliente_email,
             "cliente_telefono": res.cliente_telefono,
         }
+
+    def _comparar(self, a: dict, _sid: UUID) -> dict:
+        skus_arg = a.get("skus") or []
+        if isinstance(skus_arg, str):
+            skus_arg = [s.strip() for s in skus_arg.split(",") if s.strip()]
+        resultado = self.comparar.ejecutar(CompararProductosQuery(skus=tuple(skus_arg)))
+        salida = ComparacionSerializer.a_dict(resultado.productos)
+        if resultado.skus_no_encontrados:
+            salida["skus_no_encontrados"] = resultado.skus_no_encontrados
+        return salida

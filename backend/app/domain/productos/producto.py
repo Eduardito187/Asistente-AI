@@ -22,6 +22,16 @@ class Producto:
     stock: int
     imagen_url: Optional[str]
     activo: bool
+    pulgadas: Optional[float] = None
+    capacidad_gb: Optional[int] = None
+    ram_gb: Optional[int] = None
+    capacidad_litros: Optional[float] = None
+    capacidad_kg: Optional[float] = None
+    potencia_w: Optional[int] = None
+    procesador: Optional[str] = None
+    color: Optional[str] = None
+    tipo_panel: Optional[str] = None
+    resolucion: Optional[str] = None
 
     def disponible(self) -> bool:
         return self.activo and self.stock > 0
