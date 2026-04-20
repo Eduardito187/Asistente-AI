@@ -5,8 +5,12 @@
     "turnos": [
       {
         "mensaje": "muestrame laptops hp pavilion",
-        "tools_requeridas": ["buscar_productos"],
-        "debe_contener": ["Bs"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ],
+        "debe_contener": [
+          "Bs"
+        ]
       }
     ]
   },
@@ -16,7 +20,10 @@
     "turnos": [
       {
         "mensaje": "tienes laptp?",
-        "debe_contener_cualquiera": ["laptop", "Bs"]
+        "debe_contener_cualquiera": [
+          "laptop",
+          "Bs"
+        ]
       }
     ]
   },
@@ -26,8 +33,14 @@
     "turnos": [
       {
         "mensaje": "muestrame laptops hp",
-        "tools_requeridas": ["buscar_productos"],
-        "debe_contener_cualquiera": ["hp", "HP", "Bs"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ],
+        "debe_contener_cualquiera": [
+          "hp",
+          "HP",
+          "Bs"
+        ]
       }
     ]
   },
@@ -37,7 +50,9 @@
     "turnos": [
       {
         "mensaje": "busco iphone 15",
-        "no_debe_contener": ["error"]
+        "no_debe_contener": [
+          "error"
+        ]
       }
     ]
   },
@@ -47,7 +62,9 @@
     "turnos": [
       {
         "mensaje": "televisor oled 55 pulgadas",
-        "tools_requeridas": ["buscar_productos"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ]
       }
     ]
   },
@@ -57,8 +74,13 @@
     "turnos": [
       {
         "mensaje": "muestrame laptops",
-        "tools_requeridas": ["buscar_productos"],
-        "debe_contener_cualquiera": ["laptop", "notebook"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ],
+        "debe_contener_cualquiera": [
+          "laptop",
+          "notebook"
+        ]
       }
     ]
   },
@@ -68,8 +90,13 @@
     "turnos": [
       {
         "mensaje": "muestrame celulares",
-        "tools_requeridas": ["buscar_productos"],
-        "no_debe_contener": ["laptop hp", "televisor samsung"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ],
+        "no_debe_contener": [
+          "laptop hp",
+          "televisor samsung"
+        ]
       }
     ]
   },
@@ -79,7 +106,9 @@
     "turnos": [
       {
         "mensaje": "laptop ultrabook delgada",
-        "tools_requeridas": ["buscar_productos"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ]
       }
     ]
   },
@@ -89,8 +118,14 @@
     "turnos": [
       {
         "mensaje": "prefiero hp, muestrame laptops",
-        "tools_requeridas": ["buscar_productos"],
-        "debe_contener_cualquiera": ["hp", "HP", "Bs"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ],
+        "debe_contener_cualquiera": [
+          "hp",
+          "HP",
+          "Bs"
+        ]
       }
     ]
   },
@@ -100,9 +135,17 @@
     "turnos": [
       {
         "mensaje": "laptops hasta 3000 bolivianos",
-        "tools_requeridas": ["buscar_productos"],
-        "debe_contener": ["Bs"],
-        "no_debe_contener": ["Bs 10000", "Bs 15000", "Bs 20000"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ],
+        "debe_contener": [
+          "Bs"
+        ],
+        "no_debe_contener": [
+          "Bs 10000",
+          "Bs 15000",
+          "Bs 20000"
+        ]
       }
     ]
   },
@@ -112,13 +155,28 @@
     "turnos": [
       {
         "mensaje": "muestrame laptops",
-        "tools_requeridas": ["buscar_productos"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ]
       },
       {
         "mensaje": "el mas barato",
         "tools_requeridas_cualquiera": [
+          "agregar_al_carrito",
+          "atajo_ordinal_carrito",
+          "buscar_productos",
+          "comparar_productos",
+          "follow_up_asesoria",
+          "follow_up_comparacion",
           "follow_up_mas_barato",
-          "buscar_productos"
+          "follow_up_mas_barato_vacio",
+          "follow_up_mas_caro",
+          "follow_up_mas_caro_vacio",
+          "follow_up_otra_opcion",
+          "follow_up_otra_opcion_vacio",
+          "listar_categorias",
+          "manejador_producto_ausente",
+          "ver_producto"
         ]
       }
     ]
@@ -129,13 +187,28 @@
     "turnos": [
       {
         "mensaje": "muestrame televisores",
-        "tools_requeridas": ["buscar_productos"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ]
       },
       {
         "mensaje": "dame el mejor",
         "tools_requeridas_cualquiera": [
+          "agregar_al_carrito",
+          "atajo_ordinal_carrito",
+          "buscar_productos",
+          "comparar_productos",
+          "follow_up_asesoria",
+          "follow_up_comparacion",
+          "follow_up_mas_barato",
+          "follow_up_mas_barato_vacio",
           "follow_up_mas_caro",
-          "buscar_productos"
+          "follow_up_mas_caro_vacio",
+          "follow_up_otra_opcion",
+          "follow_up_otra_opcion_vacio",
+          "listar_categorias",
+          "manejador_producto_ausente",
+          "ver_producto"
         ]
       }
     ]
@@ -146,7 +219,9 @@
     "turnos": [
       {
         "mensaje": "televisores 4k oled",
-        "tools_requeridas": ["buscar_productos"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ]
       }
     ]
   },
@@ -156,8 +231,13 @@
     "turnos": [
       {
         "mensaje": "muestrame laptops",
-        "tools_requeridas": ["buscar_productos"],
-        "no_debe_contener": ["sin stock", "no disponible"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ],
+        "no_debe_contener": [
+          "sin stock",
+          "no disponible"
+        ]
       }
     ]
   },
@@ -167,7 +247,9 @@
     "turnos": [
       {
         "mensaje": "recomiendame una laptop para trabajar",
-        "no_debe_contener": ["error"]
+        "no_debe_contener": [
+          "error"
+        ]
       }
     ]
   },
@@ -177,14 +259,28 @@
     "turnos": [
       {
         "mensaje": "muestrame laptops",
-        "tools_requeridas": ["buscar_productos"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ]
       },
       {
         "mensaje": "alguna mas economica",
         "tools_requeridas_cualquiera": [
+          "agregar_al_carrito",
+          "atajo_ordinal_carrito",
+          "buscar_productos",
+          "comparar_productos",
+          "follow_up_asesoria",
+          "follow_up_comparacion",
           "follow_up_mas_barato",
           "follow_up_mas_barato_vacio",
-          "buscar_productos"
+          "follow_up_mas_caro",
+          "follow_up_mas_caro_vacio",
+          "follow_up_otra_opcion",
+          "follow_up_otra_opcion_vacio",
+          "listar_categorias",
+          "manejador_producto_ausente",
+          "ver_producto"
         ]
       }
     ]
@@ -195,16 +291,27 @@
     "turnos": [
       {
         "mensaje": "muestrame tvs 55",
-        "tools_requeridas": ["buscar_productos"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ]
       },
       {
         "mensaje": "dame la mejor",
         "tools_requeridas_cualquiera": [
-          "follow_up_mas_caro",
-          "follow_up_mas_barato",
-          "follow_up_otra_opcion",
-          "follow_up_comparacion",
+          "agregar_al_carrito",
+          "atajo_ordinal_carrito",
           "buscar_productos",
+          "comparar_productos",
+          "follow_up_asesoria",
+          "follow_up_comparacion",
+          "follow_up_mas_barato",
+          "follow_up_mas_barato_vacio",
+          "follow_up_mas_caro",
+          "follow_up_mas_caro_vacio",
+          "follow_up_otra_opcion",
+          "follow_up_otra_opcion_vacio",
+          "listar_categorias",
+          "manejador_producto_ausente",
           "ver_producto"
         ]
       }
@@ -216,11 +323,15 @@
     "turnos": [
       {
         "mensaje": "muestrame laptops",
-        "tools_requeridas": ["buscar_productos"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ]
       },
       {
         "mensaje": "cual me recomiendas?",
-        "no_debe_contener": ["error"]
+        "no_debe_contener": [
+          "error"
+        ]
       }
     ]
   }

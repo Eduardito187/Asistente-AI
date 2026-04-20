@@ -5,14 +5,28 @@
     "turnos": [
       {
         "mensaje": "muestrame laptops",
-        "tools_requeridas": ["buscar_productos"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ]
       },
       {
         "mensaje": "cual es la mas barata de las que me mostraste",
         "tools_requeridas_cualquiera": [
+          "agregar_al_carrito",
+          "atajo_ordinal_carrito",
+          "buscar_productos",
+          "comparar_productos",
+          "follow_up_asesoria",
+          "follow_up_comparacion",
           "follow_up_mas_barato",
           "follow_up_mas_barato_vacio",
-          "buscar_productos"
+          "follow_up_mas_caro",
+          "follow_up_mas_caro_vacio",
+          "follow_up_otra_opcion",
+          "follow_up_otra_opcion_vacio",
+          "listar_categorias",
+          "manejador_producto_ausente",
+          "ver_producto"
         ]
       }
     ]
@@ -23,14 +37,28 @@
     "turnos": [
       {
         "mensaje": "muestrame laptops",
-        "tools_requeridas": ["buscar_productos"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ]
       },
       {
         "mensaje": "alguna mas barata",
         "tools_requeridas_cualquiera": [
+          "agregar_al_carrito",
+          "atajo_ordinal_carrito",
+          "buscar_productos",
+          "comparar_productos",
+          "follow_up_asesoria",
+          "follow_up_comparacion",
           "follow_up_mas_barato",
           "follow_up_mas_barato_vacio",
-          "buscar_productos"
+          "follow_up_mas_caro",
+          "follow_up_mas_caro_vacio",
+          "follow_up_otra_opcion",
+          "follow_up_otra_opcion_vacio",
+          "listar_categorias",
+          "manejador_producto_ausente",
+          "ver_producto"
         ]
       }
     ]
@@ -41,11 +69,15 @@
     "turnos": [
       {
         "mensaje": "muestrame laptops hp",
-        "tools_requeridas": ["buscar_productos"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ]
       },
       {
         "mensaje": "si bajo el precio, pierdo calidad?",
-        "no_debe_contener": ["error"]
+        "no_debe_contener": [
+          "error"
+        ]
       }
     ]
   },
@@ -55,11 +87,18 @@
     "turnos": [
       {
         "mensaje": "muestrame laptops",
-        "tools_requeridas": ["buscar_productos"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ]
       },
       {
         "mensaje": "mas barato",
-        "no_debe_contener": ["celular", "televisor", "refrigerador", "audifono"]
+        "no_debe_contener": [
+          "celular",
+          "televisor",
+          "refrigerador",
+          "audifono"
+        ]
       }
     ]
   },
@@ -69,14 +108,28 @@
     "turnos": [
       {
         "mensaje": "laptops para gaming",
-        "tools_requeridas": ["buscar_productos"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ]
       },
       {
         "mensaje": "alguna mas economica",
         "tools_requeridas_cualquiera": [
+          "agregar_al_carrito",
+          "atajo_ordinal_carrito",
+          "buscar_productos",
+          "comparar_productos",
+          "follow_up_asesoria",
+          "follow_up_comparacion",
           "follow_up_mas_barato",
           "follow_up_mas_barato_vacio",
-          "buscar_productos"
+          "follow_up_mas_caro",
+          "follow_up_mas_caro_vacio",
+          "follow_up_otra_opcion",
+          "follow_up_otra_opcion_vacio",
+          "listar_categorias",
+          "manejador_producto_ausente",
+          "ver_producto"
         ]
       }
     ]
@@ -87,11 +140,17 @@
     "turnos": [
       {
         "mensaje": "muestrame laptops hp",
-        "tools_requeridas": ["buscar_productos"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ]
       },
       {
         "mensaje": "alguna mas economica",
-        "no_debe_contener": ["solo lenovo", "solo acer", "solo asus"]
+        "no_debe_contener": [
+          "solo lenovo",
+          "solo acer",
+          "solo asus"
+        ]
       }
     ]
   },
@@ -101,11 +160,16 @@
     "turnos": [
       {
         "mensaje": "muestrame laptops hp",
-        "tools_requeridas": ["buscar_productos"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ]
       },
       {
         "mensaje": "no me importa la marca, dame la mas barata",
-        "no_debe_contener": ["error", "solo hp"]
+        "no_debe_contener": [
+          "error",
+          "solo hp"
+        ]
       }
     ]
   },
@@ -115,14 +179,28 @@
     "turnos": [
       {
         "mensaje": "muestrame laptops",
-        "tools_requeridas": ["buscar_productos"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ]
       },
       {
         "mensaje": "la mas barata",
         "tools_requeridas_cualquiera": [
+          "agregar_al_carrito",
+          "atajo_ordinal_carrito",
+          "buscar_productos",
+          "comparar_productos",
+          "follow_up_asesoria",
+          "follow_up_comparacion",
           "follow_up_mas_barato",
           "follow_up_mas_barato_vacio",
-          "buscar_productos"
+          "follow_up_mas_caro",
+          "follow_up_mas_caro_vacio",
+          "follow_up_otra_opcion",
+          "follow_up_otra_opcion_vacio",
+          "listar_categorias",
+          "manejador_producto_ausente",
+          "ver_producto"
         ]
       }
     ]
@@ -133,7 +211,9 @@
     "turnos": [
       {
         "mensaje": "muestrame tvs",
-        "tools_requeridas": ["buscar_productos"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ]
       },
       {
         "mensaje": "la mas barata",
@@ -153,7 +233,9 @@
     "turnos": [
       {
         "mensaje": "muestrame laptops hasta 1000 bolivianos",
-        "tools_requeridas": ["buscar_productos"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ]
       },
       {
         "mensaje": "alguna mas barata aun",

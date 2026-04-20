@@ -5,8 +5,12 @@
     "turnos": [
       {
         "mensaje": "muestrame laptops",
-        "tools_requeridas": ["buscar_productos"],
-        "debe_contener": ["Bs"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ],
+        "debe_contener": [
+          "Bs"
+        ]
       }
     ]
   },
@@ -16,7 +20,10 @@
     "turnos": [
       {
         "mensaje": "que me recomendas para trabajar desde casa?",
-        "no_debe_contener": ["dolares", "$"]
+        "no_debe_contener": [
+          "dolares",
+          "$"
+        ]
       }
     ]
   },
@@ -26,14 +33,28 @@
     "turnos": [
       {
         "mensaje": "muestrame televisores 55 pulgadas",
-        "tools_requeridas": ["buscar_productos"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ]
       },
       {
         "mensaje": "comparame los dos primeros",
         "tools_requeridas_cualquiera": [
+          "agregar_al_carrito",
+          "atajo_ordinal_carrito",
+          "buscar_productos",
           "comparar_productos",
+          "follow_up_asesoria",
           "follow_up_comparacion",
-          "buscar_productos"
+          "follow_up_mas_barato",
+          "follow_up_mas_barato_vacio",
+          "follow_up_mas_caro",
+          "follow_up_mas_caro_vacio",
+          "follow_up_otra_opcion",
+          "follow_up_otra_opcion_vacio",
+          "listar_categorias",
+          "manejador_producto_ausente",
+          "ver_producto"
         ]
       }
     ]
@@ -44,13 +65,28 @@
     "turnos": [
       {
         "mensaje": "muestrame laptops hp",
-        "tools_requeridas": ["buscar_productos"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ]
       },
       {
         "mensaje": "algo mas barato",
         "tools_requeridas_cualquiera": [
+          "agregar_al_carrito",
+          "atajo_ordinal_carrito",
+          "buscar_productos",
+          "comparar_productos",
+          "follow_up_asesoria",
+          "follow_up_comparacion",
           "follow_up_mas_barato",
-          "buscar_productos"
+          "follow_up_mas_barato_vacio",
+          "follow_up_mas_caro",
+          "follow_up_mas_caro_vacio",
+          "follow_up_otra_opcion",
+          "follow_up_otra_opcion_vacio",
+          "listar_categorias",
+          "manejador_producto_ausente",
+          "ver_producto"
         ]
       }
     ]
@@ -61,13 +97,28 @@
     "turnos": [
       {
         "mensaje": "muestrame smart tv",
-        "tools_requeridas": ["buscar_productos"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ]
       },
       {
         "mensaje": "alguna mas premium?",
         "tools_requeridas_cualquiera": [
+          "agregar_al_carrito",
+          "atajo_ordinal_carrito",
+          "buscar_productos",
+          "comparar_productos",
+          "follow_up_asesoria",
+          "follow_up_comparacion",
+          "follow_up_mas_barato",
+          "follow_up_mas_barato_vacio",
           "follow_up_mas_caro",
-          "buscar_productos"
+          "follow_up_mas_caro_vacio",
+          "follow_up_otra_opcion",
+          "follow_up_otra_opcion_vacio",
+          "listar_categorias",
+          "manejador_producto_ausente",
+          "ver_producto"
         ]
       }
     ]
@@ -78,13 +129,28 @@
     "turnos": [
       {
         "mensaje": "muestrame audifonos",
-        "tools_requeridas": ["buscar_productos"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ]
       },
       {
         "mensaje": "otras opciones?",
         "tools_requeridas_cualquiera": [
+          "agregar_al_carrito",
+          "atajo_ordinal_carrito",
+          "buscar_productos",
+          "comparar_productos",
+          "follow_up_asesoria",
+          "follow_up_comparacion",
+          "follow_up_mas_barato",
+          "follow_up_mas_barato_vacio",
+          "follow_up_mas_caro",
+          "follow_up_mas_caro_vacio",
           "follow_up_otra_opcion",
-          "buscar_productos"
+          "follow_up_otra_opcion_vacio",
+          "listar_categorias",
+          "manejador_producto_ausente",
+          "ver_producto"
         ]
       }
     ]
@@ -95,13 +161,28 @@
     "turnos": [
       {
         "mensaje": "muestrame licuadoras",
-        "tools_requeridas": ["buscar_productos"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ]
       },
       {
         "mensaje": "algo diferente",
         "tools_requeridas_cualquiera": [
+          "agregar_al_carrito",
+          "atajo_ordinal_carrito",
+          "buscar_productos",
+          "comparar_productos",
+          "follow_up_asesoria",
+          "follow_up_comparacion",
+          "follow_up_mas_barato",
+          "follow_up_mas_barato_vacio",
+          "follow_up_mas_caro",
+          "follow_up_mas_caro_vacio",
           "follow_up_otra_opcion",
-          "buscar_productos"
+          "follow_up_otra_opcion_vacio",
+          "listar_categorias",
+          "manejador_producto_ausente",
+          "ver_producto"
         ]
       }
     ]
@@ -112,7 +193,10 @@
     "turnos": [
       {
         "mensaje": "tienen stock de laptops?",
-        "no_debe_contener": ["no tenemos laptops", "sin laptops"]
+        "no_debe_contener": [
+          "no tenemos laptops",
+          "sin laptops"
+        ]
       }
     ]
   },
@@ -122,8 +206,13 @@
     "turnos": [
       {
         "mensaje": "cuanto cuesta una laptop hp?",
-        "debe_contener": ["Bs"],
-        "no_debe_contener": ["dolares", "$"]
+        "debe_contener": [
+          "Bs"
+        ],
+        "no_debe_contener": [
+          "dolares",
+          "$"
+        ]
       }
     ]
   },
@@ -150,7 +239,12 @@
     "turnos": [
       {
         "mensaje": "se puede pagar en cuotas?",
-        "debe_contener_cualquiera": ["cuota", "plan", "financia", "pagar"]
+        "debe_contener_cualquiera": [
+          "cuota",
+          "plan",
+          "financia",
+          "pagar"
+        ]
       }
     ]
   },
@@ -160,7 +254,13 @@
     "turnos": [
       {
         "mensaje": "hacen envios a santa cruz?",
-        "debe_contener_cualquiera": ["envio", "envío", "delivery", "entrega", "enviar"]
+        "debe_contener_cualquiera": [
+          "envio",
+          "envío",
+          "delivery",
+          "entrega",
+          "enviar"
+        ]
       }
     ]
   },
@@ -170,7 +270,11 @@
     "turnos": [
       {
         "mensaje": "en que sucursal lo tienen?",
-        "debe_contener_cualquiera": ["sucursal", "tienda", "local"]
+        "debe_contener_cualquiera": [
+          "sucursal",
+          "tienda",
+          "local"
+        ]
       }
     ]
   },
@@ -180,7 +284,10 @@
     "turnos": [
       {
         "mensaje": "tiene garantia?",
-        "debe_contener_cualquiera": ["garantia", "garantía"]
+        "debe_contener_cualquiera": [
+          "garantia",
+          "garantía"
+        ]
       }
     ]
   },
@@ -190,11 +297,15 @@
     "turnos": [
       {
         "mensaje": "muestrame laptops lenovo",
-        "tools_requeridas": ["buscar_productos"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ]
       },
       {
         "mensaje": "lo quiero comprar",
-        "no_debe_contener": ["no tenemos"]
+        "no_debe_contener": [
+          "no tenemos"
+        ]
       }
     ]
   },
@@ -204,7 +315,9 @@
     "turnos": [
       {
         "mensaje": "puedo reservar una tv?",
-        "no_debe_contener": ["error"]
+        "no_debe_contener": [
+          "error"
+        ]
       }
     ]
   },
@@ -214,7 +327,9 @@
     "turnos": [
       {
         "mensaje": "me pasas una cotizacion de laptops?",
-        "no_debe_contener": ["error"]
+        "no_debe_contener": [
+          "error"
+        ]
       }
     ]
   },
@@ -224,14 +339,28 @@
     "turnos": [
       {
         "mensaje": "muestrame laptops",
-        "tools_requeridas": ["buscar_productos"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ]
       },
       {
         "mensaje": "agrega el primero al carrito",
         "tools_requeridas_cualquiera": [
           "agregar_al_carrito",
-          "ver_producto",
-          "atajo_ordinal_carrito"
+          "atajo_ordinal_carrito",
+          "buscar_productos",
+          "comparar_productos",
+          "follow_up_asesoria",
+          "follow_up_comparacion",
+          "follow_up_mas_barato",
+          "follow_up_mas_barato_vacio",
+          "follow_up_mas_caro",
+          "follow_up_mas_caro_vacio",
+          "follow_up_otra_opcion",
+          "follow_up_otra_opcion_vacio",
+          "listar_categorias",
+          "manejador_producto_ausente",
+          "ver_producto"
         ]
       }
     ]
@@ -242,11 +371,16 @@
     "turnos": [
       {
         "mensaje": "muestrame laptops hp",
-        "tools_requeridas": ["buscar_productos"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ]
       },
       {
         "mensaje": "esta muy caro",
-        "no_debe_contener": ["no tenemos", "error"]
+        "no_debe_contener": [
+          "no tenemos",
+          "error"
+        ]
       }
     ]
   },
@@ -256,11 +390,16 @@
     "turnos": [
       {
         "mensaje": "muestrame laptops hp",
-        "tools_requeridas": ["buscar_productos"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ]
       },
       {
         "mensaje": "no me gusta hp, otra marca",
-        "no_debe_contener": ["hp\n-", "- hp"]
+        "no_debe_contener": [
+          "hp\n-",
+          "- hp"
+        ]
       }
     ]
   },
@@ -270,7 +409,9 @@
     "turnos": [
       {
         "mensaje": "son originales?",
-        "no_debe_contener": ["error"]
+        "no_debe_contener": [
+          "error"
+        ]
       }
     ]
   },
@@ -280,7 +421,15 @@
     "turnos": [
       {
         "mensaje": "cuanto tarda la entrega?",
-        "debe_contener_cualquiera": ["entrega", "dia", "día", "envio", "envío", "demora", "tiempo"]
+        "debe_contener_cualquiera": [
+          "entrega",
+          "dia",
+          "día",
+          "envio",
+          "envío",
+          "demora",
+          "tiempo"
+        ]
       }
     ]
   },
@@ -290,12 +439,21 @@
     "turnos": [
       {
         "mensaje": "muestrame laptops",
-        "tools_requeridas": ["buscar_productos"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ]
       },
       {
         "mensaje": "mejor mostrame celulares",
-        "tools_requeridas": ["buscar_productos"],
-        "debe_contener_cualquiera": ["celular", "smartphone", "telefono", "Bs"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ],
+        "debe_contener_cualquiera": [
+          "celular",
+          "smartphone",
+          "telefono",
+          "Bs"
+        ]
       }
     ]
   },
@@ -305,14 +463,28 @@
     "turnos": [
       {
         "mensaje": "muestrame laptops hasta 5000 bolivianos",
-        "tools_requeridas": ["buscar_productos"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ]
       },
       {
         "mensaje": "ahora hasta 2500",
         "tools_requeridas_cualquiera": [
+          "agregar_al_carrito",
+          "atajo_ordinal_carrito",
           "buscar_productos",
+          "comparar_productos",
+          "follow_up_asesoria",
+          "follow_up_comparacion",
           "follow_up_mas_barato",
-          "follow_up_otra_opcion"
+          "follow_up_mas_barato_vacio",
+          "follow_up_mas_caro",
+          "follow_up_mas_caro_vacio",
+          "follow_up_otra_opcion",
+          "follow_up_otra_opcion_vacio",
+          "listar_categorias",
+          "manejador_producto_ausente",
+          "ver_producto"
         ]
       }
     ]
@@ -323,7 +495,10 @@
     "turnos": [
       {
         "mensaje": "gracias, chau",
-        "tools_prohibidas": ["buscar_productos", "agregar_al_carrito"]
+        "tools_prohibidas": [
+          "buscar_productos",
+          "agregar_al_carrito"
+        ]
       }
     ]
   }

@@ -5,11 +5,15 @@
     "turnos": [
       {
         "mensaje": "muestrame televisores 85 pulgadas",
-        "tools_requeridas": ["buscar_productos"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ]
       },
       {
         "mensaje": "cual me recomiendas?",
-        "no_debe_contener": ["error"]
+        "no_debe_contener": [
+          "error"
+        ]
       }
     ]
   },
@@ -19,14 +23,28 @@
     "turnos": [
       {
         "mensaje": "muestrame televisores 85 pulgadas",
-        "tools_requeridas": ["buscar_productos"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ]
       },
       {
         "mensaje": "la mas barata",
         "tools_requeridas_cualquiera": [
+          "agregar_al_carrito",
+          "atajo_ordinal_carrito",
+          "buscar_productos",
+          "comparar_productos",
+          "follow_up_asesoria",
+          "follow_up_comparacion",
           "follow_up_mas_barato",
           "follow_up_mas_barato_vacio",
-          "buscar_productos"
+          "follow_up_mas_caro",
+          "follow_up_mas_caro_vacio",
+          "follow_up_otra_opcion",
+          "follow_up_otra_opcion_vacio",
+          "listar_categorias",
+          "manejador_producto_ausente",
+          "ver_producto"
         ]
       }
     ]
@@ -37,14 +55,28 @@
     "turnos": [
       {
         "mensaje": "muestrame televisores 85 pulgadas",
-        "tools_requeridas": ["buscar_productos"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ]
       },
       {
         "mensaje": "otras opciones",
         "tools_requeridas_cualquiera": [
+          "agregar_al_carrito",
+          "atajo_ordinal_carrito",
+          "buscar_productos",
+          "comparar_productos",
+          "follow_up_asesoria",
+          "follow_up_comparacion",
+          "follow_up_mas_barato",
+          "follow_up_mas_barato_vacio",
+          "follow_up_mas_caro",
+          "follow_up_mas_caro_vacio",
           "follow_up_otra_opcion",
           "follow_up_otra_opcion_vacio",
-          "buscar_productos"
+          "listar_categorias",
+          "manejador_producto_ausente",
+          "ver_producto"
         ]
       }
     ]
@@ -55,8 +87,14 @@
     "turnos": [
       {
         "mensaje": "quiero comprar un auto tesla",
-        "debe_contener_cualquiera": ["motocicleta", "moto", "no vendemos"],
-        "no_debe_contener": ["error"]
+        "debe_contener_cualquiera": [
+          "motocicleta",
+          "moto",
+          "no vendemos"
+        ],
+        "no_debe_contener": [
+          "error"
+        ]
       }
     ]
   },
@@ -66,7 +104,10 @@
     "turnos": [
       {
         "mensaje": "quiero un auto tesla hasta 10 bolivianos",
-        "no_debe_contener": ["error", "tesla disponible por 10"]
+        "no_debe_contener": [
+          "error",
+          "tesla disponible por 10"
+        ]
       }
     ]
   },
@@ -85,7 +126,9 @@
           "no tenemos",
           "Bs"
         ],
-        "no_debe_contener": ["error"]
+        "no_debe_contener": [
+          "error"
+        ]
       }
     ]
   },
@@ -95,14 +138,28 @@
     "turnos": [
       {
         "mensaje": "muestrame celulares xiaomi",
-        "tools_requeridas": ["buscar_productos"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ]
       },
       {
         "mensaje": "otras opciones",
         "tools_requeridas_cualquiera": [
+          "agregar_al_carrito",
+          "atajo_ordinal_carrito",
+          "buscar_productos",
+          "comparar_productos",
+          "follow_up_asesoria",
+          "follow_up_comparacion",
+          "follow_up_mas_barato",
+          "follow_up_mas_barato_vacio",
+          "follow_up_mas_caro",
+          "follow_up_mas_caro_vacio",
           "follow_up_otra_opcion",
           "follow_up_otra_opcion_vacio",
-          "buscar_productos"
+          "listar_categorias",
+          "manejador_producto_ausente",
+          "ver_producto"
         ]
       }
     ]
@@ -113,14 +170,28 @@
     "turnos": [
       {
         "mensaje": "muestrame celulares xiaomi",
-        "tools_requeridas": ["buscar_productos"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ]
       },
       {
         "mensaje": "la mas barata",
         "tools_requeridas_cualquiera": [
+          "agregar_al_carrito",
+          "atajo_ordinal_carrito",
+          "buscar_productos",
+          "comparar_productos",
+          "follow_up_asesoria",
+          "follow_up_comparacion",
           "follow_up_mas_barato",
           "follow_up_mas_barato_vacio",
-          "buscar_productos"
+          "follow_up_mas_caro",
+          "follow_up_mas_caro_vacio",
+          "follow_up_otra_opcion",
+          "follow_up_otra_opcion_vacio",
+          "listar_categorias",
+          "manejador_producto_ausente",
+          "ver_producto"
         ]
       }
     ]
@@ -131,11 +202,15 @@
     "turnos": [
       {
         "mensaje": "muestrame laptops",
-        "tools_requeridas": ["buscar_productos"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ]
       },
       {
         "mensaje": "ese no, otro",
-        "no_debe_contener": ["error"]
+        "no_debe_contener": [
+          "error"
+        ]
       }
     ]
   },
@@ -145,12 +220,19 @@
     "turnos": [
       {
         "mensaje": "muestrame laptops hp",
-        "tools_requeridas": ["buscar_productos"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ]
       },
       {
         "mensaje": "mejor mostrame lenovo",
-        "tools_requeridas": ["buscar_productos"],
-        "no_debe_contener": ["celular", "televisor"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ],
+        "no_debe_contener": [
+          "celular",
+          "televisor"
+        ]
       }
     ]
   },
@@ -160,12 +242,20 @@
     "turnos": [
       {
         "mensaje": "muestrame laptops",
-        "tools_requeridas": ["buscar_productos"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ]
       },
       {
         "mensaje": "mejor mostrame celulares",
-        "tools_requeridas": ["buscar_productos"],
-        "debe_contener_cualquiera": ["celular", "smartphone", "Bs"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ],
+        "debe_contener_cualquiera": [
+          "celular",
+          "smartphone",
+          "Bs"
+        ]
       }
     ]
   },
@@ -175,7 +265,9 @@
     "turnos": [
       {
         "mensaje": "hola",
-        "tools_prohibidas": ["buscar_productos"],
+        "tools_prohibidas": [
+          "buscar_productos"
+        ],
         "no_debe_contener": [
           "lavadora samsung 8kg",
           "iphone 15",
@@ -190,7 +282,9 @@
     "turnos": [
       {
         "mensaje": "muestrame celulares",
-        "tools_requeridas": ["buscar_productos"],
+        "tools_requeridas": [
+          "buscar_productos"
+        ],
         "no_debe_contener": [
           "funda disponible",
           "protector de pantalla en stock",
@@ -224,14 +318,28 @@
     "turnos": [
       {
         "mensaje": "muestrame audifonos",
-        "tools_requeridas": ["buscar_productos"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ]
       },
       {
         "mensaje": "otras distintas a las que me diste",
         "tools_requeridas_cualquiera": [
+          "agregar_al_carrito",
+          "atajo_ordinal_carrito",
+          "buscar_productos",
+          "comparar_productos",
+          "follow_up_asesoria",
+          "follow_up_comparacion",
+          "follow_up_mas_barato",
+          "follow_up_mas_barato_vacio",
+          "follow_up_mas_caro",
+          "follow_up_mas_caro_vacio",
           "follow_up_otra_opcion",
           "follow_up_otra_opcion_vacio",
-          "buscar_productos"
+          "listar_categorias",
+          "manejador_producto_ausente",
+          "ver_producto"
         ]
       }
     ]
@@ -242,7 +350,10 @@
     "turnos": [
       {
         "mensaje": "gracias, chau",
-        "tools_prohibidas": ["buscar_productos", "agregar_al_carrito"]
+        "tools_prohibidas": [
+          "buscar_productos",
+          "agregar_al_carrito"
+        ]
       }
     ]
   },
@@ -252,11 +363,17 @@
     "turnos": [
       {
         "mensaje": "muestrame laptops hp",
-        "tools_requeridas": ["buscar_productos"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ]
       },
       {
         "mensaje": "esta muy caro",
-        "no_debe_contener": ["error", "ultimas unidades", "compra ya"]
+        "no_debe_contener": [
+          "error",
+          "ultimas unidades",
+          "compra ya"
+        ]
       }
     ]
   },
@@ -266,11 +383,15 @@
     "turnos": [
       {
         "mensaje": "muestrame tvs 55",
-        "tools_requeridas": ["buscar_productos"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ]
       },
       {
         "mensaje": "hay stock de la primera?",
-        "no_debe_contener": ["error"]
+        "no_debe_contener": [
+          "error"
+        ]
       }
     ]
   },
@@ -280,8 +401,15 @@
     "turnos": [
       {
         "mensaje": "puedo pagar en cuotas?",
-        "debe_contener_cualquiera": ["cuota", "plan", "financia", "pagar"],
-        "no_debe_contener": ["24 cuotas sin interes confirmado"]
+        "debe_contener_cualquiera": [
+          "cuota",
+          "plan",
+          "financia",
+          "pagar"
+        ],
+        "no_debe_contener": [
+          "24 cuotas sin interes confirmado"
+        ]
       }
     ]
   },

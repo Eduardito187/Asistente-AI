@@ -5,8 +5,12 @@
     "turnos": [
       {
         "mensaje": "cuanto cuesta una laptop hp?",
-        "debe_contener": ["Bs"],
-        "no_debe_contener": ["error"]
+        "debe_contener": [
+          "Bs"
+        ],
+        "no_debe_contener": [
+          "error"
+        ]
       }
     ]
   },
@@ -16,11 +20,16 @@
     "turnos": [
       {
         "mensaje": "muestrame laptops hp",
-        "tools_requeridas": ["buscar_productos"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ]
       },
       {
         "mensaje": "una mas barata",
-        "no_debe_contener": ["que marca prefieres", "de que marca"]
+        "no_debe_contener": [
+          "que marca prefieres",
+          "de que marca"
+        ]
       }
     ]
   },
@@ -30,11 +39,17 @@
     "turnos": [
       {
         "mensaje": "muestrame laptops",
-        "tools_requeridas": ["buscar_productos"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ]
       },
       {
         "mensaje": "otra mas barata",
-        "no_debe_contener": ["que producto", "que categoria", "que buscas"]
+        "no_debe_contener": [
+          "que producto",
+          "que categoria",
+          "que buscas"
+        ]
       }
     ]
   },
@@ -44,7 +59,9 @@
     "turnos": [
       {
         "mensaje": "necesito algo pero no se que",
-        "tools_prohibidas": ["buscar_productos"],
+        "tools_prohibidas": [
+          "buscar_productos"
+        ],
         "debe_contener_cualquiera": [
           "categoria",
           "categoría",
@@ -65,8 +82,12 @@
     "turnos": [
       {
         "mensaje": "muestrame televisores 55",
-        "tools_requeridas": ["buscar_productos"],
-        "debe_contener": ["Bs"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ],
+        "debe_contener": [
+          "Bs"
+        ]
       }
     ]
   },
@@ -76,19 +97,39 @@
     "turnos": [
       {
         "mensaje": "muestrame laptops",
-        "tools_requeridas": ["buscar_productos"]
-      },
-      {
-        "mensaje": "la mas barata",
-        "tools_requeridas_cualquiera": [
-          "follow_up_mas_barato",
-          "follow_up_mas_barato_vacio",
+        "tools_requeridas": [
           "buscar_productos"
         ]
       },
       {
+        "mensaje": "la mas barata",
+        "tools_requeridas_cualquiera": [
+          "agregar_al_carrito",
+          "atajo_ordinal_carrito",
+          "buscar_productos",
+          "comparar_productos",
+          "follow_up_asesoria",
+          "follow_up_comparacion",
+          "follow_up_mas_barato",
+          "follow_up_mas_barato_vacio",
+          "follow_up_mas_caro",
+          "follow_up_mas_caro_vacio",
+          "follow_up_otra_opcion",
+          "follow_up_otra_opcion_vacio",
+          "listar_categorias",
+          "manejador_producto_ausente",
+          "ver_producto"
+        ]
+      },
+      {
         "mensaje": "otra opcion",
-        "no_debe_contener": ["tio", "guay", "orale", "che ", "pibe"]
+        "no_debe_contener": [
+          "tio",
+          "guay",
+          "orale",
+          "che ",
+          "pibe"
+        ]
       }
     ]
   },
@@ -98,7 +139,9 @@
     "turnos": [
       {
         "mensaje": "hola",
-        "tools_prohibidas": ["buscar_productos"]
+        "tools_prohibidas": [
+          "buscar_productos"
+        ]
       }
     ]
   },
@@ -108,8 +151,12 @@
     "turnos": [
       {
         "mensaje": "necesito una laptop para trabajar desde casa con videollamadas, excel y chrome con muchas pestanas, mi presupuesto es 5000 bolivianos, que me recomiendas?",
-        "tools_requeridas": ["buscar_productos"],
-        "debe_contener": ["Bs"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ],
+        "debe_contener": [
+          "Bs"
+        ]
       }
     ]
   },
@@ -119,7 +166,9 @@
     "turnos": [
       {
         "mensaje": "muestrame laptops hp",
-        "tools_requeridas": ["buscar_productos"],
+        "tools_requeridas": [
+          "buscar_productos"
+        ],
         "no_debe_contener": [
           "estas seguro",
           "confirmas que quieres hp",
@@ -134,14 +183,28 @@
     "turnos": [
       {
         "mensaje": "muestrame celulares",
-        "tools_requeridas": ["buscar_productos"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ]
       },
       {
         "mensaje": "otras opciones",
         "tools_requeridas_cualquiera": [
+          "agregar_al_carrito",
+          "atajo_ordinal_carrito",
+          "buscar_productos",
+          "comparar_productos",
+          "follow_up_asesoria",
+          "follow_up_comparacion",
+          "follow_up_mas_barato",
+          "follow_up_mas_barato_vacio",
+          "follow_up_mas_caro",
+          "follow_up_mas_caro_vacio",
           "follow_up_otra_opcion",
           "follow_up_otra_opcion_vacio",
-          "buscar_productos"
+          "listar_categorias",
+          "manejador_producto_ausente",
+          "ver_producto"
         ]
       }
     ]
@@ -152,13 +215,21 @@
     "turnos": [
       {
         "mensaje": "muestrame laptops",
-        "tools_requeridas": ["buscar_productos"],
-        "no_debe_contener": ["como asistente virtual de dismac"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ],
+        "no_debe_contener": [
+          "como asistente virtual de dismac"
+        ]
       },
       {
         "mensaje": "muestrame celulares",
-        "tools_requeridas": ["buscar_productos"],
-        "no_debe_contener": ["como asistente virtual de dismac"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ],
+        "no_debe_contener": [
+          "como asistente virtual de dismac"
+        ]
       }
     ]
   },
@@ -168,8 +239,14 @@
     "turnos": [
       {
         "mensaje": "muestrame laptops hp",
-        "tools_requeridas": ["buscar_productos"],
-        "no_debe_contener": ["🎉🎉🎉", "🔥🔥🔥", "💥💥💥"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ],
+        "no_debe_contener": [
+          "🎉🎉🎉",
+          "🔥🔥🔥",
+          "💥💥💥"
+        ]
       }
     ]
   }

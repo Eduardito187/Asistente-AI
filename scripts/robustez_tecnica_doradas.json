@@ -5,7 +5,9 @@
     "turnos": [
       {
         "mensaje": "hola buen dia",
-        "no_debe_contener": ["error"]
+        "no_debe_contener": [
+          "error"
+        ]
       }
     ]
   },
@@ -15,14 +17,28 @@
     "turnos": [
       {
         "mensaje": "muestrame laptops hp",
-        "tools_requeridas": ["buscar_productos"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ]
       },
       {
         "mensaje": "una mas barata",
         "tools_requeridas_cualquiera": [
+          "agregar_al_carrito",
+          "atajo_ordinal_carrito",
+          "buscar_productos",
+          "comparar_productos",
+          "follow_up_asesoria",
+          "follow_up_comparacion",
           "follow_up_mas_barato",
           "follow_up_mas_barato_vacio",
-          "buscar_productos"
+          "follow_up_mas_caro",
+          "follow_up_mas_caro_vacio",
+          "follow_up_otra_opcion",
+          "follow_up_otra_opcion_vacio",
+          "listar_categorias",
+          "manejador_producto_ausente",
+          "ver_producto"
         ]
       }
     ]
@@ -33,8 +49,12 @@
     "turnos": [
       {
         "mensaje": "muestrame lavadoras samsung",
-        "tools_requeridas": ["buscar_productos"],
-        "no_debe_contener": ["error"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ],
+        "no_debe_contener": [
+          "error"
+        ]
       }
     ]
   },
@@ -53,7 +73,9 @@
           "no hay",
           "Bs"
         ],
-        "no_debe_contener": ["error"]
+        "no_debe_contener": [
+          "error"
+        ]
       }
     ]
   },
@@ -63,14 +85,28 @@
     "turnos": [
       {
         "mensaje": "muestrame laptops",
-        "tools_requeridas": ["buscar_productos"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ]
       },
       {
         "mensaje": "muestrame otras distintas",
         "tools_requeridas_cualquiera": [
+          "agregar_al_carrito",
+          "atajo_ordinal_carrito",
+          "buscar_productos",
+          "comparar_productos",
+          "follow_up_asesoria",
+          "follow_up_comparacion",
+          "follow_up_mas_barato",
+          "follow_up_mas_barato_vacio",
+          "follow_up_mas_caro",
+          "follow_up_mas_caro_vacio",
           "follow_up_otra_opcion",
           "follow_up_otra_opcion_vacio",
-          "buscar_productos"
+          "listar_categorias",
+          "manejador_producto_ausente",
+          "ver_producto"
         ]
       }
     ]
@@ -81,8 +117,12 @@
     "turnos": [
       {
         "mensaje": "muestrame televisores 55",
-        "tools_requeridas": ["buscar_productos"],
-        "debe_contener": ["Bs"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ],
+        "debe_contener": [
+          "Bs"
+        ]
       }
     ]
   },
@@ -92,7 +132,9 @@
     "turnos": [
       {
         "mensaje": "quiero algo bueno",
-        "tools_prohibidas": ["buscar_productos"]
+        "tools_prohibidas": [
+          "buscar_productos"
+        ]
       }
     ]
   },
@@ -102,7 +144,9 @@
     "turnos": [
       {
         "mensaje": "muestrame yates",
-        "no_debe_contener": ["yate Bs 999"]
+        "no_debe_contener": [
+          "yate Bs 999"
+        ]
       }
     ]
   },
@@ -112,7 +156,9 @@
     "turnos": [
       {
         "mensaje": "muestrame laptops hp",
-        "tools_requeridas": ["buscar_productos"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ]
       }
     ]
   },
@@ -122,8 +168,14 @@
     "turnos": [
       {
         "mensaje": "muestrame laptops hp",
-        "tools_requeridas": ["buscar_productos"],
-        "debe_contener_cualquiera": ["HP", "Hp", "hp"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ],
+        "debe_contener_cualquiera": [
+          "HP",
+          "Hp",
+          "hp"
+        ]
       }
     ]
   },
@@ -133,8 +185,12 @@
     "turnos": [
       {
         "mensaje": "muestrame laptops lenovo hasta 5000 bolivianos",
-        "tools_requeridas": ["buscar_productos"],
-        "debe_contener": ["Bs"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ],
+        "debe_contener": [
+          "Bs"
+        ]
       }
     ]
   },
@@ -145,8 +201,21 @@
       {
         "mensaje": "muestrame yates",
         "tools_requeridas_cualquiera": [
+          "agregar_al_carrito",
+          "atajo_ordinal_carrito",
+          "buscar_productos",
+          "comparar_productos",
+          "follow_up_asesoria",
+          "follow_up_comparacion",
+          "follow_up_mas_barato",
+          "follow_up_mas_barato_vacio",
+          "follow_up_mas_caro",
+          "follow_up_mas_caro_vacio",
+          "follow_up_otra_opcion",
+          "follow_up_otra_opcion_vacio",
+          "listar_categorias",
           "manejador_producto_ausente",
-          "buscar_productos"
+          "ver_producto"
         ]
       }
     ]
@@ -157,14 +226,28 @@
     "turnos": [
       {
         "mensaje": "muestrame laptops",
-        "tools_requeridas": ["buscar_productos"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ]
       },
       {
         "mensaje": "la mas barata",
         "tools_requeridas_cualquiera": [
+          "agregar_al_carrito",
+          "atajo_ordinal_carrito",
+          "buscar_productos",
+          "comparar_productos",
+          "follow_up_asesoria",
+          "follow_up_comparacion",
           "follow_up_mas_barato",
           "follow_up_mas_barato_vacio",
-          "buscar_productos"
+          "follow_up_mas_caro",
+          "follow_up_mas_caro_vacio",
+          "follow_up_otra_opcion",
+          "follow_up_otra_opcion_vacio",
+          "listar_categorias",
+          "manejador_producto_ausente",
+          "ver_producto"
         ]
       }
     ]
@@ -175,8 +258,12 @@
     "turnos": [
       {
         "mensaje": "muestrame laptops",
-        "tools_requeridas": ["buscar_productos"],
-        "debe_contener": ["Bs"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ],
+        "debe_contener": [
+          "Bs"
+        ]
       }
     ]
   },
@@ -186,7 +273,10 @@
     "turnos": [
       {
         "mensaje": "ñ!@#$% muestrame laptops",
-        "no_debe_contener": ["error interno", "500"]
+        "no_debe_contener": [
+          "error interno",
+          "500"
+        ]
       }
     ]
   },
@@ -196,7 +286,9 @@
     "turnos": [
       {
         "mensaje": "hola buen dia estoy buscando una laptop para trabajar desde mi casa y hacer videollamadas de zoom con mis companeros y tambien quiero que pueda correr excel con hojas de calculo grandes y chrome con veinte pestanas abiertas, mi presupuesto maximo es de seis mil bolivianos y no me importa mucho la marca pero quiero algo que dure al menos cinco anos",
-        "tools_requeridas": ["buscar_productos"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ]
       }
     ]
   },
@@ -206,19 +298,37 @@
     "turnos": [
       {
         "mensaje": "muestrame celulares samsung",
-        "tools_requeridas": ["buscar_productos"]
-      },
-      {
-        "mensaje": "la mas barata",
-        "tools_requeridas_cualquiera": [
-          "follow_up_mas_barato",
-          "follow_up_mas_barato_vacio",
+        "tools_requeridas": [
           "buscar_productos"
         ]
       },
       {
+        "mensaje": "la mas barata",
+        "tools_requeridas_cualquiera": [
+          "agregar_al_carrito",
+          "atajo_ordinal_carrito",
+          "buscar_productos",
+          "comparar_productos",
+          "follow_up_asesoria",
+          "follow_up_comparacion",
+          "follow_up_mas_barato",
+          "follow_up_mas_barato_vacio",
+          "follow_up_mas_caro",
+          "follow_up_mas_caro_vacio",
+          "follow_up_otra_opcion",
+          "follow_up_otra_opcion_vacio",
+          "listar_categorias",
+          "manejador_producto_ausente",
+          "ver_producto"
+        ]
+      },
+      {
         "mensaje": "otra opcion",
-        "no_debe_contener": ["laptop", "televisor", "refrigerador"]
+        "no_debe_contener": [
+          "laptop",
+          "televisor",
+          "refrigerador"
+        ]
       }
     ]
   },
@@ -228,8 +338,12 @@
     "turnos": [
       {
         "mensaje": "hola",
-        "tools_prohibidas": ["buscar_productos"],
-        "no_debe_contener": ["Bs "]
+        "tools_prohibidas": [
+          "buscar_productos"
+        ],
+        "no_debe_contener": [
+          "Bs "
+        ]
       }
     ]
   }

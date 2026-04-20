@@ -5,11 +5,17 @@
     "turnos": [
       {
         "mensaje": "muestrame laptops hp",
-        "tools_requeridas": ["buscar_productos"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ]
       },
       {
         "mensaje": "esta muy caro para mi",
-        "no_debe_contener": ["error", "ultimas unidades", "compra ya"]
+        "no_debe_contener": [
+          "error",
+          "ultimas unidades",
+          "compra ya"
+        ]
       }
     ]
   },
@@ -19,7 +25,9 @@
     "turnos": [
       {
         "mensaje": "muestrame tvs 55",
-        "tools_requeridas": ["buscar_productos"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ]
       },
       {
         "mensaje": "lo vi mas barato en otro lado",
@@ -37,11 +45,15 @@
     "turnos": [
       {
         "mensaje": "muestrame lavadoras lg",
-        "tools_requeridas": ["buscar_productos"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ]
       },
       {
         "mensaje": "no me convence lg, que otras marcas hay?",
-        "no_debe_contener": ["error"],
+        "no_debe_contener": [
+          "error"
+        ],
         "debe_contener_cualquiera": [
           "Whirlpool",
           "Samsung",
@@ -61,11 +73,15 @@
     "turnos": [
       {
         "mensaje": "muestrame audifonos sony",
-        "tools_requeridas": ["buscar_productos"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ]
       },
       {
         "mensaje": "no se si sale bueno ese",
-        "no_debe_contener": ["error"]
+        "no_debe_contener": [
+          "error"
+        ]
       }
     ]
   },
@@ -75,12 +91,18 @@
     "turnos": [
       {
         "mensaje": "muestrame laptops",
-        "tools_requeridas": ["buscar_productos"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ]
       },
       {
         "mensaje": "no estoy seguro todavia",
-        "tools_prohibidas": ["agregar_al_carrito"],
-        "no_debe_contener": ["cerrar compra ya"]
+        "tools_prohibidas": [
+          "agregar_al_carrito"
+        ],
+        "no_debe_contener": [
+          "cerrar compra ya"
+        ]
       }
     ]
   },
@@ -90,11 +112,17 @@
     "turnos": [
       {
         "mensaje": "muestrame refrigeradores",
-        "tools_requeridas": ["buscar_productos"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ]
       },
       {
         "mensaje": "quiero pensarlo, te aviso",
-        "no_debe_contener": ["error", "no te lo pierdas", "ultimas unidades"]
+        "no_debe_contener": [
+          "error",
+          "no te lo pierdas",
+          "ultimas unidades"
+        ]
       }
     ]
   },
@@ -104,11 +132,15 @@
     "turnos": [
       {
         "mensaje": "muestrame tvs 65 pulgadas",
-        "tools_requeridas": ["buscar_productos"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ]
       },
       {
         "mensaje": "no me alcanza, esta fuera de mi presupuesto",
-        "no_debe_contener": ["error"],
+        "no_debe_contener": [
+          "error"
+        ],
         "debe_contener_cualquiera": [
           "cuotas",
           "mas economic",
@@ -128,11 +160,15 @@
     "turnos": [
       {
         "mensaje": "muestrame laptops",
-        "tools_requeridas": ["buscar_productos"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ]
       },
       {
         "mensaje": "no quiero gastar tanto, algo mas economico por favor",
-        "no_debe_contener": ["error"],
+        "no_debe_contener": [
+          "error"
+        ],
         "debe_contener_cualquiera": [
           "economic",
           "barat",
@@ -150,18 +186,32 @@
     "turnos": [
       {
         "mensaje": "muestrame celulares",
-        "tools_requeridas": ["buscar_productos"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ]
       },
       {
         "mensaje": "dame algo bueno pero economico",
         "tools_requeridas_cualquiera": [
+          "agregar_al_carrito",
+          "atajo_ordinal_carrito",
+          "buscar_productos",
+          "comparar_productos",
+          "follow_up_asesoria",
+          "follow_up_comparacion",
           "follow_up_mas_barato",
           "follow_up_mas_barato_vacio",
+          "follow_up_mas_caro",
+          "follow_up_mas_caro_vacio",
           "follow_up_otra_opcion",
           "follow_up_otra_opcion_vacio",
-          "buscar_productos"
+          "listar_categorias",
+          "manejador_producto_ausente",
+          "ver_producto"
         ],
-        "no_debe_contener": ["error"]
+        "no_debe_contener": [
+          "error"
+        ]
       }
     ]
   },
@@ -171,11 +221,15 @@
     "turnos": [
       {
         "mensaje": "muestrame tvs 55",
-        "tools_requeridas": ["buscar_productos"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ]
       },
       {
         "mensaje": "no se cual elegir, ayudame",
-        "no_debe_contener": ["error"]
+        "no_debe_contener": [
+          "error"
+        ]
       }
     ]
   }

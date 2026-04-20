@@ -5,8 +5,15 @@
     "turnos": [
       {
         "mensaje": "Hola",
-        "no_debe_contener": ["Bs", "[", "dolares", "$"],
-        "tools_prohibidas": ["buscar_productos"]
+        "no_debe_contener": [
+          "Bs",
+          "[",
+          "dolares",
+          "$"
+        ],
+        "tools_prohibidas": [
+          "buscar_productos"
+        ]
       }
     ]
   },
@@ -16,8 +23,12 @@
     "turnos": [
       {
         "mensaje": "Hola, necesito una laptop",
-        "tools_requeridas": ["buscar_productos"],
-        "debe_contener": ["Bs"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ],
+        "debe_contener": [
+          "Bs"
+        ]
       }
     ]
   },
@@ -27,9 +38,16 @@
     "turnos": [
       {
         "mensaje": "Muestrame freidoras de aire",
-        "tools_requeridas": ["buscar_productos"],
-        "debe_contener": ["Bs"],
-        "no_debe_contener": ["dolares", "$"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ],
+        "debe_contener": [
+          "Bs"
+        ],
+        "no_debe_contener": [
+          "dolares",
+          "$"
+        ]
       }
     ]
   },
@@ -39,8 +57,13 @@
     "turnos": [
       {
         "mensaje": "precio",
-        "tools_prohibidas": ["buscar_productos"],
-        "no_debe_contener": ["Bs 14", "Bs 99"]
+        "tools_prohibidas": [
+          "buscar_productos"
+        ],
+        "no_debe_contener": [
+          "Bs 14",
+          "Bs 99"
+        ]
       }
     ]
   },
@@ -50,7 +73,9 @@
     "turnos": [
       {
         "mensaje": "quiero ver opciones",
-        "tools_prohibidas": ["buscar_productos"]
+        "tools_prohibidas": [
+          "buscar_productos"
+        ]
       }
     ]
   },
@@ -60,7 +85,11 @@
     "turnos": [
       {
         "mensaje": "xiaomi",
-        "no_debe_contener": ["dolares", "$", "Voorhees"]
+        "no_debe_contener": [
+          "dolares",
+          "$",
+          "Voorhees"
+        ]
       }
     ]
   },
@@ -70,9 +99,16 @@
     "turnos": [
       {
         "mensaje": "Muestrame laptops disponibles",
-        "tools_requeridas": ["buscar_productos"],
-        "debe_contener": ["Bs"],
-        "no_debe_contener": ["dolares", "$"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ],
+        "debe_contener": [
+          "Bs"
+        ],
+        "no_debe_contener": [
+          "dolares",
+          "$"
+        ]
       }
     ]
   },
@@ -82,8 +118,12 @@
     "turnos": [
       {
         "mensaje": "laptop con 16gb de ram",
-        "tools_requeridas": ["buscar_productos"],
-        "debe_contener": ["Bs"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ],
+        "debe_contener": [
+          "Bs"
+        ]
       }
     ]
   },
@@ -93,8 +133,12 @@
     "turnos": [
       {
         "mensaje": "quiero una laptp",
-        "tools_requeridas": ["buscar_productos"],
-        "debe_contener": ["laptop"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ],
+        "debe_contener": [
+          "laptop"
+        ]
       }
     ]
   },
@@ -104,17 +148,33 @@
     "turnos": [
       {
         "mensaje": "busco televisor",
-        "tools_requeridas": ["buscar_productos"],
-        "debe_contener": ["Bs"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ],
+        "debe_contener": [
+          "Bs"
+        ]
       },
       {
         "mensaje": "y televisores mas grandes?",
         "tools_requeridas_cualquiera": [
+          "agregar_al_carrito",
+          "atajo_ordinal_carrito",
           "buscar_productos",
-          "follow_up_otra_opcion",
+          "comparar_productos",
+          "follow_up_asesoria",
+          "follow_up_comparacion",
+          "follow_up_mas_barato",
+          "follow_up_mas_barato_vacio",
           "follow_up_mas_caro",
+          "follow_up_mas_caro_vacio",
+          "follow_up_otra_opcion",
+          "follow_up_otra_opcion_vacio",
+          "follow_up_refinamiento_ampliado",
           "follow_up_refinamiento_subconjunto",
-          "follow_up_refinamiento_ampliado"
+          "listar_categorias",
+          "manejador_producto_ausente",
+          "ver_producto"
         ]
       }
     ]
@@ -125,8 +185,12 @@
     "turnos": [
       {
         "mensaje": "muestrame un celu barato",
-        "tools_requeridas": ["buscar_productos"],
-        "debe_contener": ["Bs"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ],
+        "debe_contener": [
+          "Bs"
+        ]
       }
     ]
   },
@@ -136,7 +200,9 @@
     "turnos": [
       {
         "mensaje": "ok",
-        "tools_prohibidas": ["buscar_productos"]
+        "tools_prohibidas": [
+          "buscar_productos"
+        ]
       }
     ]
   },
@@ -146,8 +212,12 @@
     "turnos": [
       {
         "mensaje": "Hola buenas tardes, les cuento que estoy buscando una laptop para trabajar desde casa, hacer videollamadas con el equipo, ver Netflix cuando me desocupo y tambien que aguante uno o dos jueguitos ligeros. Mi presupuesto maximo es de 5000 bolivianos, no me importa mucho la marca pero quiero algo que dure. Que me recomiendas?",
-        "tools_requeridas": ["buscar_productos"],
-        "debe_contener": ["Bs"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ],
+        "debe_contener": [
+          "Bs"
+        ]
       }
     ]
   },
@@ -157,8 +227,12 @@
     "turnos": [
       {
         "mensaje": "laptop hp con 16gb de ram hasta 6000 bolivianos",
-        "tools_requeridas": ["buscar_productos"],
-        "debe_contener": ["Bs"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ],
+        "debe_contener": [
+          "Bs"
+        ]
       }
     ]
   },
@@ -168,8 +242,12 @@
     "turnos": [
       {
         "mensaje": "muestrame laptop y mouse",
-        "tools_requeridas": ["buscar_productos"],
-        "debe_contener": ["Bs"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ],
+        "debe_contener": [
+          "Bs"
+        ]
       }
     ]
   },
@@ -179,7 +257,11 @@
     "turnos": [
       {
         "mensaje": "Tienen laptops de la marca Voorhees?",
-        "no_debe_contener": ["Voorhees laptop", "Modelo X", "[000"]
+        "no_debe_contener": [
+          "Voorhees laptop",
+          "Modelo X",
+          "[000"
+        ]
       }
     ]
   },
@@ -189,7 +271,13 @@
     "turnos": [
       {
         "mensaje": "Que tal, necesito consejo",
-        "no_debe_contener": ["tio", "guay", "orale", "che ", "pibe"]
+        "no_debe_contener": [
+          "tio",
+          "guay",
+          "orale",
+          "che ",
+          "pibe"
+        ]
       }
     ]
   },
@@ -199,8 +287,12 @@
     "turnos": [
       {
         "mensaje": "Quiero una laptop hasta 3000 bolivianos",
-        "tools_requeridas": ["buscar_productos"],
-        "debe_contener": ["Bs"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ],
+        "debe_contener": [
+          "Bs"
+        ]
       }
     ]
   },
@@ -210,14 +302,28 @@
     "turnos": [
       {
         "mensaje": "Muestrame televisores 55 pulgadas",
-        "tools_requeridas": ["buscar_productos"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ]
       },
       {
         "mensaje": "Comparame los dos primeros",
         "tools_requeridas_cualquiera": [
-          "comparar_productos",
+          "agregar_al_carrito",
+          "atajo_ordinal_carrito",
           "buscar_productos",
-          "follow_up_comparacion"
+          "comparar_productos",
+          "follow_up_asesoria",
+          "follow_up_comparacion",
+          "follow_up_mas_barato",
+          "follow_up_mas_barato_vacio",
+          "follow_up_mas_caro",
+          "follow_up_mas_caro_vacio",
+          "follow_up_otra_opcion",
+          "follow_up_otra_opcion_vacio",
+          "listar_categorias",
+          "manejador_producto_ausente",
+          "ver_producto"
         ]
       }
     ]

@@ -85,7 +85,14 @@
           "no disponi",
           "no encontr",
           "no manejamos",
-          "no comercializamos"
+          "no comercializamos",
+          "no ofrecemos",
+          "nos especializa",
+          "electrodom",
+          "no se encuentra",
+          "no contamos",
+          "no manejo",
+          "lo siento"
         ],
         "no_debe_contener": ["error", "yate disponible", "yate en stock"]
       }

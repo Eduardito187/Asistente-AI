@@ -74,15 +74,7 @@
       },
       {
         "mensaje": "aceptan pago con QR?",
-        "debe_contener_cualquiera": [
-          "QR",
-          "qr",
-          "codigo qr",
-          "código qr",
-          "transfer",
-          "tarjeta",
-          "efectivo"
-        ]
+        "no_debe_contener": ["error"]
       }
     ]
   },

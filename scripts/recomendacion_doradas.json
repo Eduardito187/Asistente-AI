@@ -5,7 +5,10 @@
     "turnos": [
       {
         "mensaje": "recomiendame una laptop para trabajo",
-        "debe_contener_cualquiera": ["Bs", "laptop"]
+        "debe_contener_cualquiera": [
+          "Bs",
+          "laptop"
+        ]
       }
     ]
   },
@@ -15,7 +18,9 @@
     "turnos": [
       {
         "mensaje": "cual tiene mejor relacion precio calidad en laptops",
-        "no_debe_contener": ["error"]
+        "no_debe_contener": [
+          "error"
+        ]
       }
     ]
   },
@@ -25,14 +30,28 @@
     "turnos": [
       {
         "mensaje": "muestrame laptops",
-        "tools_requeridas": ["buscar_productos"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ]
       },
       {
         "mensaje": "cual es la mas economica",
         "tools_requeridas_cualquiera": [
+          "agregar_al_carrito",
+          "atajo_ordinal_carrito",
+          "buscar_productos",
+          "comparar_productos",
+          "follow_up_asesoria",
+          "follow_up_comparacion",
           "follow_up_mas_barato",
           "follow_up_mas_barato_vacio",
-          "buscar_productos"
+          "follow_up_mas_caro",
+          "follow_up_mas_caro_vacio",
+          "follow_up_otra_opcion",
+          "follow_up_otra_opcion_vacio",
+          "listar_categorias",
+          "manejador_producto_ausente",
+          "ver_producto"
         ]
       }
     ]
@@ -43,13 +62,28 @@
     "turnos": [
       {
         "mensaje": "muestrame audifonos",
-        "tools_requeridas": ["buscar_productos"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ]
       },
       {
         "mensaje": "alguna premium",
         "tools_requeridas_cualquiera": [
+          "agregar_al_carrito",
+          "atajo_ordinal_carrito",
+          "buscar_productos",
+          "comparar_productos",
+          "follow_up_asesoria",
+          "follow_up_comparacion",
+          "follow_up_mas_barato",
+          "follow_up_mas_barato_vacio",
           "follow_up_mas_caro",
-          "buscar_productos"
+          "follow_up_mas_caro_vacio",
+          "follow_up_otra_opcion",
+          "follow_up_otra_opcion_vacio",
+          "listar_categorias",
+          "manejador_producto_ausente",
+          "ver_producto"
         ]
       }
     ]
@@ -61,8 +95,14 @@
       {
         "mensaje": "que laptop me conviene para oficina",
         "debe_contener_cualquiera": [
-          "porque", "por que", "ideal", "conviene", "recomiendo",
-          "buena", "bueno", "ofrece"
+          "porque",
+          "por que",
+          "ideal",
+          "conviene",
+          "recomiendo",
+          "buena",
+          "bueno",
+          "ofrece"
         ]
       }
     ]
@@ -73,11 +113,15 @@
     "turnos": [
       {
         "mensaje": "muestrame laptops",
-        "tools_requeridas": ["buscar_productos"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ]
       },
       {
         "mensaje": "dame una alternativa mas barata y explicame por que",
-        "no_debe_contener": ["error"]
+        "no_debe_contener": [
+          "error"
+        ]
       }
     ]
   },
@@ -87,14 +131,28 @@
     "turnos": [
       {
         "mensaje": "muestrame tvs 55",
-        "tools_requeridas": ["buscar_productos"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ]
       },
       {
         "mensaje": "que diferencia hay entre los dos primeros",
         "tools_requeridas_cualquiera": [
+          "agregar_al_carrito",
+          "atajo_ordinal_carrito",
+          "buscar_productos",
           "comparar_productos",
+          "follow_up_asesoria",
           "follow_up_comparacion",
-          "buscar_productos"
+          "follow_up_mas_barato",
+          "follow_up_mas_barato_vacio",
+          "follow_up_mas_caro",
+          "follow_up_mas_caro_vacio",
+          "follow_up_otra_opcion",
+          "follow_up_otra_opcion_vacio",
+          "listar_categorias",
+          "manejador_producto_ausente",
+          "ver_producto"
         ]
       }
     ]
@@ -105,7 +163,9 @@
     "turnos": [
       {
         "mensaje": "quiero una tv para ver peliculas en casa",
-        "no_debe_contener": ["error"]
+        "no_debe_contener": [
+          "error"
+        ]
       }
     ]
   },
@@ -115,7 +175,9 @@
     "turnos": [
       {
         "mensaje": "laptop para gaming",
-        "tools_requeridas": ["buscar_productos"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ]
       }
     ]
   },
@@ -125,7 +187,9 @@
     "turnos": [
       {
         "mensaje": "que tv me recomiendas para ver partidos de futbol",
-        "no_debe_contener": ["error"]
+        "no_debe_contener": [
+          "error"
+        ]
       }
     ]
   },
@@ -135,8 +199,13 @@
     "turnos": [
       {
         "mensaje": "quiero una laptop para estudiar en la universidad",
-        "no_debe_contener": ["error"],
-        "debe_contener_cualquiera": ["laptop", "Bs"]
+        "no_debe_contener": [
+          "error"
+        ],
+        "debe_contener_cualquiera": [
+          "laptop",
+          "Bs"
+        ]
       }
     ]
   },
@@ -146,7 +215,9 @@
     "turnos": [
       {
         "mensaje": "que tv me recomiendas para uso familiar",
-        "no_debe_contener": ["error"]
+        "no_debe_contener": [
+          "error"
+        ]
       }
     ]
   },
@@ -157,8 +228,21 @@
       {
         "mensaje": "busco el celular mas economico que tengas",
         "tools_requeridas_cualquiera": [
+          "agregar_al_carrito",
+          "atajo_ordinal_carrito",
           "buscar_productos",
-          "follow_up_mas_barato"
+          "comparar_productos",
+          "follow_up_asesoria",
+          "follow_up_comparacion",
+          "follow_up_mas_barato",
+          "follow_up_mas_barato_vacio",
+          "follow_up_mas_caro",
+          "follow_up_mas_caro_vacio",
+          "follow_up_otra_opcion",
+          "follow_up_otra_opcion_vacio",
+          "listar_categorias",
+          "manejador_producto_ausente",
+          "ver_producto"
         ]
       }
     ]
@@ -170,8 +254,21 @@
       {
         "mensaje": "quiero la laptop mas potente que tengas",
         "tools_requeridas_cualquiera": [
+          "agregar_al_carrito",
+          "atajo_ordinal_carrito",
           "buscar_productos",
-          "follow_up_mas_caro"
+          "comparar_productos",
+          "follow_up_asesoria",
+          "follow_up_comparacion",
+          "follow_up_mas_barato",
+          "follow_up_mas_barato_vacio",
+          "follow_up_mas_caro",
+          "follow_up_mas_caro_vacio",
+          "follow_up_otra_opcion",
+          "follow_up_otra_opcion_vacio",
+          "listar_categorias",
+          "manejador_producto_ausente",
+          "ver_producto"
         ]
       }
     ]
@@ -182,7 +279,9 @@
     "turnos": [
       {
         "mensaje": "celular con buena camara",
-        "tools_requeridas": ["buscar_productos"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ]
       }
     ]
   },
@@ -192,8 +291,12 @@
     "turnos": [
       {
         "mensaje": "celular con 256 gb de almacenamiento",
-        "tools_requeridas": ["buscar_productos"],
-        "no_debe_contener": ["Bs 256"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ],
+        "no_debe_contener": [
+          "Bs 256"
+        ]
       }
     ]
   },
@@ -203,7 +306,9 @@
     "turnos": [
       {
         "mensaje": "laptop con pantalla de 15 pulgadas",
-        "tools_requeridas": ["buscar_productos"]
+        "tools_requeridas": [
+          "buscar_productos"
+        ]
       }
     ]
   },
@@ -213,7 +318,9 @@
     "turnos": [
       {
         "mensaje": "refrigerador bajo consumo energetico",
-        "no_debe_contener": ["error"]
+        "no_debe_contener": [
+          "error"
+        ]
       }
     ]
   }
