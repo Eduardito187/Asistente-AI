@@ -1,0 +1,126 @@
+[
+  {
+    "nombre": "L01_mejor_mostrados",
+    "descripcion": "'la mejor de las mostradas' activa follow-up mejor opcion.",
+    "turnos": [
+      {
+        "mensaje": "muestrame tvs 55",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "cual es la mejor de las que me mostraste",
+        "tools_requeridas_cualquiera": [
+          "follow_up_mas_caro",
+          "follow_up_mas_caro_vacio",
+          "buscar_productos"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "L02_mejor_dentro_presupuesto",
+    "descripcion": "'mejor dentro de mi presupuesto' respeta el budget.",
+    "turnos": [
+      {
+        "mensaje": "laptops hasta 5000",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "dame la mejor opcion dentro de ese rango",
+        "tools_requeridas_cualquiera": [
+          "follow_up_mas_caro",
+          "follow_up_mas_caro_vacio",
+          "buscar_productos"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "L03_mejor_subir_precio",
+    "descripcion": "'si subo el precio, dame la mejor' no crashea.",
+    "turnos": [
+      {
+        "mensaje": "laptops hasta 3000",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "si subo a 6000, dame la mejor",
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "L04_explicar_por_que_mejor",
+    "descripcion": "'dame la mejor y explicame por que' — no crashea.",
+    "turnos": [
+      {
+        "mensaje": "muestrame celulares",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "dame la mejor y explicame por que",
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "L05_costo_extra_beneficio",
+    "descripcion": "'vale la pena el costo extra?' — sin crash.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "vale la pena pagar mas por una mejor",
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "L06_mejor_no_es_mas_cara",
+    "descripcion": "'la mejor' no implica automaticamente 'la mas cara'; justifica.",
+    "turnos": [
+      {
+        "mensaje": "muestrame audifonos",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "cual es la mejor?",
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "L07_mantener_categoria_necesidad",
+    "descripcion": "Follow-up 'mejor' mantiene la categoria (no salta a otra).",
+    "turnos": [
+      {
+        "mensaje": "muestrame celulares",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "dame la mejor",
+        "no_debe_contener": ["laptop", "televisor", "refrigerador"]
+      }
+    ]
+  },
+  {
+    "nombre": "L08_no_reiniciar_busqueda",
+    "descripcion": "'mejor' no debe reiniciar desde cero — hereda filtros de T1.",
+    "turnos": [
+      {
+        "mensaje": "laptops hp para gaming",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "dame la mejor",
+        "no_debe_contener": [
+          "que categoria",
+          "que necesitas",
+          "que producto"
+        ]
+      }
+    ]
+  }
+]

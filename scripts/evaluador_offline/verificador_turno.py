@@ -12,6 +12,7 @@ class VerificadorTurno:
         tools_llamadas = {p.get("tool") for p in respuesta.get("pasos") or []}
         asertos: list[ResultadoAserto] = []
         asertos.extend(cls._debe_contener(turno, texto))
+        asertos.extend(cls._debe_contener_cualquiera(turno, texto))
         asertos.extend(cls._no_debe_contener(turno, texto))
         asertos.extend(cls._tools_requeridas(turno, tools_llamadas))
         asertos.extend(cls._tools_requeridas_cualquiera(turno, tools_llamadas))
@@ -27,6 +28,20 @@ class VerificadorTurno:
                 detalle="" if token.lower() in texto else f"no aparecio «{token}»",
             )
             for token in turno.get("debe_contener") or []
+        ]
+
+    @staticmethod
+    def _debe_contener_cualquiera(turno: dict, texto: str) -> list[ResultadoAserto]:
+        opciones = turno.get("debe_contener_cualquiera") or []
+        if not opciones:
+            return []
+        ok = any(t.lower() in texto for t in opciones)
+        return [
+            ResultadoAserto(
+                nombre=f"debe_contener_cualquiera:{','.join(opciones)}",
+                ok=ok,
+                detalle="" if ok else f"no aparecio ninguno de {opciones}",
+            )
         ]
 
     @staticmethod

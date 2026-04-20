@@ -1,0 +1,182 @@
+[
+  {
+    "nombre": "X01_pago_contado",
+    "descripcion": "'pago al contado' tras ver productos: no debe crashear ni inventar promos.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "si pago al contado en efectivo tengo algun descuento?",
+        "no_debe_contener": ["error", "50% garantizado"],
+        "debe_contener_cualquiera": [
+          "contado",
+          "efectivo",
+          "descuento",
+          "promoci",
+          "tarjeta",
+          "sucursal",
+          "transfer",
+          "pago",
+          "Bs"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "X02_pago_tarjeta",
+    "descripcion": "'aceptan tarjeta?' debe mencionar tarjeta/credito/debito.",
+    "turnos": [
+      {
+        "mensaje": "aceptan tarjeta de credito?",
+        "debe_contener_cualquiera": [
+          "tarjeta",
+          "credito",
+          "crédito",
+          "debito",
+          "débito",
+          "visa",
+          "mastercard"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "X03_pago_transferencia",
+    "descripcion": "'transferencia bancaria?' tras ver producto debe aludir a transferencia.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "aceptan pago por transferencia bancaria?",
+        "debe_contener_cualquiera": [
+          "transfer",
+          "banco",
+          "cuenta",
+          "QR",
+          "qr",
+          "tarjeta",
+          "efectivo"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "X04_pago_qr",
+    "descripcion": "'pago QR' tras ver producto debe aludir a QR u otros medios.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "aceptan pago con QR?",
+        "debe_contener_cualquiera": [
+          "QR",
+          "qr",
+          "codigo qr",
+          "código qr",
+          "transfer",
+          "tarjeta",
+          "efectivo"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "X05_pago_cuotas",
+    "descripcion": "'cuantas cuotas hay?' responde genericamente, no inventa.",
+    "turnos": [
+      {
+        "mensaje": "en cuantas cuotas puedo pagar una laptop?",
+        "debe_contener_cualquiera": ["cuota", "plan", "financia"],
+        "no_debe_contener": [
+          "24 cuotas sin interes confirmado",
+          "48 cuotas garantizado"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "X06_credito",
+    "descripcion": "'tienen credito propio?' no debe crashear.",
+    "turnos": [
+      {
+        "mensaje": "manejan credito propio de la tienda?",
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "X07_financiamiento_banco",
+    "descripcion": "'financiamiento con banco' no debe crashear.",
+    "turnos": [
+      {
+        "mensaje": "trabajan con financiamiento del banco mercantil?",
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "X08_requisitos_financiamiento",
+    "descripcion": "'que requisitos?' no debe inventar requisitos especificos.",
+    "turnos": [
+      {
+        "mensaje": "que requisitos piden para el credito?",
+        "no_debe_contener": [
+          "error",
+          "garantizamos aprobacion 100%",
+          "sin requisitos"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "X09_inicial_mas_cuotas",
+    "descripcion": "'pago inicial + cuotas' no debe crashear.",
+    "turnos": [
+      {
+        "mensaje": "puedo dar un pago inicial y el resto en cuotas?",
+        "no_debe_contener": ["error"],
+        "debe_contener_cualquiera": [
+          "inicial",
+          "cuota",
+          "plan",
+          "financia",
+          "parcial"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "X10_promociones_tarjeta",
+    "descripcion": "'promos tarjeta' no debe inventar 2x1/50% imposible.",
+    "turnos": [
+      {
+        "mensaje": "hay promociones si pago con tarjeta BCP?",
+        "no_debe_contener": [
+          "2x1 confirmado",
+          "50% descuento garantizado",
+          "cashback 100%"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "X11_explicar_sin_inventar",
+    "descripcion": "'explicame el plan' no debe inventar tasa / interes especifico.",
+    "turnos": [
+      {
+        "mensaje": "explicame como funciona el plan de cuotas",
+        "no_debe_contener": [
+          "error",
+          "0% interes garantizado siempre",
+          "tasa fija 5% confirmada"
+        ]
+      }
+    ]
+  }
+]

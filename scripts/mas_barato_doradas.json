@@ -1,0 +1,173 @@
+[
+  {
+    "nombre": "K01_mas_barato_mostrados",
+    "descripcion": "Pedir la mas barata de las mostradas activa follow_up_mas_barato.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "cual es la mas barata de las que me mostraste",
+        "tools_requeridas_cualquiera": [
+          "follow_up_mas_barato",
+          "follow_up_mas_barato_vacio",
+          "buscar_productos"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "K02_mas_barato_nueva",
+    "descripcion": "'alguna mas barata' busca NUEVAS no mostradas.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "alguna mas barata",
+        "tools_requeridas_cualquiera": [
+          "follow_up_mas_barato",
+          "follow_up_mas_barato_vacio",
+          "buscar_productos"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "K03_bajar_precio_calidad",
+    "descripcion": "Cliente pregunta si al bajar precio se pierde calidad — sin crash.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops hp",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "si bajo el precio, pierdo calidad?",
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "K04_mantener_categoria",
+    "descripcion": "Follow-up 'mas barato' mantiene categoria laptops.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "mas barato",
+        "no_debe_contener": ["celular", "televisor", "refrigerador", "audifono"]
+      }
+    ]
+  },
+  {
+    "nombre": "K05_mantener_subcategoria",
+    "descripcion": "Follow-up mantiene subcategoria (laptops gaming).",
+    "turnos": [
+      {
+        "mensaje": "laptops para gaming",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "alguna mas economica",
+        "tools_requeridas_cualquiera": [
+          "follow_up_mas_barato",
+          "follow_up_mas_barato_vacio",
+          "buscar_productos"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "K06_mantener_marca",
+    "descripcion": "Si el cliente fijo HP, 'mas barato' NO debe cambiar marca.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops hp",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "alguna mas economica",
+        "no_debe_contener": ["solo lenovo", "solo acer", "solo asus"]
+      }
+    ]
+  },
+  {
+    "nombre": "K07_relajar_marca_indiferente",
+    "descripcion": "Cliente dice 'no me importa marca' + 'mas barato' → puede traer otras marcas.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops hp",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "no me importa la marca, dame la mas barata",
+        "no_debe_contener": ["error", "solo hp"]
+      }
+    ]
+  },
+  {
+    "nombre": "K08_no_repetir_lista",
+    "descripcion": "'mas barato' no debe repetir la MISMA lista sin interpretar.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "la mas barata",
+        "tools_requeridas_cualquiera": [
+          "follow_up_mas_barato",
+          "follow_up_mas_barato_vacio",
+          "buscar_productos"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "K09_no_repedir_producto",
+    "descripcion": "'mas barato' no debe volver a preguntar categoria o producto.",
+    "turnos": [
+      {
+        "mensaje": "muestrame tvs",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "la mas barata",
+        "no_debe_contener": [
+          "que categoria",
+          "que producto buscas",
+          "de que tipo",
+          "cual producto",
+          "que tipo de producto"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "K10_ampliar_rango_si_nohay",
+    "descripcion": "Si no hay mas baratas, responder que no hay y proponer flexibilizar.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops hasta 1000 bolivianos",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "alguna mas barata aun",
+        "debe_contener_cualquiera": [
+          "flexibiliz",
+          "ampliar",
+          "otra marca",
+          "otro rango",
+          "bajar",
+          "no encontre",
+          "no hay",
+          "Bs"
+        ]
+      }
+    ]
+  }
+]

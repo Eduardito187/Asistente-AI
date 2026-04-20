@@ -22,27 +22,32 @@ RX_USO = re.compile(
 )
 RX_CATEGORIAS = {
     "Laptops": re.compile(
-        r"\b(laptop|notebook|portatil|ultrabook|macbook)\b", re.IGNORECASE,
+        r"\b(laptops?|notebooks?|portatiles?|portatil|ultrabooks?|macbooks?)\b",
+        re.IGNORECASE,
     ),
     "Celulares": re.compile(
-        r"\b(celular|smartphone|telefono|iphone|movil)\b", re.IGNORECASE,
+        r"\b(celulares?|smartphones?|telefonos?|iphones?|moviles?|movil|celu|celus)\b",
+        re.IGNORECASE,
     ),
     "Televisores": re.compile(
-        r"\b(tv|televisor|smart\s*tv|pantalla|tele)\b", re.IGNORECASE,
+        r"\b(tv|tvs|televisor(?:es)?|smart\s*tv|pantallas?|teles?)\b",
+        re.IGNORECASE,
     ),
     "Electrodomesticos": re.compile(
-        r"\b(freidora|licuadora|lavadora|secadora|refrigerador|heladera|nevera|"
-        r"microondas|horno|cocina|aspiradora|ventilador|aire\s+acondicionado|"
-        r"batidora|cafetera|tostadora|plancha)\b",
+        r"\b(freidoras?|licuadoras?|lavadoras?|secadoras?|refrigeradores?|"
+        r"refrigerador|heladeras?|neveras?|microondas|hornos?|cocinas?|"
+        r"aspiradoras?|ventiladores?|ventilador|aire\s+acondicionado|"
+        r"batidoras?|cafeteras?|tostadoras?|planchas?)\b",
         re.IGNORECASE,
     ),
     "Audio": re.compile(
-        r"\b(audifonos|auriculares|parlante|bocina|soundbar|"
+        r"\b(audifonos?|auriculares?|parlantes?|bocinas?|soundbars?|"
         r"barra\s+de\s+sonido|home\s*theater)\b",
         re.IGNORECASE,
     ),
     "Computacion": re.compile(
-        r"\b(pc|desktop|monitor|teclado|mouse|impresora|raton)\b",
+        r"\b(pc|pcs|desktops?|monitores?|monitor|teclados?|mouse|ratones?|raton|"
+        r"impresoras?)\b",
         re.IGNORECASE,
     ),
 }

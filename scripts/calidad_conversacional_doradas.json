@@ -1,0 +1,176 @@
+[
+  {
+    "nombre": "Z01_respuesta_directa_precio",
+    "descripcion": "Pregunta directa de precio: respuesta debe incluir Bs sin divagacion.",
+    "turnos": [
+      {
+        "mensaje": "cuanto cuesta una laptop hp?",
+        "debe_contener": ["Bs"],
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "Z02_no_repite_pregunta_resuelta",
+    "descripcion": "Si cliente ya dijo marca HP, no debe volver a preguntarla.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops hp",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "una mas barata",
+        "no_debe_contener": ["que marca prefieres", "de que marca"]
+      }
+    ]
+  },
+  {
+    "nombre": "Z03_no_repreguntar_categoria",
+    "descripcion": "Si cliente dijo laptop no re-preguntar 'que producto'.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "otra mas barata",
+        "no_debe_contener": ["que producto", "que categoria", "que buscas"]
+      }
+    ]
+  },
+  {
+    "nombre": "Z04_preguntas_utiles",
+    "descripcion": "Mensaje ambiguo debe pedir dato concreto, no relleno generico.",
+    "turnos": [
+      {
+        "mensaje": "necesito algo pero no se que",
+        "tools_prohibidas": ["buscar_productos"],
+        "debe_contener_cualquiera": [
+          "categoria",
+          "categoría",
+          "producto",
+          "marca",
+          "presupuesto",
+          "para que",
+          "buscas",
+          "interesa",
+          "tipo"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "Z05_tono_vendedor",
+    "descripcion": "Tras mostrar productos, tono comercial amigable.",
+    "turnos": [
+      {
+        "mensaje": "muestrame televisores 55",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener": ["Bs"]
+      }
+    ]
+  },
+  {
+    "nombre": "Z06_tono_consistente_multi_turno",
+    "descripcion": "Tras 3 turnos, respuesta sigue siendo coherente con es-BO.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "la mas barata",
+        "tools_requeridas_cualquiera": [
+          "follow_up_mas_barato",
+          "follow_up_mas_barato_vacio",
+          "buscar_productos"
+        ]
+      },
+      {
+        "mensaje": "otra opcion",
+        "no_debe_contener": ["tio", "guay", "orale", "che ", "pibe"]
+      }
+    ]
+  },
+  {
+    "nombre": "Z07_respuesta_corta_si_corta",
+    "descripcion": "'hola' produce saludo corto, no disertacion.",
+    "turnos": [
+      {
+        "mensaje": "hola",
+        "tools_prohibidas": ["buscar_productos"]
+      }
+    ]
+  },
+  {
+    "nombre": "Z08_asesoria_explicada",
+    "descripcion": "Mensaje pidiendo asesoria larga debe dar explicacion, no corto.",
+    "turnos": [
+      {
+        "mensaje": "necesito una laptop para trabajar desde casa con videollamadas, excel y chrome con muchas pestanas, mi presupuesto es 5000 bolivianos, que me recomiendas?",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener": ["Bs"]
+      }
+    ]
+  },
+  {
+    "nombre": "Z09_no_pedir_confirmacion_obvia",
+    "descripcion": "Pedido claro 'muestrame laptops hp' no debe pedir 'estas seguro?'.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops hp",
+        "tools_requeridas": ["buscar_productos"],
+        "no_debe_contener": [
+          "estas seguro",
+          "confirmas que quieres hp",
+          "quieres hp?"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "Z10_no_repetir_misma_lista",
+    "descripcion": "'otras opciones' no debe devolver mismo encabezado trivialmente.",
+    "turnos": [
+      {
+        "mensaje": "muestrame celulares",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "otras opciones",
+        "tools_requeridas_cualquiera": [
+          "follow_up_otra_opcion",
+          "follow_up_otra_opcion_vacio",
+          "buscar_productos"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "Z11_no_frase_plantilla",
+    "descripcion": "Dos consultas distintas no deben abrir con la misma frase plantilla.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops",
+        "tools_requeridas": ["buscar_productos"],
+        "no_debe_contener": ["como asistente virtual de dismac"]
+      },
+      {
+        "mensaje": "muestrame celulares",
+        "tools_requeridas": ["buscar_productos"],
+        "no_debe_contener": ["como asistente virtual de dismac"]
+      }
+    ]
+  },
+  {
+    "nombre": "Z12_no_emojis_excesivos",
+    "descripcion": "Respuesta no debe saturar con emojis que danen claridad.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops hp",
+        "tools_requeridas": ["buscar_productos"],
+        "no_debe_contener": ["🎉🎉🎉", "🔥🔥🔥", "💥💥💥"]
+      }
+    ]
+  }
+]

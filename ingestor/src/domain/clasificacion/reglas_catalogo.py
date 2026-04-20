@@ -73,10 +73,23 @@ REGLAS: List[ReglaCategoria] = [
     ReglaCategoria(_CAT_GAMING,  "Consolas",         r"\b(playstation|\bps\s*[34-5]\b|xbox|nintendo switch|nintendo\b)\b"),
     ReglaCategoria(_CAT_GAMING,  "Accesorios",       r"\b(joystick|gamepad|control ps\d|control xbox|volante gamer|dualsense|dualshock|case\s+gaming|gabinete\s+gamer|auriculares?\s+(?:para\s+juegos?|gaming)|auricular\s+(?:para\s+)?juegos?|mando\s+(?:inal[aá]mbrico\s+)?(?:logitech|razer|gamer)|lector\s+de\s+disco\s+externos?\s+(?:para\s+)?(?:ps|playtation|playstation))\b"),
     ReglaCategoria(_CAT_GAMING,  "VR",               r"\b(gafas\s+(?:de\s+)?realidad\s+virtual|meta\s+quest|oculus(?:\s+quest)?|headset\s+vr|vr\s+headset)\b"),
-    ReglaCategoria(_CAT_CEL,     "Smartphones",      r"\b(tel[ée]fono celular|celular\b|smartphone|iphone|\bgalaxy\b|redmi|\bmoto\s+[gxe]\b)\b"),
-    ReglaCategoria(_CAT_CEL,     "Accesorios",       r"\b(fundas?\s+(?:de\s+silicona|con\s+magneto|para\s+(?:celular|iphone|galaxy))|estuches?\s+para\s+(?:celular|iphone|galaxy)|protectores?\s+de\s+pantalla|vidrios?\s+templados?|cables?\s+lightning)\b"),
-    ReglaCategoria(_CAT_TAB,     "Tablets",          r"\btablet\b|\bipad\b"),
-    ReglaCategoria(_CAT_SW,      "Smartwatch",       r"\b(smartwatch|smart watch|apple\s*watch|applewatch|reloj inteligente|galaxy watch|mi band|mi watch)\b"),
+    # Smartwatch antes que Smartphones: "correa para galaxy watch7" no debe
+    # caer en celulares.
+    ReglaCategoria(_CAT_SW,      "Smartwatch",       r"\b(smartwatch|smart watch|apple\s*watch|applewatch|reloj inteligente|galaxy\s+watch\d*|mi band|mi watch)\b"),
+    ReglaCategoria(_CAT_SW,      "Accesorios",       r"\bcorrea\s+(?:deportiva\s+)?(?:\([^)]*\)\s+)?para\s+galaxy\s+watch|\bbanda\s+para\s+(?:apple\s*watch|galaxy\s+watch)"),
+    # Accesorios de celular ANTES de Smartphones: "estuche para celular",
+    # "portarollo con soporte para telefono", "microfono con entrada iphone",
+    # "soporte vehicular para celular", "bolson porta celular" — nada de eso
+    # es un smartphone.
+    ReglaCategoria(_CAT_CEL,     "Accesorios",       r"\b(fundas?(?:\s+\w+){0,3}\s+(?:de\s+silicona|con\s+magneto|para\s+(?:celular|iphone|galaxy|tel[eé]fono))|estuches?(?:\s+\w+){0,3}\s+(?:para|de)\s+(?:celular|iphone|galaxy|tel[eé]fono)|protectores?\s+de\s+pantalla|vidrios?\s+templados?|cables?\s+lightning|bols[oó]n\s+porta\s+(?:celular|tel[eé]fono)|porta\s*rollos?(?:\s+\w+){0,5}\s+para\s+(?:tel[eé]fono|celular)|soportes?\s+(?:vehicular(?:es)?|universal(?:es)?|magn[eé]tico|de\s+auto|para)(?:\s+\w+){0,4}\s+(?:para\s+)?(?:celular|tel[eé]fono|iphone|galaxy)|cargadores?\s+(?:magn[eé]tico\s+)?para\s+(?:iphone|celular|galaxy))\b"),
+    # Tablets antes que Smartphones: "tablet xiaomi redmi pad" no debe
+    # terminar en Smartphones.
+    ReglaCategoria(_CAT_TAB,     "Tablets",          r"\btablet\b|\bipad\b|\bxiaomi\s+(?:pad|redmi\s+pad)"),
+    # Smartphones: el catalogo real empieza todos los telefonos con el
+    # prefijo "Telefono celular". Exigirlo evita que accesorios, bicicletas,
+    # tablets, scooters o relojes caigan aqui solo por compartir una marca.
+    # Smartphone standalone / iphone N siguen siendo senales fuertes.
+    ReglaCategoria(_CAT_CEL,     "Smartphones",      r"^\s*tel[ée]fono\s+celular\b|^\s*celular\s+\w|\bsmartphone\b|\biphone\s+\d"),
     ReglaCategoria(_CAT_FOTO,    "Cámaras",          r"\bc[áa]mara\s+(?:sony|canon|nikon|fuji|panasonic|fotogr[áa]fica|digital|r[eé]flex|mirrorless|gopro)\b|\blentes?\s+(?:sony|canon|nikon)\b|\bteleobjetivo\b|\btr[ií]pode\s+(?:aluminio|foto|para\s+c[áa]mara)\b|\bflash\s+(?:profesional|para\s+c[áa]mara)\b"),
     ReglaCategoria(_CAT_SEG,     "Cámaras de Seguridad", r"\bc[áa]mara\s+(?:\w+\s+){0,3}(?:de seguridad|ip|wifi|wi[-\s]?fi|domo|vigilancia|inteligente|tapo|ezviz)\b|\b(?:enabot\s+ebo|robot\s+c[aá]mara|home\s+security)\b"),
     ReglaCategoria(_CAT_SEG,     "Alarmas",          r"\b(kit\s+alarma|kit\s+de\s+alarma|kit\s+c[aá]maras?|alarma\s+(?:wifi|wi[-\s]?fi|smart)|sensor (?:pir|magn[eé]tico|de humo|de movimiento|de\s+temperatura|y\s+humedad|de\s+apertura)|bot[oó]n\s+(?:inteligente|de\s+p[aá]nico)|cerradura\s+(?:smart|inteligente|digital))\b"),
@@ -87,7 +100,7 @@ REGLAS: List[ReglaCategoria] = [
     ReglaCategoria(_CAT_SEG,     "Señalización",     r"\btablero\s+plegable\s+piso\s+mojado\b|\bse[ñn]aliz"),
 
     # --- Audio ---
-    ReglaCategoria(_CAT_AUDIO,   "Audífonos",        r"\b(aud[íi]fonos?|auriculares?|earbuds|headphones?|in[-\s]?ear|airpods)\b"),
+    ReglaCategoria(_CAT_AUDIO,   "Audífonos",        r"\b(aud[íi]fonos?|auriculares?|earbuds|headphones?|in[-\s]?ear|airpods|galaxy\s+buds\w*)\b"),
     ReglaCategoria(_CAT_AUDIO,   "Parlantes",        r"\b(parlantes?|altavoces?|bocinas?|soundbar|speakers?|minicomponentes?|subwoofer)\b"),
     ReglaCategoria(_CAT_AUDIO,   "Home Theater",     r"\b(home theater|home cinema|minicomponente|microcomponente|cine\s+en\s+casa|bravia\s+theater)\b"),
     ReglaCategoria(_CAT_AUDIO,   "Micrófonos",       r"\b(micr[oó]fono|amplificador (?:est[eé]reo|de audio)|mezclador (?:de )?audio|turntable|tornamesa)\b"),

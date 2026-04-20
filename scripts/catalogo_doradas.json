@@ -1,0 +1,153 @@
+[
+  {
+    "nombre": "Q01_no_negar_categoria_existente",
+    "descripcion": "Freidoras existen en catalogo: agente no debe negarlas.",
+    "turnos": [
+      {
+        "mensaje": "tienen freidoras?",
+        "debe_contener_cualquiera": ["si", "sí", "Bs", "freidora"],
+        "no_debe_contener": ["error", "no tenemos freidora", "no manejamos freidora"]
+      }
+    ]
+  },
+  {
+    "nombre": "Q02_no_afirmar_categoria_inexistente",
+    "descripcion": "Autos no hay: no afirmar que si tenemos.",
+    "turnos": [
+      {
+        "mensaje": "tienen autos?",
+        "debe_contener_cualquiera": [
+          "no vendemos",
+          "no tenemos",
+          "motocicleta",
+          "moto",
+          "scooter"
+        ],
+        "no_debe_contener": ["error", "tenemos autos disponibles", "si tenemos autos"]
+      }
+    ]
+  },
+  {
+    "nombre": "Q03_marcas_desde_fuente",
+    "descripcion": "Listar tvs dispara buscar_productos y menciona marcas reales del catalogo.",
+    "turnos": [
+      {
+        "mensaje": "muestrame televisores 55 pulgadas",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener_cualquiera": [
+          "Sony",
+          "LG",
+          "Samsung",
+          "Hisense",
+          "TCL",
+          "JVC",
+          "Kernig",
+          "Toshiba",
+          "Flux",
+          "Iffalcon",
+          "Tcl",
+          "Bs"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "Q04_disponibilidad_estructurada",
+    "descripcion": "Pedido de ver lavadoras dispara tool y concreta Bs.",
+    "turnos": [
+      {
+        "mensaje": "muestrame lavadoras disponibles",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener": ["Bs", "lavadora"]
+      }
+    ]
+  },
+  {
+    "nombre": "Q05_precio_estructurado",
+    "descripcion": "Precio viene del catalogo (Bs), no inventado en dolares o otra moneda.",
+    "turnos": [
+      {
+        "mensaje": "cuanto cuesta una laptop HP?",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener": ["Bs"],
+        "no_debe_contener": ["$", "dolares", "USD", "pesos argentinos"]
+      }
+    ]
+  },
+  {
+    "nombre": "Q06_no_inventar_promociones",
+    "descripcion": "Preguntar promociones sin que existan no debe inventar 2x1.",
+    "turnos": [
+      {
+        "mensaje": "tienen promocion 2x1 en laptops?",
+        "no_debe_contener": [
+          "2x1 confirmado",
+          "2x1 disponible",
+          "llevate 2 por 1"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "Q07_no_inventar_cuotas",
+    "descripcion": "Preguntar cuotas no debe inventar plan (24 sin interes) sin fuente.",
+    "turnos": [
+      {
+        "mensaje": "puedo pagar en 24 cuotas sin interes?",
+        "no_debe_contener": [
+          "24 cuotas sin interes confirmado",
+          "24 cuotas garantizado"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "Q08_no_inventar_stock",
+    "descripcion": "Preguntar cantidad especifica no debe generar numero falso.",
+    "turnos": [
+      {
+        "mensaje": "cuantas lavadoras Samsung tienes en stock exacto?",
+        "no_debe_contener": [
+          "tenemos exactamente 47",
+          "exactamente 100 en stock"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "Q09_no_contradecir_previo",
+    "descripcion": "Tras confirmar que hay TVs Samsung, no decir luego que no tenemos.",
+    "turnos": [
+      {
+        "mensaje": "muestrame tvs samsung",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener": ["Bs"]
+      },
+      {
+        "mensaje": "tienes tvs samsung?",
+        "no_debe_contener": ["no tenemos samsung", "no manejamos samsung"]
+      }
+    ]
+  },
+  {
+    "nombre": "Q10_categoria_desde_fuente",
+    "descripcion": "Preguntar categorias de hogar -> lista real del catalogo.",
+    "turnos": [
+      {
+        "mensaje": "que tipo de televisores tienen?",
+        "debe_contener_cualquiera": ["Smart TV", "televisor", "pulgadas", "Bs"]
+      }
+    ]
+  },
+  {
+    "nombre": "Q11_no_inventar_modelos",
+    "descripcion": "Preguntar por laptops no debe citar modelo inexistente tipo 'Modelo X'.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops",
+        "tools_requeridas": ["buscar_productos"],
+        "no_debe_contener": ["Modelo X", "Modelo Y", "[000"]
+      }
+    ]
+  }
+]

@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from ...application.ports import UnitOfWork
 from .engine import SessionLocal
 from .mariadb.carrito_repositorio import MariaDbCarritoRepository
+from .mariadb.catalogo_keywords_repositorio import MariaDbCatalogoKeywordsRepository
 from .mariadb.chat_repositorio import MariaDbChatRepository
 from .mariadb.conversaciones_curadas_repositorio import MariaDbConversacionesCuradasRepository
 from .mariadb.feedback_ordenes_repositorio import MariaDbFeedbackOrdenesRepository
@@ -36,6 +37,7 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
         self.perfiles_sesion = MariaDbPerfilSesionRepository(self._session)
         self.feedback_ordenes = MariaDbFeedbackOrdenesRepository(self._session)
         self.productos_embeddings = MariaDbProductosEmbeddingsRepository(self._session)
+        self.catalogo_keywords = MariaDbCatalogoKeywordsRepository(self._session)
         return self
 
     def __exit__(self, exc_type, exc, tb) -> None:

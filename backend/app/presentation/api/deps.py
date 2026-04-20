@@ -16,6 +16,9 @@ from ...application.commands.crear_sesion import CrearSesionHandler
 from ...application.commands.curar_conversacion import CurarConversacionHandler
 from ...application.commands.marcar_carritos_abandonados import MarcarCarritosAbandonadosHandler
 from ...application.commands.quitar_del_carrito import QuitarDelCarritoHandler
+from ...application.commands.registrar_alternativa_ofrecida import (
+    RegistrarAlternativaOfrecidaHandler,
+)
 from ...application.commands.registrar_feedback_orden import (
     RegistrarFeedbackOrdenHandler,
 )
@@ -44,10 +47,14 @@ from ...application.queries.listar_ordenes import ListarOrdenesHandler
 from ...application.queries.obtener_ejemplos_fewshot import ObtenerEjemplosFewShotHandler
 from ...application.queries.obtener_orden import ObtenerOrdenHandler
 from ...application.queries.obtener_perfil_sesion import ObtenerPerfilSesionHandler
+from ...application.queries.resolver_categoria_sinonimo import (
+    ResolverCategoriaSinonimoHandler,
+)
 from ...application.queries.ver_carrito import VerCarritoHandler
 from ...application.queries.ver_ordenes_sesion import VerOrdenesSesionHandler
 from ...application.queries.ver_producto import VerProductoHandler
 from ...application.services.aplicador_cross_sell import AplicadorCrossSell
+from ...application.services.atajo_ordinal_carrito import AtajoOrdinalCarrito
 from ...application.services.atajo_sku_directo import AtajoSkuDirecto
 from ...application.services.buscador_semantico import BuscadorSemantico
 from ...application.services.clasificador_intencion import ClasificadorIntencion
@@ -58,11 +65,32 @@ from ...application.services.detector_sku_mensaje import DetectorSkuMensaje
 from ...application.services.evaluador_conversacion import EvaluadorConversacion
 from ...application.services.extractor_perfil_mensaje import ExtractorPerfilMensaje
 from ...application.services.gestor_feedback_post_orden import GestorFeedbackPostOrden
+from ...application.services.gestor_follow_ups_contextuales import (
+    GestorFollowUpsContextuales,
+)
 from ...application.services.inyector_fewshot import InyectorFewShot
 from ...application.services.manejador_producto_ausente import ManejadorProductoAusente
 from ...application.services.procesar_chat_service import ProcesarChatService
 from ...application.services.reindexador_embeddings import ReindexadorEmbeddings
+from ...application.services.resolvedor_categoria_cercana import (
+    ResolvedorCategoriaCercana,
+)
+from ...application.services.responder_consulta_disponibilidad import (
+    ResponderConsultaDisponibilidad,
+)
 from ...application.services.reranker_por_perfil import ReRankerPorPerfil
+from ...application.services.responder_comparacion_mostrados import (
+    ResponderComparacionMostrados,
+)
+from ...application.services.responder_mas_barato import ResponderMasBarato
+from ...application.services.responder_mas_caro import ResponderMasCaro
+from ...application.services.responder_otra_opcion import ResponderOtraOpcion
+from ...application.services.responder_recomendacion_shown import (
+    ResponderRecomendacionShown,
+)
+from ...application.services.responder_refinamiento_shown import (
+    ResponderRefinamientoShown,
+)
 from ...application.services.sugeridor_cross_sell import SugeridorCrossSell
 from ...application.services.sugeridor_productos_alternativos import (
     SugeridorProductosAlternativos,
@@ -201,11 +229,24 @@ def dashboard_metricas_handler() -> DashboardMetricasHandler:
     return DashboardMetricasHandler(dashboard_metricas_read_model())
 
 
+def resolver_categoria_sinonimo_handler() -> ResolverCategoriaSinonimoHandler:
+    return ResolverCategoriaSinonimoHandler(uow_factory)
+
+
+def resolvedor_categoria_cercana() -> ResolvedorCategoriaCercana:
+    return ResolvedorCategoriaCercana(resolver=resolver_categoria_sinonimo_handler())
+
+
+def registrar_alternativa_ofrecida_handler() -> RegistrarAlternativaOfrecidaHandler:
+    return RegistrarAlternativaOfrecidaHandler(uow_factory)
+
+
 def manejador_producto_ausente() -> ManejadorProductoAusente:
     return ManejadorProductoAusente(
         validador=ValidadorProductoReal(llm=llm_port()),
         sugeridor=SugeridorProductosAlternativos(buscar=buscar_handler()),
         registrar_sugerencia=registrar_sugerencia_catalogo_handler(),
+        resolvedor_categoria=resolvedor_categoria_cercana(),
     )
 
 
@@ -270,6 +311,9 @@ def procesar_chat_service() -> ProcesarChatService:
         inyector_fewshot=inyector_fewshot(),
     )
     atajo_sku = AtajoSkuDirecto(detector=DetectorSkuMensaje(), dispatcher=dispatcher)
+    atajo_ordinal = AtajoOrdinalCarrito(
+        dispatcher=dispatcher, obtener_perfil=obtener_perfil_sesion_handler()
+    )
     cross_sell = AplicadorCrossSell(
         sugeridor=SugeridorCrossSell(buscar=buscar_handler()),
     )
@@ -278,6 +322,30 @@ def procesar_chat_service() -> ProcesarChatService:
         registrar=registrar_feedback_orden_handler(),
         buscar_pendiente=buscar_orden_sin_feedback_handler(),
     )
+    obtener_perfil = obtener_perfil_sesion_handler()
+    buscar = buscar_handler()
+    gestor_follow_ups = GestorFollowUpsContextuales(
+        responder_mas_barato=ResponderMasBarato(
+            obtener_perfil=obtener_perfil, buscar_productos=buscar
+        ),
+        responder_mas_caro=ResponderMasCaro(
+            obtener_perfil=obtener_perfil, buscar_productos=buscar
+        ),
+        responder_otra_opcion=ResponderOtraOpcion(
+            obtener_perfil=obtener_perfil, buscar_productos=buscar
+        ),
+        responder_comparacion=ResponderComparacionMostrados(
+            obtener_perfil=obtener_perfil, comparar=comparar_productos_handler()
+        ),
+        responder_recomendacion=ResponderRecomendacionShown(
+            obtener_perfil=obtener_perfil, buscar_productos=buscar
+        ),
+        responder_refinamiento=ResponderRefinamientoShown(
+            obtener_perfil=obtener_perfil,
+            comparar=comparar_productos_handler(),
+            buscar=buscar,
+        ),
+    )
     return ProcesarChatService(
         uow_factory=uow_factory,
         crear_sesion=crear_sesion_handler(),
@@ -285,17 +353,24 @@ def procesar_chat_service() -> ProcesarChatService:
         historial_chat=historial_chat_handler(),
         agente=agente,
         dispatcher=dispatcher,
-        buscar_productos=buscar_handler(),
+        buscar_productos=buscar,
         detector=DetectorMentiras(),
         manejador_ausente=manejador_producto_ausente(),
         clasificador=ClasificadorIntencion(),
         curador=curador_conversaciones(),
         registrar_metrica=registrar_metrica_turno_handler(),
         atajo_sku=atajo_sku,
+        atajo_ordinal=atajo_ordinal,
         extractor_perfil=ExtractorPerfilMensaje(),
         actualizar_perfil=actualizar_perfil_sesion_handler(),
-        obtener_perfil=obtener_perfil_sesion_handler(),
+        obtener_perfil=obtener_perfil,
         cross_sell=cross_sell,
         gestor_feedback=gestor_feedback,
         registrar_turno_mostrado=registrar_turno_mostrado_handler(),
+        gestor_follow_ups=gestor_follow_ups,
+        registrar_alternativa=registrar_alternativa_ofrecida_handler(),
+        resolvedor_categoria=resolvedor_categoria_cercana(),
+        responder_consulta_disponibilidad=ResponderConsultaDisponibilidad(
+            buscar=buscar
+        ),
     )

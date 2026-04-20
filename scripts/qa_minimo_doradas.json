@@ -1,0 +1,304 @@
+[
+  {
+    "nombre": "AB01_tv85_recomendacion",
+    "descripcion": "TV 85 pulgadas + pedir recomendacion -> asesoria real.",
+    "turnos": [
+      {
+        "mensaje": "muestrame televisores 85 pulgadas",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "cual me recomiendas?",
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "AB02_tv85_mas_barato",
+    "descripcion": "TV 85 + mas barato: follow_up_mas_barato o mensaje honesto si no hay.",
+    "turnos": [
+      {
+        "mensaje": "muestrame televisores 85 pulgadas",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "la mas barata",
+        "tools_requeridas_cualquiera": [
+          "follow_up_mas_barato",
+          "follow_up_mas_barato_vacio",
+          "buscar_productos"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "AB03_tv85_otras_opciones",
+    "descripcion": "TV 85 + otras opciones: follow_up_otra_opcion o honesto si agotadas.",
+    "turnos": [
+      {
+        "mensaje": "muestrame televisores 85 pulgadas",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "otras opciones",
+        "tools_requeridas_cualquiera": [
+          "follow_up_otra_opcion",
+          "follow_up_otra_opcion_vacio",
+          "buscar_productos"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "AB04_tesla_motos",
+    "descripcion": "Tesla -> ofrecer motocicletas (categoria relacionada).",
+    "turnos": [
+      {
+        "mensaje": "quiero comprar un auto tesla",
+        "debe_contener_cualquiera": ["motocicleta", "moto", "no vendemos"],
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "AB05_tesla_agotadas_honesto",
+    "descripcion": "Tesla + filtro imposible -> responder no hay sin inventar.",
+    "turnos": [
+      {
+        "mensaje": "quiero un auto tesla hasta 10 bolivianos",
+        "no_debe_contener": ["error", "tesla disponible por 10"]
+      }
+    ]
+  },
+  {
+    "nombre": "AB06_xiaomi_exacto_no_existe",
+    "descripcion": "Xiaomi modelo fake -> fallback smartphones Xiaomi reales.",
+    "turnos": [
+      {
+        "mensaje": "quiero el xiaomi redmi note 999 ultra",
+        "debe_contener_cualquiera": [
+          "Xiaomi",
+          "smartphone",
+          "Redmi",
+          "similar",
+          "equivalente",
+          "no tenemos",
+          "Bs"
+        ],
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "AB07_xiaomi_otras_opciones",
+    "descripcion": "Xiaomi + otras opciones respetando marca.",
+    "turnos": [
+      {
+        "mensaje": "muestrame celulares xiaomi",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "otras opciones",
+        "tools_requeridas_cualquiera": [
+          "follow_up_otra_opcion",
+          "follow_up_otra_opcion_vacio",
+          "buscar_productos"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "AB08_xiaomi_mas_barato",
+    "descripcion": "Xiaomi + mas barato respetando marca.",
+    "turnos": [
+      {
+        "mensaje": "muestrame celulares xiaomi",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "la mas barata",
+        "tools_requeridas_cualquiera": [
+          "follow_up_mas_barato",
+          "follow_up_mas_barato_vacio",
+          "buscar_productos"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "AB09_follow_up_corto_ese_no",
+    "descripcion": "'ese no' tras mostrar debe seguir buscando en la misma categoria.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "ese no, otro",
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "AB10_cambio_marca",
+    "descripcion": "T1 laptops HP, T2 'mejor lenovo' pivotea marca sin perder categoria.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops hp",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "mejor mostrame lenovo",
+        "tools_requeridas": ["buscar_productos"],
+        "no_debe_contener": ["celular", "televisor"]
+      }
+    ]
+  },
+  {
+    "nombre": "AB11_cambio_categoria",
+    "descripcion": "T1 laptops, T2 'mejor celulares' pivotea categoria.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "mejor mostrame celulares",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener_cualquiera": ["celular", "smartphone", "Bs"]
+      }
+    ]
+  },
+  {
+    "nombre": "AB12_query_fantasma",
+    "descripcion": "Saludo no debe citar 'lavadora samsung 8kg' u otros ejemplos fantasma.",
+    "turnos": [
+      {
+        "mensaje": "hola",
+        "tools_prohibidas": ["buscar_productos"],
+        "no_debe_contener": [
+          "lavadora samsung 8kg",
+          "iphone 15",
+          "laptop rtx"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "AB13_accesorio_indebido",
+    "descripcion": "Pedir celular no debe caer a fundas como principal.",
+    "turnos": [
+      {
+        "mensaje": "muestrame celulares",
+        "tools_requeridas": ["buscar_productos"],
+        "no_debe_contener": [
+          "funda disponible",
+          "protector de pantalla en stock",
+          "cargador disponible"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "AB14_no_disponible_transparente",
+    "descripcion": "Yate -> responder no disponible con honestidad (canned o explicativo).",
+    "turnos": [
+      {
+        "mensaje": "quiero un yate de 40 pies",
+        "debe_contener_cualquiera": [
+          "no tenemos",
+          "no vendemos",
+          "no disponi",
+          "no manejamos",
+          "no comercializamos",
+          "no ofrecemos",
+          "nos especializa",
+          "electrodom"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "AB15_exclusion_mostrados",
+    "descripcion": "'muestrame otras distintas' no debe repetir mismos SKUs.",
+    "turnos": [
+      {
+        "mensaje": "muestrame audifonos",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "otras distintas a las que me diste",
+        "tools_requeridas_cualquiera": [
+          "follow_up_otra_opcion",
+          "follow_up_otra_opcion_vacio",
+          "buscar_productos"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "AB16_cierre_correcto",
+    "descripcion": "Despedida normal cierra sin tools adicionales.",
+    "turnos": [
+      {
+        "mensaje": "gracias, chau",
+        "tools_prohibidas": ["buscar_productos", "agregar_al_carrito"]
+      }
+    ]
+  },
+  {
+    "nombre": "AB17_objecion_precio",
+    "descripcion": "Objecion 'esta caro' activa respuesta sin insistir.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops hp",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "esta muy caro",
+        "no_debe_contener": ["error", "ultimas unidades", "compra ya"]
+      }
+    ]
+  },
+  {
+    "nombre": "AB18_stock",
+    "descripcion": "'hay stock?' tras ver producto responde contextualmente.",
+    "turnos": [
+      {
+        "mensaje": "muestrame tvs 55",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "hay stock de la primera?",
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "AB19_cuotas",
+    "descripcion": "Pregunta de cuotas da respuesta sin inventar plan especifico.",
+    "turnos": [
+      {
+        "mensaje": "puedo pagar en cuotas?",
+        "debe_contener_cualquiera": ["cuota", "plan", "financia", "pagar"],
+        "no_debe_contener": ["24 cuotas sin interes confirmado"]
+      }
+    ]
+  },
+  {
+    "nombre": "AB20_logistica",
+    "descripcion": "Pregunta de envio recibe respuesta comercial.",
+    "turnos": [
+      {
+        "mensaje": "hacen envios a santa cruz?",
+        "debe_contener_cualquiera": [
+          "envio",
+          "envío",
+          "delivery",
+          "entrega",
+          "enviar"
+        ]
+      }
+    ]
+  }
+]

@@ -56,3 +56,11 @@ class MariaDbPerfilSesionRepository(PerfilSesionRepository):
                 "pmax": precio_max,
             },
         )
+
+    def registrar_alternativa_ofrecida(
+        self, sesion_id: UUID, alternativa: str
+    ) -> None:
+        self._s.execute(
+            text(PerfilSesionSql.REGISTRAR_ALTERNATIVA),
+            {"sid": str(sesion_id), "alt": alternativa},
+        )

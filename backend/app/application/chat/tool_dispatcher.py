@@ -127,7 +127,7 @@ class ToolDispatcher:
         "capacidad_gb_min", "ram_gb_min",
         "capacidad_litros_min", "capacidad_kg_min",
         "potencia_w_min", "potencia_w_max", "procesador",
-        "tipo_panel", "resolucion", "color",
+        "tipo_panel", "resolucion", "color", "es_electrico",
     )
 
     @classmethod
@@ -136,8 +136,8 @@ class ToolDispatcher:
         marca_final = marca_arg if marca_indiferente else (marca_arg or perfil.marca_preferida or None)
         return {
             "query": SanitizadorQueryBusqueda.sanitizar(cls._texto(a, "query")),
-            "categoria": cls._texto(a, "categoria") or perfil.categoria_foco or None,
-            "subcategoria": cls._texto(a, "subcategoria"),
+            "categoria": cls._texto(a, "categoria") or perfil.categoria_efectiva() or None,
+            "subcategoria": cls._texto(a, "subcategoria") or perfil.subcategoria_efectiva() or None,
             "marca": marca_final,
             "precio_min": ValueParser.a_float(a.get("precio_min")),
             "precio_max": cls._precio_max(a, perfil),
@@ -154,6 +154,7 @@ class ToolDispatcher:
             "tipo_panel": cls._texto(a, "tipo_panel", transform=str.upper) or perfil.tipo_panel,
             "resolucion": cls._texto(a, "resolucion", transform=str.upper) or perfil.resolucion,
             "color": cls._texto(a, "color", transform=str.lower),
+            "es_electrico": ValueParser.a_bool(a.get("es_electrico")),
             "solo_con_stock": True,
         }
 

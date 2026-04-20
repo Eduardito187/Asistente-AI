@@ -30,7 +30,7 @@ class ParserPresupuesto:
     _CURRENCY = r"(?:bs\.?|bob|bolivianos?|\$)"
     _NON_MONEY_UNIT = (
         r"(?:mah|gb|tb|kg|litros?|lts?|mhz|ghz|hz|mp|"
-        r"pulgadas?|inch|cm|mm|ml|rpm|fps)"
+        r"pulgadas?|inch|cm|mm|ml|rpm|fps|cc|ccs|%)"
     )
 
     _RX_POR_KEYWORD = re.compile(
@@ -46,6 +46,10 @@ class ParserPresupuesto:
         rf"\b{_CURRENCY}\.?\s*([\d][\d\.,]{{2,}})",
         re.IGNORECASE,
     )
+    _RX_MIL = re.compile(
+        r"\b(\d{1,3})\s*(?:mil|k)\b(?!\s*(?:mah|hz|ghz|mhz|rpm))",
+        re.IGNORECASE,
+    )
     _RX_UNIDAD_NO_MONETARIA = re.compile(
         rf"([\d][\d\.,]{{2,}})\s*{_NON_MONEY_UNIT}\b",
         re.IGNORECASE,
@@ -56,9 +60,23 @@ class ParserPresupuesto:
         if not texto:
             return None
         no_monetarios = cls._numeros_no_monetarios(texto)
+        valor_mil = cls._extraer_mil(texto)
+        if valor_mil is not None:
+            return valor_mil
         for regex in (cls._RX_POR_KEYWORD, cls._RX_POR_MONEDA, cls._RX_MONEDA_PREFIJO):
             valor = cls._primer_valor_valido(regex, texto, no_monetarios)
             if valor is not None:
+                return valor
+        return None
+
+    @classmethod
+    def _extraer_mil(cls, texto: str) -> float | None:
+        for match in cls._RX_MIL.finditer(texto):
+            try:
+                valor = float(match.group(1)) * 1000.0
+            except ValueError:
+                continue
+            if cls._MIN <= valor <= cls._MAX:
                 return valor
         return None
 

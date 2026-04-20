@@ -1,0 +1,163 @@
+[
+  {
+    "nombre": "D01_moneda_bs",
+    "descripcion": "Presupuesto con 'Bs' se detecta: respuesta debe respetarlo.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops hasta Bs 3000",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener": ["Bs"]
+      }
+    ]
+  },
+  {
+    "nombre": "D02_moneda_bolivianos",
+    "descripcion": "Presupuesto con 'bolivianos' se detecta.",
+    "turnos": [
+      {
+        "mensaje": "muestrame celulares hasta 2500 bolivianos",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener": ["Bs"]
+      }
+    ]
+  },
+  {
+    "nombre": "D03_presupuesto_por_contexto",
+    "descripcion": "Presupuesto sin moneda explicita, por keyword (hasta/presupuesto).",
+    "turnos": [
+      {
+        "mensaje": "mi presupuesto es 4000, quiero laptops",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener": ["Bs"]
+      }
+    ]
+  },
+  {
+    "nombre": "D04_pulgadas",
+    "descripcion": "85 pulgadas se detectan como atributo, no como precio ni SKU.",
+    "turnos": [
+      {
+        "mensaje": "muestrame televisores de 85 pulgadas",
+        "tools_requeridas": ["buscar_productos"],
+        "no_debe_contener": ["Bs 85", "Bs. 85", "85 bolivianos"]
+      }
+    ]
+  },
+  {
+    "nombre": "D05_gigas",
+    "descripcion": "128 GB es almacenamiento, no precio.",
+    "turnos": [
+      {
+        "mensaje": "celular 128 gb",
+        "tools_requeridas": ["buscar_productos"],
+        "no_debe_contener": ["Bs 128", "128 bolivianos"]
+      }
+    ]
+  },
+  {
+    "nombre": "D06_mah",
+    "descripcion": "30000 mAh no se confunde con 30000 Bs.",
+    "turnos": [
+      {
+        "mensaje": "celular con 30000 mAh de bateria",
+        "tools_requeridas": ["buscar_productos"],
+        "no_debe_contener": ["Bs 30000", "30000 bolivianos", "Bs 30.000"]
+      }
+    ]
+  },
+  {
+    "nombre": "D07_cc",
+    "descripcion": "150cc (motocicletas) no se confunde con precio — el agente no debe ofrecer Bs 150.",
+    "turnos": [
+      {
+        "mensaje": "tienen motos de 150cc?",
+        "no_debe_contener": ["Bs 150", "150 bolivianos"]
+      }
+    ]
+  },
+  {
+    "nombre": "D08_kg",
+    "descripcion": "8 kg (lavadora) no se confunde con 8 GB ni con precio.",
+    "turnos": [
+      {
+        "mensaje": "lavadora de 8 kg",
+        "tools_requeridas": ["buscar_productos"],
+        "no_debe_contener": ["8 gb", "Bs 8", "8 bolivianos"]
+      }
+    ]
+  },
+  {
+    "nombre": "D09_hz",
+    "descripcion": "144 Hz (refresh rate) no se confunde con precio.",
+    "turnos": [
+      {
+        "mensaje": "monitor de 144 hz",
+        "no_debe_contener": ["Bs 144", "144 bolivianos"]
+      }
+    ]
+  },
+  {
+    "nombre": "D10_descuento_porcentaje",
+    "descripcion": "Cliente pregunta por descuento — agente no debe interpretarlo como presupuesto.",
+    "turnos": [
+      {
+        "mensaje": "tienen laptops con 20% de descuento?",
+        "no_debe_contener": ["Bs 20", "20 bolivianos"]
+      }
+    ]
+  },
+  {
+    "nombre": "D11_bs_vs_mah",
+    "descripcion": "30000 Bs SI es presupuesto cuando hay moneda explicita, aunque tambien haya mAh en otro mensaje.",
+    "turnos": [
+      {
+        "mensaje": "laptops hasta 30000 Bs",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener": ["Bs"]
+      }
+    ]
+  },
+  {
+    "nombre": "D12_pulgadas_vs_sku",
+    "descripcion": "85 pulgadas nunca se interpreta como SKU (productos siguen siendo TVs).",
+    "turnos": [
+      {
+        "mensaje": "televisor 85\"",
+        "tools_requeridas": ["buscar_productos"],
+        "no_debe_contener": ["SKU 85", "[85]"]
+      }
+    ]
+  },
+  {
+    "nombre": "D13_kg_vs_gb",
+    "descripcion": "8 kg no dispara busqueda por 8 GB (categorias disjuntas).",
+    "turnos": [
+      {
+        "mensaje": "lavadora 8 kg",
+        "tools_requeridas": ["buscar_productos"],
+        "no_debe_contener": ["lavadora 8 gb", "8 gb"]
+      }
+    ]
+  },
+  {
+    "nombre": "D14_cc_vs_precio",
+    "descripcion": "'150cc' no debe terminar como 'presupuesto 150 Bs'.",
+    "turnos": [
+      {
+        "mensaje": "moto 150cc precio",
+        "no_debe_contener": ["Bs 150.", "presupuesto de 150", "150 bolivianos"]
+      }
+    ]
+  },
+  {
+    "nombre": "D15_numero_con_coma",
+    "descripcion": "Numero con coma/punto se normaliza (3.000 = 3000).",
+    "turnos": [
+      {
+        "mensaje": "laptops hasta Bs 3.000",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener": ["Bs"]
+      }
+    ]
+  }
+]

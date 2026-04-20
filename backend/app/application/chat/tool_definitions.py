@@ -86,6 +86,15 @@ TOOLS_SPEC: list[dict] = [
                 "enum": ["8K", "4K", "2K", "FHD", "HD"],
             },
             "color": {"type": "string"},
+            "es_electrico": {
+                "type": "boolean",
+                "description": (
+                    "True para vehiculos/productos electricos (motocicletas "
+                    "electricas, autos electricos). False para combustion. "
+                    "Usar cuando el cliente pregunta 'electricas', 'a bateria', "
+                    "'sin gasolina'."
+                ),
+            },
             "solo_con_stock": {"type": "boolean", "default": True},
         },
     ),

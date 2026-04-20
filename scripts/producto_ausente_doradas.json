@@ -1,0 +1,191 @@
+[
+  {
+    "nombre": "N01_modelo_exacto_no_existe_transparente",
+    "descripcion": "Modelo inventado: agente no afirma tenerlo, ofrece alternativas.",
+    "turnos": [
+      {
+        "mensaje": "quiero un iphone 99 pro max ultra",
+        "debe_contener_cualquiera": [
+          "no lo tenemos",
+          "no tenemos",
+          "equivalente",
+          "similar",
+          "smartphone",
+          "Apple",
+          "Samsung",
+          "Xiaomi",
+          "Bs"
+        ],
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "N02_misma_marca_subcategoria",
+    "descripcion": "Lavadora Samsung modelo inexistente: caer a lavadoras Samsung reales.",
+    "turnos": [
+      {
+        "mensaje": "muestrame la lavadora Samsung modelo ws999x ecobubble extreme",
+        "debe_contener_cualquiera": [
+          "lavadora",
+          "Samsung",
+          "no tenemos",
+          "no encontr",
+          "similar",
+          "Bs"
+        ],
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "N03_misma_subcategoria_sin_marca",
+    "descripcion": "Lavadora marca inexistente: ofrecer otras lavadoras disponibles.",
+    "turnos": [
+      {
+        "mensaje": "tienen lavadoras marca Phantom AeroMax 20kg?",
+        "debe_contener_cualquiera": [
+          "lavadora",
+          "no tenemos",
+          "no encontr",
+          "no disponi",
+          "otras marcas",
+          "Bs"
+        ],
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "N04_categoria_relacionada_real",
+    "descripcion": "Auto Tesla no hay, pero hay motocicletas (categoria_relacionada en BD).",
+    "turnos": [
+      {
+        "mensaje": "quiero comprar un auto Tesla Model S",
+        "debe_contener_cualquiera": [
+          "motocicleta",
+          "moto",
+          "no vendemos",
+          "no tenemos",
+          "scooter"
+        ],
+        "no_debe_contener": ["error", "Tesla Model S disponible", "Tesla en stock"]
+      }
+    ]
+  },
+  {
+    "nombre": "N05_sin_categoria_relacionada",
+    "descripcion": "Producto sin relacionada (yate): decir no disponible con honestidad.",
+    "turnos": [
+      {
+        "mensaje": "quiero comprar un yate de 30 pies",
+        "debe_contener_cualquiera": [
+          "no tenemos",
+          "no vendemos",
+          "no disponi",
+          "no encontr",
+          "no manejamos",
+          "no comercializamos"
+        ],
+        "no_debe_contener": ["error", "yate disponible", "yate en stock"]
+      }
+    ]
+  },
+  {
+    "nombre": "N06_no_inventar_parecidos",
+    "descripcion": "Pedir lavadora no debe generar 'parecidos' que sean licuadoras.",
+    "turnos": [
+      {
+        "mensaje": "muestrame una lavadora",
+        "tools_requeridas": ["buscar_productos"],
+        "no_debe_contener": ["licuadora", "freidora", "tostadora"]
+      }
+    ]
+  },
+  {
+    "nombre": "N07_no_varios_sin_mostrar",
+    "descripcion": "No decir 'tenemos varios X' sin listar productos concretos con Bs.",
+    "turnos": [
+      {
+        "mensaje": "muestrame televisores 55 pulgadas",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener": ["Bs"]
+      }
+    ]
+  },
+  {
+    "nombre": "N08_no_accesorios_primer_fallback",
+    "descripcion": "Celular xiaomi modelo fake: caer a smartphones, no a fundas/cargadores.",
+    "turnos": [
+      {
+        "mensaje": "quiero el celular Xiaomi Redmi 99 Pro Ultra Max",
+        "no_debe_contener": [
+          "error",
+          "funda disponible",
+          "protector de pantalla en stock",
+          "cargador disponible"
+        ],
+        "debe_contener_cualquiera": [
+          "smartphone",
+          "Xiaomi",
+          "Redmi",
+          "no tenemos",
+          "similar",
+          "equivalente",
+          "Bs"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "N09_ofrecer_categoria_valida",
+    "descripcion": "'quiero un auto' ofrece motocicleta (categoria real), no inventada.",
+    "turnos": [
+      {
+        "mensaje": "necesito un auto para moverme en la ciudad",
+        "debe_contener_cualquiera": [
+          "motocicleta",
+          "moto",
+          "scooter",
+          "no vendemos",
+          "no tenemos"
+        ],
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "N10_guardar_rama_si_acepta",
+    "descripcion": "Si acepta la alternativa ofrecida, follow-up hereda la subcategoria.",
+    "turnos": [
+      {
+        "mensaje": "quiero un auto",
+        "no_debe_contener": ["error"]
+      },
+      {
+        "mensaje": "dame la mas barata",
+        "no_debe_contener": [
+          "que categoria",
+          "que producto buscas",
+          "no entiendo"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "N11_no_saltar_accesorios_vs_principal",
+    "descripcion": "'muestrame celulares' debe mostrar Smartphones, no Accesorios de Celulares.",
+    "turnos": [
+      {
+        "mensaje": "muestrame celulares",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener": ["Bs"],
+        "no_debe_contener": [
+          "funda disponible",
+          "cargador disponible",
+          "protector pantalla disponible"
+        ]
+      }
+    ]
+  }
+]

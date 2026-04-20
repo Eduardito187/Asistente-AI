@@ -1,0 +1,206 @@
+[
+  {
+    "nombre": "J01_comparar_mostrados",
+    "descripcion": "Comparar los dos primeros mostrados activa follow_up_comparacion o comparar_productos.",
+    "turnos": [
+      {
+        "mensaje": "muestrame tvs 55",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "comparame los dos primeros",
+        "tools_requeridas_cualquiera": [
+          "comparar_productos",
+          "follow_up_comparacion",
+          "buscar_productos"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "J02_comparar_no_mostrados",
+    "descripcion": "Comparar productos no mostrados todavia — backend no crashea, LLM contesta.",
+    "turnos": [
+      {
+        "mensaje": "compara una laptop hp con una lenovo",
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "J03_comparar_precio",
+    "descripcion": "Cliente pide diferencia de precio entre dos productos — responde sin crash.",
+    "turnos": [
+      {
+        "mensaje": "muestrame celulares",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "que diferencia de precio hay entre los dos primeros",
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "J04_comparar_calidad",
+    "descripcion": "Comparar por calidad/especificaciones — no crashea.",
+    "turnos": [
+      {
+        "mensaje": "muestrame tvs 55",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "cual tiene mejor calidad",
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "J05_comparar_sistema_operativo",
+    "descripcion": "Comparar por SO entre celulares — no crashea.",
+    "turnos": [
+      {
+        "mensaje": "muestrame celulares",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "cual tiene mejor sistema operativo",
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "J06_comparar_panel",
+    "descripcion": "Comparar panel (OLED vs QLED) — sin crash.",
+    "turnos": [
+      {
+        "mensaje": "muestrame tvs 55 pulgadas",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "cual tiene mejor panel",
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "J07_comparar_memoria",
+    "descripcion": "Comparar por memoria RAM — sin crash.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "cual tiene mas memoria ram",
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "J08_comparar_almacenamiento",
+    "descripcion": "Comparar por almacenamiento — sin crash.",
+    "turnos": [
+      {
+        "mensaje": "muestrame celulares",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "cual tiene mas almacenamiento",
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "J09_comparar_marca",
+    "descripcion": "Comparar por marca — sin crash.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "cual es de mejor marca",
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "J10_comparar_garantia",
+    "descripcion": "Comparar por garantia — ResponderConsultaPolitica o LLM responde sin crash.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "cual tiene mejor garantia",
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "J11_comparar_uso_ideal",
+    "descripcion": "Comparar por uso (gaming vs oficina) — sin crash.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "cual es mejor para gaming",
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "J12_concluir_cual_conviene",
+    "descripcion": "Cliente pide conclusion — respuesta concluyente sin crash.",
+    "turnos": [
+      {
+        "mensaje": "muestrame celulares",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "comparalos y dime cual conviene",
+        "tools_requeridas_cualquiera": [
+          "comparar_productos",
+          "follow_up_comparacion",
+          "buscar_productos"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "J13_comparacion_corta",
+    "descripcion": "'compara brevemente' — sin crash.",
+    "turnos": [
+      {
+        "mensaje": "muestrame tvs",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "dame una comparacion corta",
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "J14_comparacion_detallada",
+    "descripcion": "'comparacion detallada' — sin crash.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "dame una comparacion detallada de los dos primeros",
+        "tools_requeridas_cualquiera": [
+          "comparar_productos",
+          "follow_up_comparacion",
+          "buscar_productos"
+        ]
+      }
+    ]
+  }
+]

@@ -29,4 +29,5 @@ class ObtenerPerfilSesionHandler:
             ultimos_skus_mostrados=perfil.ultimos_skus_mostrados,
             precio_min_mostrado=perfil.precio_min_mostrado,
             precio_max_mostrado=perfil.precio_max_mostrado,
+            alternativa_ofrecida=perfil.alternativa_ofrecida,
         )

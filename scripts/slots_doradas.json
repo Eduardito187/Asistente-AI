@@ -1,0 +1,233 @@
+[
+  {
+    "nombre": "C01_slot_categoria",
+    "descripcion": "Categoria explicita dispara buscar_productos con la categoria correcta.",
+    "turnos": [
+      {
+        "mensaje": "muestrame celulares",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener_cualquiera": ["celular", "smartphone", "telefono"]
+      }
+    ]
+  },
+  {
+    "nombre": "C02_slot_subcategoria",
+    "descripcion": "Subcategoria declarada (ultrabook) debe respetarse en la busqueda.",
+    "turnos": [
+      {
+        "mensaje": "quiero una laptop ultrabook",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener_cualquiera": ["laptop", "ultrabook", "Bs"]
+      }
+    ]
+  },
+  {
+    "nombre": "C03_slot_marca",
+    "descripcion": "Marca explicita se refleja en la respuesta.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops hp",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener_cualquiera": ["hp", "HP", "Bs"]
+      }
+    ]
+  },
+  {
+    "nombre": "C04_slot_no_marca",
+    "descripcion": "Cliente excluye marca — no debe recomendarle solo esa marca.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops hp",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "no me gustan las hp, mostrame otras marcas",
+        "no_debe_contener": ["solo hp", "unicamente hp"]
+      }
+    ]
+  },
+  {
+    "nombre": "C05_slot_modelo",
+    "descripcion": "Modelo especifico (iphone 15) no debe crashear y debe intentar busqueda.",
+    "turnos": [
+      {
+        "mensaje": "tienes el iphone 15?",
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "C06_slot_pulgadas",
+    "descripcion": "Pulgadas declaradas se respetan: TV 55\" → resultados de TV.",
+    "turnos": [
+      {
+        "mensaje": "muestrame televisor de 55 pulgadas",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener_cualquiera": ["55", "tv", "televisor", "Bs"]
+      }
+    ]
+  },
+  {
+    "nombre": "C07_slot_capacidad_gb",
+    "descripcion": "Capacidad GB declarada dispara busqueda sin confundir con dinero.",
+    "turnos": [
+      {
+        "mensaje": "quiero un celular con 128 GB de almacenamiento",
+        "tools_requeridas": ["buscar_productos"],
+        "no_debe_contener": ["128 bolivianos", "Bs 128"]
+      }
+    ]
+  },
+  {
+    "nombre": "C08_slot_ram_gb",
+    "descripcion": "RAM declarada dispara busqueda y no se confunde con dinero.",
+    "turnos": [
+      {
+        "mensaje": "laptop con 16 GB de RAM",
+        "tools_requeridas": ["buscar_productos"],
+        "no_debe_contener": ["16 bolivianos"]
+      }
+    ]
+  },
+  {
+    "nombre": "C09_slot_color",
+    "descripcion": "Color declarado no rompe busqueda.",
+    "turnos": [
+      {
+        "mensaje": "laptop de color negro",
+        "tools_requeridas": ["buscar_productos"]
+      }
+    ]
+  },
+  {
+    "nombre": "C10_slot_presupuesto_max",
+    "descripcion": "Presupuesto maximo se respeta y no aparecen precios altos.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops hasta 3000 bolivianos",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener": ["Bs"]
+      }
+    ]
+  },
+  {
+    "nombre": "C11_slot_rango_precio",
+    "descripcion": "Rango de precio explicito (entre X y Y) dispara busqueda.",
+    "turnos": [
+      {
+        "mensaje": "laptops entre 3000 y 5000 bolivianos",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener": ["Bs"]
+      }
+    ]
+  },
+  {
+    "nombre": "C12_slot_uso",
+    "descripcion": "Uso declarado (gaming) no rompe y activa busqueda.",
+    "turnos": [
+      {
+        "mensaje": "laptop para gaming",
+        "tools_requeridas": ["buscar_productos"]
+      }
+    ]
+  },
+  {
+    "nombre": "C13_slot_panel",
+    "descripcion": "Panel OLED declarado se refleja en la respuesta.",
+    "turnos": [
+      {
+        "mensaje": "muestrame televisores oled",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener_cualquiera": ["oled", "OLED", "tv", "televisor", "Bs"]
+      }
+    ]
+  },
+  {
+    "nombre": "C14_slot_resolucion",
+    "descripcion": "Resolucion 4K declarada dispara busqueda.",
+    "turnos": [
+      {
+        "mensaje": "televisor 4k",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener_cualquiera": ["tv", "televisor", "4k", "4K", "Bs"]
+      }
+    ]
+  },
+  {
+    "nombre": "C15_slot_sistema_operativo",
+    "descripcion": "Sistema operativo declarado (android) no rompe busqueda.",
+    "turnos": [
+      {
+        "mensaje": "celular android",
+        "tools_requeridas": ["buscar_productos"]
+      }
+    ]
+  },
+  {
+    "nombre": "C16_slot_cantidad",
+    "descripcion": "Cliente pide cantidad — agente no debe negar ni crashear.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "quiero dos de la primera",
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "C17_slot_ubicacion",
+    "descripcion": "Ubicacion declarada dispara respuesta de politica de envio.",
+    "turnos": [
+      {
+        "mensaje": "hacen envios a santa cruz?",
+        "debe_contener_cualquiera": ["envio", "envío", "delivery", "entrega", "santa cruz"]
+      }
+    ]
+  },
+  {
+    "nombre": "C18_slot_potencia",
+    "descripcion": "Potencia declarada (en watts) no debe romper la busqueda.",
+    "turnos": [
+      {
+        "mensaje": "licuadora de 1000 watts",
+        "tools_requeridas": ["buscar_productos"]
+      }
+    ]
+  },
+  {
+    "nombre": "C19_slot_capacidad_litros",
+    "descripcion": "Capacidad en litros no se confunde con dinero.",
+    "turnos": [
+      {
+        "mensaje": "refrigerador de 300 litros",
+        "tools_requeridas": ["buscar_productos"],
+        "no_debe_contener": ["300 bolivianos"]
+      }
+    ]
+  },
+  {
+    "nombre": "C20_slot_precio_minimo",
+    "descripcion": "Precio minimo (desde X bolivianos) se reconoce como filtro, no crashea.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops desde 3000 bolivianos",
+        "tools_requeridas": ["buscar_productos"],
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "C21_slot_anio_version",
+    "descripcion": "Ano o version se menciona sin crashear el agente.",
+    "turnos": [
+      {
+        "mensaje": "muestrame celulares samsung galaxy s23",
+        "tools_requeridas": ["buscar_productos"],
+        "no_debe_contener": ["error"]
+      }
+    ]
+  }
+]

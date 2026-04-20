@@ -24,6 +24,7 @@ class PerfilSesion:
     ultimos_skus_mostrados: Optional[str] = None
     precio_min_mostrado: Optional[float] = None
     precio_max_mostrado: Optional[float] = None
+    alternativa_ofrecida: Optional[str] = None
 
     @staticmethod
     def vacio(sesion_id: UUID) -> "PerfilSesion":
@@ -40,6 +41,7 @@ class PerfilSesion:
             ultimos_skus_mostrados=None,
             precio_min_mostrado=None,
             precio_max_mostrado=None,
+            alternativa_ofrecida=None,
         )
 
     def esta_vacio(self) -> bool:
@@ -65,4 +67,5 @@ class PerfilSesion:
             ultimos_skus_mostrados=otro.ultimos_skus_mostrados or self.ultimos_skus_mostrados,
             precio_min_mostrado=otro.precio_min_mostrado or self.precio_min_mostrado,
             precio_max_mostrado=otro.precio_max_mostrado or self.precio_max_mostrado,
+            alternativa_ofrecida=otro.alternativa_ofrecida or self.alternativa_ofrecida,
         )

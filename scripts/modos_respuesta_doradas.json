@@ -1,0 +1,157 @@
+[
+  {
+    "nombre": "T01_respuesta_catalogo",
+    "descripcion": "Pedido directo de producto -> modo catalogo (buscar_productos + lista con Bs).",
+    "turnos": [
+      {
+        "mensaje": "muestrame audifonos bluetooth",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener": ["Bs"]
+      }
+    ]
+  },
+  {
+    "nombre": "T02_respuesta_asesor",
+    "descripcion": "Pregunta abierta activa respuesta tipo asesor: sin crash.",
+    "turnos": [
+      {
+        "mensaje": "que me recomiendas para empezar a trabajar desde casa?",
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "T03_respuesta_comparacion",
+    "descripcion": "'comparalos' tras mostrar -> modo comparacion short-circuit.",
+    "turnos": [
+      {
+        "mensaje": "muestrame televisores 55",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "comparalos",
+        "tools_requeridas_cualquiera": [
+          "comparar_productos",
+          "follow_up_comparacion",
+          "buscar_productos"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "T04_respuesta_mas_barato",
+    "descripcion": "'mas barato' activa responder mas barato.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "la mas barata",
+        "tools_requeridas_cualquiera": [
+          "follow_up_mas_barato",
+          "follow_up_mas_barato_vacio",
+          "buscar_productos"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "T05_respuesta_mejor_opcion",
+    "descripcion": "'mejor opcion' activa responder mejor opcion.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "cual es la mejor opcion",
+        "tools_requeridas_cualquiera": [
+          "follow_up_mas_caro",
+          "follow_up_mas_caro_vacio",
+          "buscar_productos"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "T06_respuesta_mostrar_mas",
+    "descripcion": "'otras opciones' activa follow_up_otra_opcion.",
+    "turnos": [
+      {
+        "mensaje": "muestrame celulares",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "muestrame mas opciones",
+        "tools_requeridas_cualquiera": [
+          "follow_up_otra_opcion",
+          "follow_up_otra_opcion_vacio",
+          "buscar_productos"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "T07_respuesta_no_disponible",
+    "descripcion": "Pedido de vertical no existente -> respuesta no disponible.",
+    "turnos": [
+      {
+        "mensaje": "quiero comprar un yate",
+        "debe_contener_cualquiera": [
+          "no tenemos",
+          "no vendemos",
+          "no disponi",
+          "no manejamos",
+          "no comercializamos"
+        ],
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "T08_respuesta_categoria_relacionada",
+    "descripcion": "Auto -> modo categoria relacionada (motocicleta).",
+    "turnos": [
+      {
+        "mensaje": "quiero un auto",
+        "debe_contener_cualquiera": [
+          "motocicleta",
+          "moto",
+          "scooter",
+          "no vendemos"
+        ],
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "T09_respuesta_compra",
+    "descripcion": "Intencion de compra tras mostrar -> accion carrito.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "agrega la primera al carrito",
+        "tools_requeridas_cualquiera": [
+          "agregar_al_carrito",
+          "atajo_ordinal_carrito",
+          "buscar_productos"
+        ],
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "T10_respuesta_postventa",
+    "descripcion": "Pregunta postventa (garantia/envio) no debe crashear.",
+    "turnos": [
+      {
+        "mensaje": "tienen garantia en las lavadoras?",
+        "no_debe_contener": ["error"]
+      }
+    ]
+  }
+]

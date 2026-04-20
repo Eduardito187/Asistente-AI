@@ -33,6 +33,7 @@ class ValidadorFiltrosDuros:
             and cls._cumple_minimos(p, filtros)
             and cls._cumple_potencia_max(p, filtros)
             and cls._cumple_iguales(p, filtros)
+            and cls._cumple_es_electrico(p, filtros)
         )
 
     @staticmethod
@@ -100,3 +101,12 @@ class ValidadorFiltrosDuros:
             if actual != esperado.lower():
                 return False
         return True
+
+    @staticmethod
+    def _cumple_es_electrico(p, filtros: dict) -> bool:
+        """Booleano estricto: si el filtro pide electrico=True/False, un producto
+        con es_electrico=None queda fuera (desconocido != confirmado)."""
+        esperado = filtros.get("es_electrico")
+        if esperado is None:
+            return True
+        return p.es_electrico is not None and bool(p.es_electrico) == bool(esperado)

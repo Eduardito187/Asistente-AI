@@ -1,0 +1,162 @@
+[
+  {
+    "nombre": "U01_no_cerrar_muy_pronto",
+    "descripcion": "Tras un saludo, NO debe empujar al carrito.",
+    "turnos": [
+      {
+        "mensaje": "hola, me recomiendan algo?",
+        "tools_prohibidas": ["agregar_al_carrito"],
+        "no_debe_contener": ["lo agrego al carrito", "cerrar compra ya"]
+      }
+    ]
+  },
+  {
+    "nombre": "U02_no_carrito_mientras_compara",
+    "descripcion": "Cliente comparando no debe recibir push de carrito.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "cual es mejor para trabajar?",
+        "tools_prohibidas": ["agregar_al_carrito"]
+      }
+    ]
+  },
+  {
+    "nombre": "U03_detectar_senal_compra",
+    "descripcion": "Senal clara ('me la llevo') debe ofrecer carrito/cierre.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "me llevo la primera",
+        "tools_requeridas_cualquiera": [
+          "agregar_al_carrito",
+          "atajo_ordinal_carrito",
+          "ver_producto",
+          "buscar_productos"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "U04_ofrecer_carrito_cuando_eligio",
+    "descripcion": "Cliente dice 'esa me gusta' tras ver: abrir camino al carrito.",
+    "turnos": [
+      {
+        "mensaje": "muestrame tvs 55 pulgadas",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "la primera me gusta",
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "U05_ofrecer_cotizacion",
+    "descripcion": "Cliente pide cotizacion: respuesta no debe crashear.",
+    "turnos": [
+      {
+        "mensaje": "me podes armar una cotizacion para 5 laptops lenovo?",
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "U06_ofrecer_reserva",
+    "descripcion": "Cliente pide reservar tras ver productos: mencionar reserva/carrito/tienda.",
+    "turnos": [
+      {
+        "mensaje": "muestrame televisores 55 pulgadas",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "puedo reservar o apartar la primera para pasar a recogerla manana?",
+        "no_debe_contener": ["error"],
+        "debe_contener_cualquiera": [
+          "reserva",
+          "apart",
+          "recoger",
+          "recog",
+          "tienda",
+          "sucursal",
+          "carrito",
+          "Bs"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "U07_ofrecer_medios_pago",
+    "descripcion": "Cliente pregunta como pagar tras ver productos: debe listar opciones.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "que formas de pago aceptan?",
+        "debe_contener_cualquiera": [
+          "tarjeta",
+          "efectivo",
+          "transferencia",
+          "QR",
+          "qr",
+          "credito",
+          "crédito",
+          "cuotas",
+          "contado"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "U08_ofrecer_envio_o_sucursal",
+    "descripcion": "Cliente pregunta como recibir el producto: envio o sucursal.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "hacen envio a domicilio o solo retiro en tienda?",
+        "debe_contener_cualquiera": [
+          "envio",
+          "envío",
+          "entrega",
+          "sucursal",
+          "tienda",
+          "delivery",
+          "retiro",
+          "retir",
+          "domicilio",
+          "local"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "U09_tono_sin_presionar",
+    "descripcion": "Cliente dudando: no debe cerrar con frases presionantes.",
+    "turnos": [
+      {
+        "mensaje": "muestrame celulares",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "no se, lo estoy pensando",
+        "no_debe_contener": [
+          "ultimas unidades",
+          "no te lo pierdas",
+          "compra ya",
+          "oferta por hoy"
+        ]
+      }
+    ]
+  }
+]

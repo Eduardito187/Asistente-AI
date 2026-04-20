@@ -34,4 +34,7 @@ class ProductoMapper:
             color=r.get("color"),
             tipo_panel=r.get("tipo_panel"),
             resolucion=r.get("resolucion"),
+            es_electrico=(
+                bool(r["es_electrico"]) if r.get("es_electrico") is not None else None
+            ),
         )

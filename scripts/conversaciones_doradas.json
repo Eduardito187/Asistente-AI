@@ -1,6 +1,6 @@
 [
   {
-    "nombre": "saludo_sin_listar",
+    "nombre": "A01_saludo_generico",
     "descripcion": "Un simple hola no debe listar productos ni SKUs inventados.",
     "turnos": [
       {
@@ -11,8 +11,62 @@
     ]
   },
   {
-    "nombre": "buscar_laptop_basico",
-    "descripcion": "Pedir una laptop debe disparar buscar_productos y citar Bs.",
+    "nombre": "A02_saludo_con_intencion_compra",
+    "descripcion": "'Hola, necesito una laptop' debe saludar Y disparar busqueda.",
+    "turnos": [
+      {
+        "mensaje": "Hola, necesito una laptop",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener": ["Bs"]
+      }
+    ]
+  },
+  {
+    "nombre": "A03_directo_producto",
+    "descripcion": "Pedido directo de producto dispara busqueda y cita Bs.",
+    "turnos": [
+      {
+        "mensaje": "Muestrame freidoras de aire",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener": ["Bs"],
+        "no_debe_contener": ["dolares", "$"]
+      }
+    ]
+  },
+  {
+    "nombre": "A04_mensaje_corto_precio",
+    "descripcion": "'precio' sin contexto no debe listar productos random; debe pedir aclaracion.",
+    "turnos": [
+      {
+        "mensaje": "precio",
+        "tools_prohibidas": ["buscar_productos"],
+        "no_debe_contener": ["Bs 14", "Bs 99"]
+      }
+    ]
+  },
+  {
+    "nombre": "A05_mensaje_ambiguo_opciones",
+    "descripcion": "'quiero ver opciones' sin categoria debe pedir aclaracion, no inventar.",
+    "turnos": [
+      {
+        "mensaje": "quiero ver opciones",
+        "tools_prohibidas": ["buscar_productos"]
+      }
+    ]
+  },
+  {
+    "nombre": "A06_marca_sin_categoria",
+    "descripcion": "'xiaomi' suelto debe pedir categoria o mostrar catalogo xiaomi, sin inventar.",
+    "turnos": [
+      {
+        "mensaje": "xiaomi",
+        "no_debe_contener": ["dolares", "$", "Voorhees"]
+      }
+    ]
+  },
+  {
+    "nombre": "A07_categoria_sin_marca",
+    "descripcion": "Pedir laptops sin marca debe funcionar y citar Bs.",
     "turnos": [
       {
         "mensaje": "Muestrame laptops disponibles",
@@ -23,11 +77,97 @@
     ]
   },
   {
-    "nombre": "presupuesto_respetado",
-    "descripcion": "Si el cliente declara presupuesto, la respuesta no debe sugerir nada por encima.",
+    "nombre": "A08_categoria_con_atributo",
+    "descripcion": "Categoria + atributo filtrado: 'laptop con 16gb de ram'.",
     "turnos": [
       {
-        "mensaje": "Quiero una laptop hasta 3000 bolivianos",
+        "mensaje": "laptop con 16gb de ram",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener": ["Bs"]
+      }
+    ]
+  },
+  {
+    "nombre": "A09_typo_producto",
+    "descripcion": "Typo 'laptp' debe tolerarse y devolver laptops igualmente.",
+    "turnos": [
+      {
+        "mensaje": "quiero una laptp",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener": ["laptop"]
+      }
+    ]
+  },
+  {
+    "nombre": "A10_plural_singular",
+    "descripcion": "'televisor' y 'televisores' deben ambos disparar busqueda de TVs.",
+    "turnos": [
+      {
+        "mensaje": "busco televisor",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener": ["Bs"]
+      },
+      {
+        "mensaje": "y televisores mas grandes?",
+        "tools_requeridas_cualquiera": [
+          "buscar_productos",
+          "follow_up_otra_opcion",
+          "follow_up_mas_caro",
+          "follow_up_refinamiento_subconjunto",
+          "follow_up_refinamiento_ampliado"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "A11_modismo_local",
+    "descripcion": "'celu' boliviano debe entenderse como celular.",
+    "turnos": [
+      {
+        "mensaje": "muestrame un celu barato",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener": ["Bs"]
+      }
+    ]
+  },
+  {
+    "nombre": "A12_texto_muy_corto",
+    "descripcion": "Texto ultra-corto 'ok' no debe crashear ni listar.",
+    "turnos": [
+      {
+        "mensaje": "ok",
+        "tools_prohibidas": ["buscar_productos"]
+      }
+    ]
+  },
+  {
+    "nombre": "A13_texto_muy_largo",
+    "descripcion": "Texto largo con divagacion debe procesarse sin crashear.",
+    "turnos": [
+      {
+        "mensaje": "Hola buenas tardes, les cuento que estoy buscando una laptop para trabajar desde casa, hacer videollamadas con el equipo, ver Netflix cuando me desocupo y tambien que aguante uno o dos jueguitos ligeros. Mi presupuesto maximo es de 5000 bolivianos, no me importa mucho la marca pero quiero algo que dure. Que me recomiendas?",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener": ["Bs"]
+      }
+    ]
+  },
+  {
+    "nombre": "A14_varias_condiciones",
+    "descripcion": "Multiples filtros en una sola frase: marca + atributo + presupuesto.",
+    "turnos": [
+      {
+        "mensaje": "laptop hp con 16gb de ram hasta 6000 bolivianos",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener": ["Bs"]
+      }
+    ]
+  },
+  {
+    "nombre": "A15_varias_categorias",
+    "descripcion": "'laptop y mouse' debe responder sin crashear; acepta buscar al menos uno.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptop y mouse",
         "tools_requeridas": ["buscar_productos"],
         "debe_contener": ["Bs"]
       }
@@ -44,8 +184,29 @@
     ]
   },
   {
-    "nombre": "flujo_comparar",
-    "descripcion": "Tras ver opciones, pedir comparar dispara comparar_productos.",
+    "nombre": "locale_boliviano",
+    "descripcion": "Nunca debe usar modismos de otros paises.",
+    "turnos": [
+      {
+        "mensaje": "Que tal, necesito consejo",
+        "no_debe_contener": ["tio", "guay", "orale", "che ", "pibe"]
+      }
+    ]
+  },
+  {
+    "nombre": "presupuesto_respetado",
+    "descripcion": "Si el cliente declara presupuesto, la respuesta no debe sugerir nada por encima.",
+    "turnos": [
+      {
+        "mensaje": "Quiero una laptop hasta 3000 bolivianos",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener": ["Bs"]
+      }
+    ]
+  },
+  {
+    "nombre": "flujo_comparar_shortcircuit",
+    "descripcion": "Tras ver opciones, 'comparalos' cae en el responder de comparacion.",
     "turnos": [
       {
         "mensaje": "Muestrame televisores 55 pulgadas",
@@ -53,17 +214,11 @@
       },
       {
         "mensaje": "Comparame los dos primeros",
-        "tools_requeridas_cualquiera": ["comparar_productos", "buscar_productos"]
-      }
-    ]
-  },
-  {
-    "nombre": "locale_boliviano",
-    "descripcion": "Nunca debe usar modismos de otros paises.",
-    "turnos": [
-      {
-        "mensaje": "Que tal, necesito consejo",
-        "no_debe_contener": ["tio", "guay", "orale", "che ", "pibe"]
+        "tools_requeridas_cualquiera": [
+          "comparar_productos",
+          "buscar_productos",
+          "follow_up_comparacion"
+        ]
       }
     ]
   }

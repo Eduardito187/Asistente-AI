@@ -32,6 +32,7 @@ class Producto:
     color: Optional[str] = None
     tipo_panel: Optional[str] = None
     resolucion: Optional[str] = None
+    es_electrico: Optional[bool] = None
 
     def disponible(self) -> bool:
         return self.activo and self.stock > 0

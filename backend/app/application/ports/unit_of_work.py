@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ...domain.carritos import CarritoRepository
+    from ...domain.catalogo import CatalogoKeywordsRepository
     from ...domain.chat import ChatRepository
     from ...domain.conversaciones_curadas import ConversacionesCuradasRepository
     from ...domain.feedback_ordenes import FeedbackOrdenesRepository
@@ -31,6 +32,7 @@ class UnitOfWork(ABC):
     perfiles_sesion: "PerfilSesionRepository"
     feedback_ordenes: "FeedbackOrdenesRepository"
     productos_embeddings: "ProductosEmbeddingsRepository"
+    catalogo_keywords: "CatalogoKeywordsRepository"
 
     @abstractmethod
     def __enter__(self) -> "UnitOfWork": ...

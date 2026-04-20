@@ -1,0 +1,170 @@
+[
+  {
+    "nombre": "W01_consultar_stock",
+    "descripcion": "'hay stock?' debe aludir a disponibilidad / sucursal.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops hp",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "hay stock de la primera?",
+        "no_debe_contener": ["error"],
+        "debe_contener_cualquiera": [
+          "stock",
+          "disponi",
+          "tenemos",
+          "sucursal",
+          "tienda",
+          "Bs"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "W02_stock_en_sucursal",
+    "descripcion": "'hay stock en sucursal X' debe hablar de sucursal.",
+    "turnos": [
+      {
+        "mensaje": "hay stock en la sucursal de cochabamba?",
+        "debe_contener_cualquiera": [
+          "sucursal",
+          "tienda",
+          "cochabamba",
+          "stock",
+          "disponi"
+        ],
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "W03_hay_envio",
+    "descripcion": "'hacen envios?' debe hablar de envio.",
+    "turnos": [
+      {
+        "mensaje": "hacen envios a domicilio?",
+        "debe_contener_cualquiera": [
+          "envio",
+          "envío",
+          "delivery",
+          "entrega",
+          "domicilio"
+        ],
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "W04_llega_a_provincia",
+    "descripcion": "'envian a provincia?' debe hablar de envio a regiones.",
+    "turnos": [
+      {
+        "mensaje": "envian a tarija?",
+        "debe_contener_cualquiera": [
+          "envio",
+          "envío",
+          "tarija",
+          "provincia",
+          "entrega",
+          "delivery",
+          "courier"
+        ],
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "W05_consultar_color",
+    "descripcion": "'en que colores viene?' no debe crashear.",
+    "turnos": [
+      {
+        "mensaje": "muestrame celulares samsung",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "en que colores viene el primero?",
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "W06_consultar_version",
+    "descripcion": "'que versiones tienen?' no debe crashear.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops lenovo",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "tienen otra version de esa?",
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "W07_mas_unidades",
+    "descripcion": "'cuantas unidades hay?' no debe inventar numero exacto falso.",
+    "turnos": [
+      {
+        "mensaje": "muestrame televisores 55",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "cuantas unidades hay de esa?",
+        "no_debe_contener": [
+          "exactamente 47 unidades",
+          "tenemos 100 unidades garantizadas"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "W08_fecha_entrega",
+    "descripcion": "'cuando llega?' debe hablar de tiempo de entrega.",
+    "turnos": [
+      {
+        "mensaje": "si lo compro hoy, cuando llega?",
+        "debe_contener_cualquiera": [
+          "entrega",
+          "dia",
+          "día",
+          "envio",
+          "envío",
+          "demora",
+          "tiempo",
+          "horario",
+          "24 h",
+          "48 h",
+          "plazo"
+        ],
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "W09_retiro_en_tienda",
+    "descripcion": "'paso a recoger a la tienda' tras ver producto: menciona tienda/sucursal.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "puedo pasar a recogerla a la tienda en lugar de envio?",
+        "debe_contener_cualquiera": [
+          "tienda",
+          "sucursal",
+          "retiro",
+          "recog",
+          "recoj",
+          "local",
+          "envio",
+          "envío",
+          "Dismac"
+        ],
+        "no_debe_contener": ["error"]
+      }
+    ]
+  }
+]

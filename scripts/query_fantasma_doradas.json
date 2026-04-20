@@ -1,0 +1,93 @@
+[
+  {
+    "nombre": "S01_no_ejemplo_prompt",
+    "descripcion": "Saludo no debe listar ejemplos que aparecen en el system prompt (laptop rtx, freidora, iphone 15).",
+    "turnos": [
+      {
+        "mensaje": "hola buenas",
+        "tools_prohibidas": ["buscar_productos"],
+        "no_debe_contener": ["laptop rtx", "iphone 15", "freidora"]
+      }
+    ]
+  },
+  {
+    "nombre": "S02_no_busqueda_otra_conversacion",
+    "descripcion": "Sesion fresca no trae resultados de sesiones previas.",
+    "turnos": [
+      {
+        "mensaje": "hola",
+        "tools_prohibidas": ["buscar_productos"]
+      }
+    ]
+  },
+  {
+    "nombre": "S03_no_busqueda_otro_test",
+    "descripcion": "Aislamiento: 'hola' no arrastra query de tests anteriores (laptops HP, tvs 55).",
+    "turnos": [
+      {
+        "mensaje": "hola",
+        "tools_prohibidas": ["buscar_productos"],
+        "no_debe_contener": ["hp gaming", "55 pulgadas", "xiaomi"]
+      }
+    ]
+  },
+  {
+    "nombre": "S04_no_texto_hardcodeado",
+    "descripcion": "Saludo no devuelve respuesta canned con productos.",
+    "turnos": [
+      {
+        "mensaje": "que tal!",
+        "tools_prohibidas": ["buscar_productos"],
+        "no_debe_contener": ["Bs ", "SKU", "stock"]
+      }
+    ]
+  },
+  {
+    "nombre": "S05_no_lavadora_samsung_8kg_fantasma",
+    "descripcion": "Ningun mensaje menciona Samsung/8kg, NO debe aparecer en respuesta.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops",
+        "tools_requeridas": ["buscar_productos"],
+        "no_debe_contener": [
+          "lavadora samsung 8kg",
+          "lavadora Samsung 8 kg",
+          "lavadora samsung 8 kg"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "S06_no_marcas_no_mencionadas",
+    "descripcion": "Pedir audifonos generico no debe citar marcas fuera de catalogo.",
+    "turnos": [
+      {
+        "mensaje": "muestrame audifonos",
+        "tools_requeridas": ["buscar_productos"],
+        "no_debe_contener": ["Bose Quietcomfort", "AirPods Max 2", "Marshall Monitor III"]
+      }
+    ]
+  },
+  {
+    "nombre": "S07_no_categorias_no_mencionadas",
+    "descripcion": "Pedido de laptops no debe traer proyector ni mueble.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops",
+        "tools_requeridas": ["buscar_productos"],
+        "no_debe_contener": ["proyector", "mueble de sala", "colchon"]
+      }
+    ]
+  },
+  {
+    "nombre": "S08_query_en_respuesta_debug",
+    "descripcion": "Query efectiva aparece reflejada: pedir 'laptops hp' menciona HP en respuesta.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops hp",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener_cualquiera": ["HP", "Hp", "hp"]
+      }
+    ]
+  }
+]

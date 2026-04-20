@@ -1,0 +1,155 @@
+[
+  {
+    "nombre": "M01_nuevas_opciones_distintas",
+    "descripcion": "'otras opciones' activa follow_up_otra_opcion.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "otras opciones",
+        "tools_requeridas_cualquiera": [
+          "follow_up_otra_opcion",
+          "follow_up_otra_opcion_vacio",
+          "buscar_productos"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "M02_excluye_mostrados",
+    "descripcion": "Tras mostrar A, 'otras opciones' NO debe repetir A exactamente.",
+    "turnos": [
+      {
+        "mensaje": "muestrame audifonos",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "muestrame otras distintas a las que ya me diste",
+        "tools_requeridas_cualquiera": [
+          "follow_up_otra_opcion",
+          "follow_up_otra_opcion_vacio",
+          "buscar_productos"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "M03_mantiene_categoria",
+    "descripcion": "'otras opciones' mantiene la categoria.",
+    "turnos": [
+      {
+        "mensaje": "muestrame celulares",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "otras opciones",
+        "no_debe_contener": ["laptop", "televisor", "refrigerador"]
+      }
+    ]
+  },
+  {
+    "nombre": "M04_mantiene_marca",
+    "descripcion": "'otras opciones' respeta marca fijada (HP).",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops hp",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "otras opciones",
+        "no_debe_contener": ["cambiar marca"]
+      }
+    ]
+  },
+  {
+    "nombre": "M05_mantiene_presupuesto",
+    "descripcion": "'otras opciones' respeta presupuesto.",
+    "turnos": [
+      {
+        "mensaje": "laptops hasta 3000 bolivianos",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "otras opciones",
+        "tools_requeridas_cualquiera": [
+          "follow_up_otra_opcion",
+          "follow_up_otra_opcion_vacio",
+          "buscar_productos"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "M06_mantiene_atributos",
+    "descripcion": "'otras opciones' respeta atributos (pulgadas).",
+    "turnos": [
+      {
+        "mensaje": "muestrame tvs de 55 pulgadas",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "otras opciones",
+        "tools_requeridas_cualquiera": [
+          "follow_up_otra_opcion",
+          "follow_up_otra_opcion_vacio",
+          "buscar_productos"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "M07_no_repetir_mismos",
+    "descripcion": "'otras opciones' NO debe devolver exactamente los mismos productos.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops hp",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "otras diferentes",
+        "tools_requeridas_cualquiera": [
+          "follow_up_otra_opcion",
+          "follow_up_otra_opcion_vacio",
+          "buscar_productos"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "M08_decir_no_hay_mas",
+    "descripcion": "Si no hay mas opciones, responde honestamente (no inventa).",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops hp hasta 1000 bolivianos",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "otras opciones",
+        "debe_contener_cualquiera": [
+          "no encontre",
+          "no hay",
+          "no tengo",
+          "flexibiliz",
+          "ampliar",
+          "Bs"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "M09_proponer_ampliar_criterios",
+    "descripcion": "Si se agotaron, agente propone ampliar (marca/precio/atributo).",
+    "turnos": [
+      {
+        "mensaje": "muestrame tvs 85 pulgadas hasta 500 bolivianos",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "otras opciones",
+        "no_debe_contener": ["error"]
+      }
+    ]
+  }
+]

@@ -27,4 +27,5 @@ class PerfilSesionMapper:
             ultimos_skus_mostrados=r.get("ultimos_skus_mostrados"),
             precio_min_mostrado=float(pmin_mostrado) if pmin_mostrado is not None else None,
             precio_max_mostrado=float(pmax_mostrado) if pmax_mostrado is not None else None,
+            alternativa_ofrecida=r.get("alternativa_ofrecida"),
         )

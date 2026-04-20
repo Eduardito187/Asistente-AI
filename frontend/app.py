@@ -11,31 +11,47 @@ import json
 import os
 from urllib.parse import quote
 
+import time
+
 import httpx
 import streamlit as st
 
 BACKEND_URL = os.environ.get("BACKEND_URL", "http://backend:8000")
 
 
-# ------------------------------------------------------------
-# Helpers
-# ------------------------------------------------------------
+class BackendNoDisponibleError(RuntimeError):
+    """El backend no respondio (caido o reiniciando)."""
+
+
+def _request_con_reintentos(method: str, path: str, *, timeout: int, **kwargs):
+    delays = (0.0, 1.0, 2.0)
+    ultimo_error: Exception | None = None
+    for espera in delays:
+        if espera:
+            time.sleep(espera)
+        try:
+            r = httpx.request(method, f"{BACKEND_URL}{path}", timeout=timeout, **kwargs)
+            r.raise_for_status()
+            return r.json()
+        except (httpx.ConnectError, httpx.ReadError, httpx.RemoteProtocolError) as exc:
+            ultimo_error = exc
+            continue
+    raise BackendNoDisponibleError(
+        f"El servidor no respondio tras 3 intentos ({method} {path}). "
+        "Probablemente esta reiniciando. Intenta de nuevo en unos segundos."
+    ) from ultimo_error
+
+
 def api_get(path: str, **kwargs):
-    r = httpx.get(f"{BACKEND_URL}{path}", timeout=30, **kwargs)
-    r.raise_for_status()
-    return r.json()
+    return _request_con_reintentos("GET", path, timeout=30, **kwargs)
 
 
 def api_post(path: str, **kwargs):
-    r = httpx.post(f"{BACKEND_URL}{path}", timeout=180, **kwargs)
-    r.raise_for_status()
-    return r.json()
+    return _request_con_reintentos("POST", path, timeout=180, **kwargs)
 
 
 def api_delete(path: str):
-    r = httpx.delete(f"{BACKEND_URL}{path}", timeout=20)
-    r.raise_for_status()
-    return r.json()
+    return _request_con_reintentos("DELETE", path, timeout=20)
 
 
 def imagen_url(producto: dict) -> str:
@@ -405,6 +421,41 @@ def _paso_humano(paso: dict) -> str:
     return fn(paso.get("args") or {}, result) if fn else ""
 
 
+def _render_tarjeta_producto(p: dict, key_prefix: str):
+    st.image(imagen_url(p), use_column_width=True)
+    st.markdown(f"**{p['nombre']}**")
+    st.caption(f"SKU `{p['sku']}` · {p.get('marca') or '—'}")
+    st.markdown(formato_precio(p), unsafe_allow_html=True)
+    if p.get("justificacion"):
+        st.caption(f"💡 _{p['justificacion']}_")
+    b1, b2 = st.columns([2, 1])
+    with b1:
+        agregar = st.button(
+            "🛒 Agregar",
+            key=f"{key_prefix}_add_{p['sku']}",
+            use_container_width=True,
+        )
+    with b2:
+        mas_info = st.button(
+            "ℹ️",
+            key=f"{key_prefix}_info_{p['sku']}",
+            help="Preguntar más detalles",
+        )
+    if agregar:
+        try:
+            agregar_carrito(p["sku"])
+        except BackendNoDisponibleError as exc:
+            st.error(str(exc))
+            st.stop()
+        st.toast(f"Agregado: {p['nombre']}", icon="✅")
+        st.rerun()
+    if mas_info:
+        st.session_state.pending_input = (
+            f"Contame más sobre el producto {p['sku']}, ¿qué ventajas tiene?"
+        )
+        st.rerun()
+
+
 def render_tarjetas(productos: list[dict], key_prefix: str):
     if not productos:
         return
@@ -414,34 +465,7 @@ def render_tarjetas(productos: list[dict], key_prefix: str):
         cols = st.columns(cols_por_fila)
         for col, p in zip(cols, productos[i : i + cols_por_fila]):
             with col, st.container(border=True):
-                st.image(imagen_url(p), use_column_width=True)
-                st.markdown(f"**{p['nombre']}**")
-                st.caption(f"SKU `{p['sku']}` · {p.get('marca') or '—'}")
-                st.markdown(formato_precio(p), unsafe_allow_html=True)
-                if p.get("justificacion"):
-                    st.caption(f"💡 _{p['justificacion']}_")
-                b1, b2 = st.columns([2, 1])
-                with b1:
-                    agregar = st.button(
-                        "🛒 Agregar",
-                        key=f"{key_prefix}_add_{p['sku']}",
-                        use_container_width=True,
-                    )
-                with b2:
-                    mas_info = st.button(
-                        "ℹ️",
-                        key=f"{key_prefix}_info_{p['sku']}",
-                        help="Preguntar más detalles",
-                    )
-                if agregar:
-                    agregar_carrito(p["sku"])
-                    st.toast(f"Agregado: {p['nombre']}", icon="✅")
-                    st.rerun()
-                if mas_info:
-                    st.session_state.pending_input = (
-                        f"Contame más sobre el producto {p['sku']}, ¿qué ventajas tiene?"
-                    )
-                    st.rerun()
+                _render_tarjeta_producto(p, key_prefix)
 
 
 # Render de historial

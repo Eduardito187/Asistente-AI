@@ -1,5 +1,6 @@
 from .carrito_read_sql import CarritoReadSql
 from .carrito_sql import CarritoSql
+from .catalogo_keywords_sql import CatalogoKeywordsSql
 from .chat_sql import ChatSql
 from .conversacion_curada_sql import ConversacionCuradaSql
 from .dashboard_metricas_sql import DashboardMetricasSql
@@ -15,6 +16,7 @@ from .sugerencia_catalogo_sql import SugerenciaCatalogoSql
 __all__ = [
     "CarritoReadSql",
     "CarritoSql",
+    "CatalogoKeywordsSql",
     "ChatSql",
     "ConversacionCuradaSql",
     "DashboardMetricasSql",

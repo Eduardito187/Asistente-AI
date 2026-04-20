@@ -1,0 +1,146 @@
+[
+  {
+    "nombre": "P01_celular_no_funda",
+    "descripcion": "Pedir celular devuelve smartphones, no accesorios como principal.",
+    "turnos": [
+      {
+        "mensaje": "muestrame celulares",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener": ["Bs"],
+        "no_debe_contener": [
+          "funda disponible",
+          "protector de pantalla disponible",
+          "cargador en stock"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "P02_celular_xiaomi_no_accesorio",
+    "descripcion": "'Xiaomi' debe ir a Smartphones Xiaomi, no a fundas Xiaomi.",
+    "turnos": [
+      {
+        "mensaje": "muestrame celulares xiaomi",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener": ["Bs"],
+        "no_debe_contener": ["funda disponible", "protector disponible"]
+      }
+    ]
+  },
+  {
+    "nombre": "P03_televisor_no_soporte",
+    "descripcion": "Pedir televisor no debe devolver soporte o mueble como principal.",
+    "turnos": [
+      {
+        "mensaje": "muestrame televisores",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener": ["Bs"],
+        "no_debe_contener": [
+          "soporte disponible",
+          "mueble disponible",
+          "cable hdmi disponible"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "P04_lavadora_no_plancha",
+    "descripcion": "Pedir lavadoras no debe caer a planchas o accesorios lavado.",
+    "turnos": [
+      {
+        "mensaje": "muestrame lavadoras",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener": ["Bs", "lavadora"],
+        "no_debe_contener": [
+          "plancha disponible",
+          "detergente",
+          "repuesto"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "P05_motocicleta_no_casco",
+    "descripcion": "Pedir motocicleta no debe devolver casco o aceite como principal.",
+    "turnos": [
+      {
+        "mensaje": "muestrame motocicletas",
+        "tools_requeridas": ["buscar_productos"],
+        "no_debe_contener": [
+          "casco disponible",
+          "aceite disponible",
+          "repuesto disponible",
+          "accesorios auto disponibles"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "P06_accesorio_explicito_ok",
+    "descripcion": "Si el usuario pide accesorio explicitamente, esta permitido mostrarlo.",
+    "turnos": [
+      {
+        "mensaje": "necesito una funda para celular",
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "P07_soporte_tv_explicito_ok",
+    "descripcion": "'soporte para tv' es pedido de accesorio: permitido.",
+    "turnos": [
+      {
+        "mensaje": "quiero un soporte para televisor",
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "P08_cross_sell_permitido",
+    "descripcion": "Tras pedir principal (celular), preguntar accesorio es valido.",
+    "turnos": [
+      {
+        "mensaje": "muestrame celulares samsung",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "y una funda para ese?",
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "P09_celular_marca_fake_no_accesorio",
+    "descripcion": "Marca fake para celular no debe caer a fundas: ofrece otros smartphones.",
+    "turnos": [
+      {
+        "mensaje": "celular Phantom Neptune 5000",
+        "no_debe_contener": [
+          "error",
+          "funda disponible",
+          "protector disponible"
+        ],
+        "debe_contener_cualquiera": [
+          "smartphone",
+          "no tenemos",
+          "no encontr",
+          "similar",
+          "equivalente",
+          "Bs"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "P10_televisor_no_proyector",
+    "descripcion": "Pedir televisor no debe devolver proyectores (otra subcategoria).",
+    "turnos": [
+      {
+        "mensaje": "muestrame televisores 65 pulgadas",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener": ["Bs"],
+        "no_debe_contener": ["proyector disponible"]
+      }
+    ]
+  }
+]

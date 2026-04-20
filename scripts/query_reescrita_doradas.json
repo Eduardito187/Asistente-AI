@@ -1,0 +1,128 @@
+[
+  {
+    "nombre": "R01_query_usa_categoria_activa",
+    "descripcion": "Tras T1 laptops, T2 'mas barata' debe seguir en laptops.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "alguna mas barata",
+        "tools_requeridas_cualquiera": [
+          "follow_up_mas_barato",
+          "follow_up_mas_barato_vacio",
+          "buscar_productos"
+        ],
+        "no_debe_contener": ["televisor", "celular", "refrigerador"]
+      }
+    ]
+  },
+  {
+    "nombre": "R02_query_respeta_marca_activa",
+    "descripcion": "T1 laptops HP, T2 follow-up debe mantener HP (no saltar a otra marca).",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops hp",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "otras opciones",
+        "no_debe_contener": ["solo lenovo", "solo acer", "cambiar a asus"]
+      }
+    ]
+  },
+  {
+    "nombre": "R03_query_respeta_intencion_activa",
+    "descripcion": "T1 mas barato, T2 'otra' debe seguir en lnea economica.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops hasta 4000 bolivianos",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "otra mas economica",
+        "tools_requeridas_cualquiera": [
+          "follow_up_mas_barato",
+          "follow_up_mas_barato_vacio",
+          "follow_up_otra_opcion",
+          "follow_up_otra_opcion_vacio",
+          "buscar_productos"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "R04_no_introducir_entidad_fantasma",
+    "descripcion": "Query de laptop no debe mencionar 'lavadora Samsung 8kg' u otra entidad fantasma.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops",
+        "tools_requeridas": ["buscar_productos"],
+        "no_debe_contener": [
+          "lavadora Samsung 8kg",
+          "lavadora samsung 8 kg",
+          "freidora sin aceite Philips",
+          "iphone 15"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "R05_no_cambiar_vertical_sin_permiso",
+    "descripcion": "T1 celulares, T2 generico 'mas barato' no debe saltar a laptops/tvs.",
+    "turnos": [
+      {
+        "mensaje": "muestrame celulares",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "la mas barata",
+        "no_debe_contener": ["laptop", "televisor", "refrigerador", "lavadora"]
+      }
+    ]
+  },
+  {
+    "nombre": "R06_no_usa_ejemplo_prompt_como_query",
+    "descripcion": "Saludo sin intencion no debe listar 'iphone 15' que aparece como ejemplo en prompt.",
+    "turnos": [
+      {
+        "mensaje": "hola, que tal?",
+        "tools_prohibidas": ["buscar_productos"],
+        "no_debe_contener": ["iphone 15", "freidora sin aceite", "laptop rtx"]
+      }
+    ]
+  },
+  {
+    "nombre": "R07_no_reutiliza_query_otra_sesion",
+    "descripcion": "Sesion fresca con 'hola' no arrastra query de otra conversacion.",
+    "turnos": [
+      {
+        "mensaje": "hola",
+        "tools_prohibidas": ["buscar_productos"],
+        "no_debe_contener": ["Bs", "SKU", "["]
+      }
+    ]
+  },
+  {
+    "nombre": "R08_no_reutiliza_query_sin_contexto",
+    "descripcion": "Mensaje ambiguo sin contexto previo no debe asumir busqueda anterior.",
+    "turnos": [
+      {
+        "mensaje": "dame la mas barata",
+        "tools_prohibidas": ["buscar_productos"],
+        "no_debe_contener": ["Bs"]
+      }
+    ]
+  },
+  {
+    "nombre": "R09_abortar_si_query_no_cuadra",
+    "descripcion": "Texto ultra-ambiguo 'xxxx' no dispara busqueda.",
+    "turnos": [
+      {
+        "mensaje": "xxxx",
+        "tools_prohibidas": ["buscar_productos"]
+      }
+    ]
+  }
+]

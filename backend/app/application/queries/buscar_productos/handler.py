@@ -31,6 +31,7 @@ class BuscarProductosHandler:
             tipo_panel=q.tipo_panel,
             resolucion=q.resolucion,
             color=q.color,
+            es_electrico=q.es_electrico,
         )
         with self._uow_factory() as uow:
             return uow.productos.buscar(

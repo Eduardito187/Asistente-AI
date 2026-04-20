@@ -15,6 +15,10 @@ from ..chat.serializers import ProductoSerializer
 from ..chat.tool_dispatcher import ToolDispatcher
 from ..commands.actualizar_perfil_sesion import ActualizarPerfilSesionHandler
 from ..commands.crear_sesion import CrearSesionCommand, CrearSesionHandler
+from ..commands.registrar_alternativa_ofrecida import (
+    RegistrarAlternativaOfrecidaCommand,
+    RegistrarAlternativaOfrecidaHandler,
+)
 from ..commands.registrar_mensaje import RegistrarMensajeCommand, RegistrarMensajeHandler
 from ..commands.registrar_metrica_turno import (
     RegistrarMetricaTurnoCommand,
@@ -33,24 +37,32 @@ from ..queries.obtener_perfil_sesion import (
     ResultadoObtenerPerfilSesion,
 )
 from .aplicador_cross_sell import AplicadorCrossSell
+from .atajo_ordinal_carrito import AtajoOrdinalCarrito
 from .atajo_sku_directo import AtajoSkuDirecto
 from .chat_input import ChatInput
 from .chat_output import ChatOutput
 from .clasificador_intencion import ClasificadorIntencion
 from .curador_conversaciones import CuradorConversaciones
 from .detector_consulta_relativa import DetectorConsultaRelativa, TipoConsultaRelativa
+from .detector_consulta_disponibilidad import DetectorConsultaDisponibilidad
 from .detector_intencion_asesoria import DetectorIntencionAsesoria
 from .detector_intencion_compra import DetectorIntencionCompra
 from .detector_mentiras import DetectorMentiras
 from .detector_pedido_detalle import DetectorPedidoDetalle
+from .detector_refinamiento_shown import DetectorRefinamientoShown
 from .extractor_perfil_mensaje import ExtractorPerfilMensaje
 from .gestor_feedback_post_orden import GestorFeedbackPostOrden
+from .gestor_follow_ups_contextuales import GestorFollowUpsContextuales
 from .manejador_producto_ausente import ManejadorProductoAusente
 from .normalizador_moneda import NormalizadorMoneda
+from .resolvedor_categoria_cercana import ResolvedorCategoriaCercana
+from .responder_consulta_disponibilidad import ResponderConsultaDisponibilidad
+from .responder_consulta_politica import ResponderConsultaPolitica
+from .respuesta_follow_up import RespuestaFollowUp
 from .sanitizador_query_busqueda import SanitizadorQueryBusqueda
 from .tools_mark import ToolsMark
 
-SKU_PATTERN = re.compile(r"\[([A-Z0-9][A-Z0-9\-]{2,40})\]")
+SKU_PATTERN = re.compile(r"\[([A-Z0-9][A-Z0-9\-.#_]{2,40})\]")
 RX_LISTA_PRODUCTOS = re.compile(
     r"(?:bs\s*[\d\.,]+|\bopcion(?:es)?\b|\brecomiendo\b|\bsugiero\b|\bpodrias\b|\bte ofrec|\baqui (?:van|tienes|tengo))",
     re.IGNORECASE,
@@ -78,12 +90,17 @@ class ProcesarChatService:
         curador: CuradorConversaciones,
         registrar_metrica: RegistrarMetricaTurnoHandler,
         atajo_sku: AtajoSkuDirecto,
+        atajo_ordinal: AtajoOrdinalCarrito,
         extractor_perfil: ExtractorPerfilMensaje,
         actualizar_perfil: ActualizarPerfilSesionHandler,
         obtener_perfil: ObtenerPerfilSesionHandler,
         cross_sell: AplicadorCrossSell,
         gestor_feedback: GestorFeedbackPostOrden,
         registrar_turno_mostrado: RegistrarTurnoMostradoHandler,
+        gestor_follow_ups: GestorFollowUpsContextuales,
+        registrar_alternativa: RegistrarAlternativaOfrecidaHandler,
+        resolvedor_categoria: ResolvedorCategoriaCercana,
+        responder_consulta_disponibilidad: ResponderConsultaDisponibilidad,
     ) -> None:
         self._uow_factory = uow_factory
         self._crear_sesion = crear_sesion
@@ -98,12 +115,17 @@ class ProcesarChatService:
         self._curador = curador
         self._registrar_metrica = registrar_metrica
         self._atajo_sku = atajo_sku
+        self._atajo_ordinal = atajo_ordinal
         self._extractor_perfil = extractor_perfil
         self._actualizar_perfil = actualizar_perfil
         self._obtener_perfil = obtener_perfil
         self._cross_sell = cross_sell
         self._gestor_feedback = gestor_feedback
         self._registrar_turno_mostrado = registrar_turno_mostrado
+        self._gestor_follow_ups = gestor_follow_ups
+        self._registrar_alternativa = registrar_alternativa
+        self._resolvedor_categoria = resolvedor_categoria
+        self._responder_consulta_disp = responder_consulta_disponibilidad
 
     async def procesar(self, inp: ChatInput) -> ChatOutput:
         t0 = time.monotonic()
@@ -153,12 +175,29 @@ class ProcesarChatService:
         if sku_directo is not None:
             return self._responder_atajo_sku(sesion_id, inp.mensaje, sku_directo, t0)
 
+        ordinal = self._atajo_ordinal.resolver(inp.mensaje, sesion_id)
+        if ordinal is not None:
+            return self._responder_follow_up(sesion_id, inp.mensaje, ordinal, t0)
+
+        politica = ResponderConsultaPolitica.responder(inp.mensaje)
+        if politica is not None:
+            return self._responder_follow_up(sesion_id, inp.mensaje, politica, t0)
+
+        follow_up = self._gestor_follow_ups.intentar(inp.mensaje, sesion_id)
+        if follow_up is not None:
+            return self._responder_follow_up(sesion_id, inp.mensaje, follow_up, t0)
+
         historial = [
             {"role": m.rol.value, "content": m.contenido}
             for m in self._historial.ejecutar(
                 HistorialChatQuery(sesion_id=sesion_id, limite=MAX_HISTORIAL)
             )
         ]
+        short_circuit = await self._short_circuit_resolver(
+            inp=inp, historial=historial, sesion_id=sesion_id, t0=t0
+        )
+        if short_circuit is not None:
+            return short_circuit
 
         contexto_turno = self._contexto_del_turno(inp.mensaje, sesion_id)
         marca_indif = DetectorIntencionAsesoria.marca_es_indiferente(inp.mensaje)
@@ -177,13 +216,7 @@ class ProcesarChatService:
                 sesion_id, inp.mensaje, faltantes, respuesta, trace
             )
 
-        busco_productos_con_resultados = any(
-            p.tool == "buscar_productos"
-            and not p.result.get("error")
-            and (p.result.get("total") or 0) > 0
-            for p in trace
-        )
-        if self._parece_listado_productos(respuesta) and not busco_productos_con_resultados:
+        if self._debe_forzar_busqueda(respuesta, trace, inp.mensaje):
             respuesta, trace, skus_tool = self._forzar_busqueda(inp.mensaje, sesion_id, trace)
 
         respuesta = NormalizadorMoneda.normalizar(respuesta)
@@ -219,6 +252,76 @@ class ProcesarChatService:
             )
         )
 
+        return ChatOutput(
+            sesion_id=sesion_id,
+            respuesta=ToolsMark.strip(respuesta),
+            productos_citados=productos,
+            pasos=[{"tool": p.tool, "args": p.args, "result": p.result} for p in trace],
+        )
+
+    async def _short_circuit_resolver(
+        self,
+        inp: ChatInput,
+        historial: list[dict],
+        sesion_id: UUID,
+        t0: float,
+    ) -> ChatOutput | None:
+        """Decide en BD si el mensaje pega contra categorias_relacionadas
+        (producto pedido != catalogo pero hay cercanos) o contra un sinonimo
+        directo + pregunta de disponibilidad. Ambos caminos cierran turno
+        antes de invocar al LLM."""
+        cercana = self._resolvedor_categoria.resolver(inp.mensaje)
+        if cercana is None:
+            return None
+        if cercana.fuente == "relacionada":
+            respuesta, trace, productos = await self._delegar_a_manejador_ausente(
+                inp.mensaje, historial, [], sesion_id
+            )
+            return self._finalizar_turno_ausente(
+                sesion_id=sesion_id,
+                inp=inp,
+                respuesta=respuesta,
+                trace=trace,
+                productos=productos,
+                t0=t0,
+            )
+        if cercana.fuente == "sinonimo" and DetectorConsultaDisponibilidad.es_consulta_disponibilidad(
+            inp.mensaje
+        ):
+            respuesta_disp = self._responder_consulta_disp.responder(cercana)
+            if respuesta_disp is not None:
+                return self._responder_follow_up(
+                    sesion_id, inp.mensaje, respuesta_disp, t0
+                )
+        return None
+
+    def _finalizar_turno_ausente(
+        self,
+        sesion_id: UUID,
+        inp: ChatInput,
+        respuesta: str,
+        trace: list[PasoAgente],
+        productos: list[dict],
+        t0: float,
+    ) -> ChatOutput:
+        """Cierre de turno cuando el short-circuit determinista via
+        ResolvedorCategoriaCercana ya decidio la respuesta. Persiste el
+        mensaje, metricas y devuelve ChatOutput sin pasar por el LLM."""
+        respuesta = NormalizadorMoneda.normalizar(respuesta)
+        self._persistir_turno_mostrado(sesion_id, productos)
+        self._registrar_respuesta(sesion_id, respuesta, trace)
+        self._registrar_metrica.ejecutar(
+            RegistrarMetricaTurnoCommand(
+                sesion_id=sesion_id,
+                mensaje_usuario_len=len(inp.mensaje),
+                respuesta_len=len(respuesta),
+                tool_calls=len(trace),
+                mentiras_detectadas=0,
+                productos_citados=len(productos),
+                ruta="manejador_ausente_short_circuit",
+                tiempo_ms=int((time.monotonic() - t0) * 1000),
+            )
+        )
         return ChatOutput(
             sesion_id=sesion_id,
             respuesta=ToolsMark.strip(respuesta),
@@ -373,6 +476,11 @@ class ProcesarChatService:
             partes.append(f"- Marca preferida: {perfil.marca_preferida}")
         if perfil.categoria_foco:
             partes.append(f"- Categoria de interes: {perfil.categoria_foco}")
+        elif perfil.alternativa_ofrecida:
+            partes.append(
+                f"- Categoria activa (alternativa ofrecida por el agente, "
+                f"el cliente la esta explorando): {perfil.alternativa_ofrecida}"
+            )
         if perfil.uso_declarado:
             partes.append(f"- Uso declarado: {perfil.uso_declarado}")
         if perfil.pulgadas:
@@ -456,6 +564,51 @@ class ProcesarChatService:
             productos_citados=[directa.producto] if directa.producto else [],
         )
 
+    def _responder_follow_up(
+        self,
+        sesion_id: UUID,
+        mensaje_usuario: str,
+        follow_up: RespuestaFollowUp,
+        t0: float,
+    ) -> ChatOutput:
+        self._registrar.ejecutar(
+            RegistrarMensajeCommand(
+                sesion_id=sesion_id,
+                rol=RolMensaje.ASSISTANT,
+                contenido=follow_up.texto,
+            )
+        )
+        if follow_up.skus:
+            self._registrar_turno_mostrado.ejecutar(
+                RegistrarTurnoMostradoCommand(
+                    sesion_id=sesion_id,
+                    skus=tuple(follow_up.skus),
+                    precios=tuple(
+                        float(p["precio_bob"])
+                        for p in follow_up.productos
+                        if p.get("precio_bob") is not None
+                    ),
+                )
+            )
+        self._registrar_metrica.ejecutar(
+            RegistrarMetricaTurnoCommand(
+                sesion_id=sesion_id,
+                mensaje_usuario_len=len(mensaje_usuario),
+                respuesta_len=len(follow_up.texto),
+                tool_calls=0,
+                mentiras_detectadas=0,
+                productos_citados=len(follow_up.productos),
+                ruta=follow_up.ruta,
+                tiempo_ms=int((time.monotonic() - t0) * 1000),
+            )
+        )
+        return ChatOutput(
+            sesion_id=sesion_id,
+            respuesta=follow_up.texto,
+            productos_citados=list(follow_up.productos),
+            pasos=[{"tool": follow_up.ruta, "args": {}, "result": {"skus": follow_up.skus}}],
+        )
+
     def _responder_feedback(
         self,
         sesion_id: UUID,
@@ -497,6 +650,27 @@ class ProcesarChatService:
             llevo_a_orden=llevo_a_orden,
         )
 
+    def _debe_forzar_busqueda(
+        self, respuesta: str, trace: list[PasoAgente], mensaje: str
+    ) -> bool:
+        """Casos en los que el LLM no busco bien y lo corregimos:
+          a) respondio listando productos sin haber llamado buscar_productos
+             con resultados (alucina productos).
+          b) no llamo buscar_productos en absoluto y el mensaje menciona una
+             categoria reconocida (sinonimo en BD)."""
+        busco_con_resultados = any(
+            p.tool == "buscar_productos"
+            and not p.result.get("error")
+            and (p.result.get("total") or 0) > 0
+            for p in trace
+        )
+        if self._parece_listado_productos(respuesta) and not busco_con_resultados:
+            return True
+        if any(p.tool == "buscar_productos" for p in trace):
+            return False
+        cercana = self._resolvedor_categoria.resolver(mensaje)
+        return cercana is not None and cercana.fuente == "sinonimo"
+
     def _parece_listado_productos(self, respuesta: str) -> bool:
         if RX_LISTA_PRODUCTOS.search(respuesta):
             return True
@@ -537,8 +711,20 @@ class ProcesarChatService:
             ObtenerPerfilSesionQuery(sesion_id=sesion_id)
         )
         res = await self._manejador_ausente.manejar(
-            mensaje, contexto, categoria_activa=perfil.categoria_foco or None
+            mensaje,
+            contexto,
+            categoria_activa=perfil.categoria_efectiva() or None,
+            subcategoria_activa=perfil.subcategoria_efectiva() or None,
+            refinamiento=DetectorRefinamientoShown.detectar(mensaje),
         )
+        if res.categoria_ofrecida:
+            self._registrar_alternativa.ejecutar(
+                RegistrarAlternativaOfrecidaCommand(
+                    sesion_id=sesion_id,
+                    categoria=res.categoria_ofrecida,
+                    subcategoria=res.subcategoria_ofrecida,
+                )
+            )
         trace.append(
             PasoAgente(
                 tool="manejador_producto_ausente",
@@ -546,6 +732,7 @@ class ProcesarChatService:
                 result={
                     "sugerencia_registrada": res.sugerencia_registrada,
                     "alternativas": len(res.productos_alternativos),
+                    "categoria_ofrecida": res.categoria_ofrecida,
                 },
                 fallback=True,
             )
@@ -568,14 +755,16 @@ class ProcesarChatService:
         tiene_terminos = bool(mensaje_limpio) and TokensConsulta.hay_terminos(mensaje_norm)
         query = BuscarProductosQuery(
             query=mensaje_limpio if tiene_terminos else None,
-            categoria=perfil.categoria_foco or None,
+            categoria=perfil.categoria_efectiva() or None,
+            subcategoria=perfil.subcategoria_efectiva() or None,
             marca=perfil.marca_preferida or None,
             precio_max=perfil.presupuesto_max,
             pulgadas=perfil.pulgadas,
             tipo_panel=perfil.tipo_panel,
             resolucion=perfil.resolucion,
+            limite=12,
         )
-        if not tiene_terminos and not perfil.categoria_foco and not perfil.pulgadas:
+        if not tiene_terminos and not perfil.categoria_efectiva() and not perfil.pulgadas:
             return (
                 "Necesito un poco mas de contexto para buscar — decime el producto "
                 "(ej. 'laptop', 'freidora', 'celular') y si tenes marca o presupuesto.",
@@ -583,16 +772,24 @@ class ProcesarChatService:
                 [],
             )
         productos = self._buscar.ejecutar(query)
+        skus_mostrados = {
+            s for s in (perfil.ultimos_skus_mostrados or "").split(",") if s
+        }
+        inedito = [p for p in productos if str(p.sku) not in skus_mostrados]
+        productos_efectivos = inedito if inedito else productos
         args = {k: v for k, v in {
             "query": query.query, "categoria": query.categoria, "marca": query.marca,
             "precio_max": query.precio_max, "pulgadas": query.pulgadas,
             "tipo_panel": query.tipo_panel, "resolucion": query.resolucion,
         }.items() if v is not None}
-        resultado = {"productos": [ProductoSerializer.resumen(p) for p in productos], "total": len(productos)}
+        resultado = {
+            "productos": [ProductoSerializer.resumen(p) for p in productos_efectivos],
+            "total": len(productos_efectivos),
+        }
         trace.append(
             PasoAgente(tool="buscar_productos", args=args, result=resultado, fallback=True)
         )
-        if not productos:
+        if not productos_efectivos:
             return (
                 "Ups, no encontre nada exacto con eso en el catalogo. "
                 "Me das mas pistas? Marca preferida, presupuesto o tamanio me ayudarian un monton.",
@@ -600,11 +797,15 @@ class ProcesarChatService:
                 [],
             )
         lineas = ["Mira lo que tengo para vos!"]
-        for p in productos[:3]:
+        for p in productos_efectivos[:3]:
             extra = f" (antes Bs {p.precio_anterior.monto:.0f})" if p.precio_anterior else ""
             lineas.append(f"- {p.nombre} — Bs {p.precio.monto:.0f}{extra} [{p.sku}]")
         lineas.append("Queres que te lo agregue al carrito o te muestro mas opciones?")
-        return "\n".join(lineas), trace, [str(p.sku) for p in productos[:3]]
+        return (
+            "\n".join(lineas),
+            trace,
+            [str(p.sku) for p in productos_efectivos[:3]],
+        )
 
     def _ejecutar_fallback_acciones(
         self,

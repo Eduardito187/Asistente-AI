@@ -1,0 +1,330 @@
+[
+  {
+    "nombre": "B01_busqueda_producto",
+    "descripcion": "Pedido directo de producto dispara buscar_productos.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener": ["Bs"]
+      }
+    ]
+  },
+  {
+    "nombre": "B02_pedido_recomendacion",
+    "descripcion": "Pedido de recomendacion sin slots debe hacer pregunta clarificadora o asesorar con uso/presupuesto.",
+    "turnos": [
+      {
+        "mensaje": "que me recomendas para trabajar desde casa?",
+        "no_debe_contener": ["dolares", "$"]
+      }
+    ]
+  },
+  {
+    "nombre": "B03_pedido_comparacion",
+    "descripcion": "Tras ver opciones, pedir comparar dispara comparar o follow_up_comparacion.",
+    "turnos": [
+      {
+        "mensaje": "muestrame televisores 55 pulgadas",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "comparame los dos primeros",
+        "tools_requeridas_cualquiera": [
+          "comparar_productos",
+          "follow_up_comparacion",
+          "buscar_productos"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "B04_pedido_mas_barato",
+    "descripcion": "Tras ver opciones, pedir mas barato dispara short-circuit follow_up_mas_barato.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops hp",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "algo mas barato",
+        "tools_requeridas_cualquiera": [
+          "follow_up_mas_barato",
+          "buscar_productos"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "B05_pedido_mejor",
+    "descripcion": "Tras ver opciones, pedir algo mejor dispara short-circuit follow_up_mas_caro.",
+    "turnos": [
+      {
+        "mensaje": "muestrame smart tv",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "alguna mas premium?",
+        "tools_requeridas_cualquiera": [
+          "follow_up_mas_caro",
+          "buscar_productos"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "B06_pedido_mas_opciones",
+    "descripcion": "Tras ver opciones, pedir mas opciones dispara follow_up_otra_opcion.",
+    "turnos": [
+      {
+        "mensaje": "muestrame audifonos",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "otras opciones?",
+        "tools_requeridas_cualquiera": [
+          "follow_up_otra_opcion",
+          "buscar_productos"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "B07_pedido_opciones_distintas",
+    "descripcion": "'algo diferente' tambien dispara otra opcion.",
+    "turnos": [
+      {
+        "mensaje": "muestrame licuadoras",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "algo diferente",
+        "tools_requeridas_cualquiera": [
+          "follow_up_otra_opcion",
+          "buscar_productos"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "B08_consulta_stock",
+    "descripcion": "Consulta de stock no debe negar lo que si hay.",
+    "turnos": [
+      {
+        "mensaje": "tienen stock de laptops?",
+        "no_debe_contener": ["no tenemos laptops", "sin laptops"]
+      }
+    ]
+  },
+  {
+    "nombre": "B09_consulta_precio",
+    "descripcion": "Consulta de precio debe responder con Bs.",
+    "turnos": [
+      {
+        "mensaje": "cuanto cuesta una laptop hp?",
+        "debe_contener": ["Bs"],
+        "no_debe_contener": ["dolares", "$"]
+      }
+    ]
+  },
+  {
+    "nombre": "B10_consulta_financiamiento",
+    "descripcion": "Consulta de financiamiento debe responder sobre pagos/financiamiento.",
+    "turnos": [
+      {
+        "mensaje": "tienen financiamiento?",
+        "debe_contener_cualquiera": [
+          "financiamiento",
+          "credito",
+          "crédito",
+          "plan",
+          "cuotas",
+          "pagar"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "B11_consulta_cuotas",
+    "descripcion": "Consulta de cuotas debe aludir a cuotas/pagos.",
+    "turnos": [
+      {
+        "mensaje": "se puede pagar en cuotas?",
+        "debe_contener_cualquiera": ["cuota", "plan", "financia", "pagar"]
+      }
+    ]
+  },
+  {
+    "nombre": "B12_consulta_envio",
+    "descripcion": "Consulta de envio debe hablar de envio/delivery.",
+    "turnos": [
+      {
+        "mensaje": "hacen envios a santa cruz?",
+        "debe_contener_cualquiera": ["envio", "envío", "delivery", "entrega", "enviar"]
+      }
+    ]
+  },
+  {
+    "nombre": "B13_consulta_sucursal",
+    "descripcion": "Consulta de sucursal debe aludir a tienda/sucursal.",
+    "turnos": [
+      {
+        "mensaje": "en que sucursal lo tienen?",
+        "debe_contener_cualquiera": ["sucursal", "tienda", "local"]
+      }
+    ]
+  },
+  {
+    "nombre": "B14_consulta_garantia",
+    "descripcion": "Consulta de garantia debe aludir a garantia.",
+    "turnos": [
+      {
+        "mensaje": "tiene garantia?",
+        "debe_contener_cualquiera": ["garantia", "garantía"]
+      }
+    ]
+  },
+  {
+    "nombre": "B15_intencion_compra",
+    "descripcion": "Cliente dice 'lo quiero comprar' — agente debe avanzar a cierre o carrito.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops lenovo",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "lo quiero comprar",
+        "no_debe_contener": ["no tenemos"]
+      }
+    ]
+  },
+  {
+    "nombre": "B16_intencion_reservar",
+    "descripcion": "Cliente pide reservar — debe responder sin crashear ni negar.",
+    "turnos": [
+      {
+        "mensaje": "puedo reservar una tv?",
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "B17_intencion_cotizar",
+    "descripcion": "Cliente pide cotizacion — debe responder con datos o guiar.",
+    "turnos": [
+      {
+        "mensaje": "me pasas una cotizacion de laptops?",
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "B18_intencion_carrito",
+    "descripcion": "Agregar al carrito con SKU debe llamar la tool.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "agrega el primero al carrito",
+        "tools_requeridas_cualquiera": [
+          "agregar_al_carrito",
+          "ver_producto",
+          "atajo_ordinal_carrito"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "B19_objeccion_precio",
+    "descripcion": "Cliente objeta por precio — agente debe bajar rango, no insistir.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops hp",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "esta muy caro",
+        "no_debe_contener": ["no tenemos", "error"]
+      }
+    ]
+  },
+  {
+    "nombre": "B20_objeccion_marca",
+    "descripcion": "Cliente rechaza marca — agente debe sugerir otra.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops hp",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "no me gusta hp, otra marca",
+        "no_debe_contener": ["hp\n-", "- hp"]
+      }
+    ]
+  },
+  {
+    "nombre": "B21_objeccion_confianza",
+    "descripcion": "Cliente pregunta por confianza — debe responder con tranquilidad.",
+    "turnos": [
+      {
+        "mensaje": "son originales?",
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "B22_objeccion_entrega",
+    "descripcion": "Cliente pregunta por tiempo de entrega — debe informar, no negar.",
+    "turnos": [
+      {
+        "mensaje": "cuanto tarda la entrega?",
+        "debe_contener_cualquiera": ["entrega", "dia", "día", "envio", "envío", "demora", "tiempo"]
+      }
+    ]
+  },
+  {
+    "nombre": "B23_cambio_categoria",
+    "descripcion": "Cliente cambia de categoria — agente debe pivotar, no mezclar.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "mejor mostrame celulares",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener_cualquiera": ["celular", "smartphone", "telefono", "Bs"]
+      }
+    ]
+  },
+  {
+    "nombre": "B24_cambio_presupuesto",
+    "descripcion": "Cliente cambia de presupuesto — agente debe respetarlo en la siguiente busqueda.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops hasta 5000 bolivianos",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "ahora hasta 2500",
+        "tools_requeridas_cualquiera": [
+          "buscar_productos",
+          "follow_up_mas_barato",
+          "follow_up_otra_opcion"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "B25_cierre_conversacion",
+    "descripcion": "Cliente se despide — debe responder con despedida, sin tools.",
+    "turnos": [
+      {
+        "mensaje": "gracias, chau",
+        "tools_prohibidas": ["buscar_productos", "agregar_al_carrito"]
+      }
+    ]
+  }
+]

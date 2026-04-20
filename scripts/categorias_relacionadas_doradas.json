@@ -1,0 +1,142 @@
+[
+  {
+    "nombre": "O01_auto_ofrecer_motocicletas",
+    "descripcion": "Auto (no hay) -> categoria_relacionada motocicletas (razon en BD).",
+    "turnos": [
+      {
+        "mensaje": "quiero comprar un auto",
+        "debe_contener_cualquiera": [
+          "motocicleta",
+          "moto",
+          "Bajaj",
+          "Sunra",
+          "no vendemos autos"
+        ],
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "O02_auto_ofrecer_scooter",
+    "descripcion": "Auto electrico -> scooter electrico (linea Sunra en BD).",
+    "turnos": [
+      {
+        "mensaje": "busco un auto electrico",
+        "debe_contener_cualquiera": [
+          "scooter",
+          "motocicleta",
+          "electric",
+          "Sunra",
+          "no vendemos"
+        ],
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "O03_smartphone_misma_marca",
+    "descripcion": "Iphone exacto no disponible -> smartphones Apple o equivalentes.",
+    "turnos": [
+      {
+        "mensaje": "quiero el iphone 99 pro ultra",
+        "debe_contener_cualquiera": [
+          "smartphone",
+          "Apple",
+          "iPhone",
+          "equivalente",
+          "similar",
+          "Bs"
+        ],
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "O04_smartphone_similares",
+    "descripcion": "Xiaomi modelo fake -> otros smartphones Xiaomi reales.",
+    "turnos": [
+      {
+        "mensaje": "quiero el Xiaomi Mi Neptune 500",
+        "debe_contener_cualquiera": [
+          "Xiaomi",
+          "smartphone",
+          "Redmi",
+          "similar",
+          "equivalente",
+          "Bs"
+        ],
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "O05_tv_mismo_tamano",
+    "descripcion": "TV 55 pulgadas marca fake -> ofrecer TVs 55 disponibles.",
+    "turnos": [
+      {
+        "mensaje": "quiero un televisor Phantom de 55 pulgadas",
+        "debe_contener_cualquiera": [
+          "televisor",
+          "tv",
+          "Smart TV",
+          "55",
+          "no tenemos",
+          "similar",
+          "Bs"
+        ],
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "O06_lavadora_similares",
+    "descripcion": "Lavadora modelo fake -> lavadoras reales.",
+    "turnos": [
+      {
+        "mensaje": "quiero la lavadora Phantom X9000 de 20 kilos",
+        "debe_contener_cualquiera": [
+          "lavadora",
+          "no tenemos",
+          "similar",
+          "otras marcas",
+          "Bs"
+        ],
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "O07_no_categorias_inventadas",
+    "descripcion": "Yate sin relacionada -> responder no disponible, sin inventar vertical.",
+    "turnos": [
+      {
+        "mensaje": "tienen yates o lanchas?",
+        "debe_contener_cualquiera": [
+          "no tenemos",
+          "no vendemos",
+          "no disponi",
+          "no manejamos",
+          "no comercializamos"
+        ],
+        "no_debe_contener": ["error", "yate disponible", "lancha en stock"]
+      }
+    ]
+  },
+  {
+    "nombre": "O08_no_verticales_no_relacionadas",
+    "descripcion": "Auto no debe derivar a laptop/audifono/licuadora.",
+    "turnos": [
+      {
+        "mensaje": "quiero un auto nuevo",
+        "no_debe_contener": [
+          "laptop",
+          "audifono",
+          "audífono",
+          "licuadora",
+          "freidora",
+          "refrigerador"
+        ]
+      }
+    ]
+  }
+]

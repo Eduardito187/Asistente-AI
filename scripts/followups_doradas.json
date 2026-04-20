@@ -1,0 +1,347 @@
+[
+  {
+    "nombre": "F01_otra_opcion",
+    "descripcion": "'otra opcion' activa follow_up_otra_opcion o buscar_productos.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "otra opcion",
+        "tools_requeridas_cualquiera": [
+          "follow_up_otra_opcion",
+          "buscar_productos"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "F02_otras_opciones",
+    "descripcion": "'otras opciones' activa follow-up.",
+    "turnos": [
+      {
+        "mensaje": "muestrame celulares",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "otras opciones",
+        "tools_requeridas_cualquiera": [
+          "follow_up_otra_opcion",
+          "buscar_productos"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "F03_muestrame_mas",
+    "descripcion": "'muestrame mas' / 'dame mas' activa follow-up de mas opciones.",
+    "turnos": [
+      {
+        "mensaje": "muestrame audifonos",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "muestrame mas",
+        "tools_requeridas_cualquiera": [
+          "follow_up_otra_opcion",
+          "buscar_productos"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "F04_otras_distintas",
+    "descripcion": "'dame otras distintas' activa otra_opcion.",
+    "turnos": [
+      {
+        "mensaje": "muestrame licuadoras",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "dame otras distintas",
+        "tools_requeridas_cualquiera": [
+          "follow_up_otra_opcion",
+          "buscar_productos"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "F05_mas_economica",
+    "descripcion": "'alguna mas economica' activa follow_up_mas_barato.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "alguna mas economica",
+        "tools_requeridas_cualquiera": [
+          "follow_up_mas_barato",
+          "buscar_productos"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "F06_y_una_mejor",
+    "descripcion": "'y una mejor' activa follow_up_mas_caro.",
+    "turnos": [
+      {
+        "mensaje": "muestrame smart tv",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "y una mejor",
+        "tools_requeridas_cualquiera": [
+          "follow_up_mas_caro",
+          "buscar_productos"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "F07_cual_me_conviene",
+    "descripcion": "'cual me conviene' no debe crashear — agente asesora.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "cual me conviene?",
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "F08_ese_sale_bueno",
+    "descripcion": "'ese sale bueno?' pide validacion — agente no debe crashear.",
+    "turnos": [
+      {
+        "mensaje": "muestrame audifonos",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "el primero sale bueno?",
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "F09_otro_color",
+    "descripcion": "'hay otro color' no debe crashear.",
+    "turnos": [
+      {
+        "mensaje": "muestrame celulares samsung",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "hay en otro color?",
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "F10_otra_marca",
+    "descripcion": "'y en otra marca' pivota a alternativa — agente no debe insistir en la marca previa.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops hp",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "y en otra marca?",
+        "no_debe_contener": ["solo hp"]
+      }
+    ]
+  },
+  {
+    "nombre": "F11_mas_memoria",
+    "descripcion": "'y con mas memoria' no debe crashear; busqueda contextual.",
+    "turnos": [
+      {
+        "mensaje": "muestrame celulares",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "y con mas memoria?",
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "F12_uno_mas_barato",
+    "descripcion": "'y uno mas barato' activa follow_up_mas_barato.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "y uno mas barato",
+        "tools_requeridas_cualquiera": [
+          "follow_up_mas_barato",
+          "buscar_productos"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "F13_subir_presupuesto",
+    "descripcion": "'y si subo el presupuesto' no debe crashear.",
+    "turnos": [
+      {
+        "mensaje": "laptops hasta 3000",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "y si subo el presupuesto?",
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "F14_bajar_presupuesto",
+    "descripcion": "'y si bajo el presupuesto' dispara follow_up_mas_barato o busqueda.",
+    "turnos": [
+      {
+        "mensaje": "laptops hasta 5000",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "y si bajo el presupuesto a 3000?",
+        "tools_requeridas_cualquiera": [
+          "follow_up_mas_barato",
+          "buscar_productos"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "F15_ese_no",
+    "descripcion": "'ese no' rechazo corto no debe crashear.",
+    "turnos": [
+      {
+        "mensaje": "muestrame licuadoras",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "ese no",
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "F16_el_segundo",
+    "descripcion": "'quiero el segundo' ordinal activa atajo_ordinal_carrito.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "quiero el segundo",
+        "tools_requeridas_cualquiera": [
+          "atajo_ordinal_carrito",
+          "agregar_al_carrito",
+          "ver_producto"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "F17_el_mas_barato",
+    "descripcion": "'el mas barato' activa follow_up_mas_barato.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "el mas barato",
+        "tools_requeridas_cualquiera": [
+          "follow_up_mas_barato",
+          "buscar_productos"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "F18_el_mejor",
+    "descripcion": "'el mejor' activa follow_up_mas_caro.",
+    "turnos": [
+      {
+        "mensaje": "muestrame tvs",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "dame la mejor opcion",
+        "tools_requeridas_cualquiera": [
+          "follow_up_mas_caro",
+          "buscar_productos"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "F19_el_de_xiaomi",
+    "descripcion": "'el de xiaomi' filtra por marca en el siguiente turno.",
+    "turnos": [
+      {
+        "mensaje": "muestrame celulares",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "el de xiaomi",
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "F20_el_de_256",
+    "descripcion": "'el de 256 GB' refina por capacidad — no crashea.",
+    "turnos": [
+      {
+        "mensaje": "muestrame celulares",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "el de 256 GB",
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "F21_ese_mismo",
+    "descripcion": "'ese mismo' referencia al ultimo mostrado — no crashea.",
+    "turnos": [
+      {
+        "mensaje": "recomiendame una laptop",
+        "tools_requeridas_cualquiera": ["buscar_productos"]
+      },
+      {
+        "mensaje": "ese mismo, cuanto cuesta?",
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "F22_distintas_ya_mostradas",
+    "descripcion": "'distintas a las que ya me diste' activa otra_opcion (excluye mostrados).",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "dame otras distintas a las que ya me diste",
+        "tools_requeridas_cualquiera": [
+          "follow_up_otra_opcion",
+          "buscar_productos"
+        ]
+      }
+    ]
+  }
+]

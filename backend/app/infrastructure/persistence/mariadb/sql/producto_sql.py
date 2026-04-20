@@ -172,3 +172,6 @@ class ProductoSql:
         if a.color:
             clauses.append("LOWER(color) = :col")
             params["col"] = a.color.lower()
+        if a.es_electrico is not None:
+            clauses.append("es_electrico = :elec")
+            params["elec"] = 1 if a.es_electrico else 0

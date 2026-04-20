@@ -28,6 +28,23 @@ class ValueParser:
             return None
 
     @staticmethod
+    def a_bool(v: Any) -> bool | None:
+        """Convierte un valor arbitrario a bool. Acepta bool nativo y strings
+        'true'/'false'/'1'/'0'/'si'/'no'. Devuelve None si no es interpretable."""
+        if v is None or v == "":
+            return None
+        if isinstance(v, bool):
+            return v
+        if isinstance(v, (int, float)):
+            return bool(v)
+        texto = str(v).strip().lower()
+        if texto in ("true", "1", "si", "sí", "yes"):
+            return True
+        if texto in ("false", "0", "no"):
+            return False
+        return None
+
+    @staticmethod
     def parse_args(raw: Any) -> dict:
         """Normaliza los arguments del tool-call a dict Python."""
         if isinstance(raw, str):

@@ -38,6 +38,11 @@ class SanitizadorQueryBusqueda:
         r"|\bque\s+opin(?:a|as|an)\b"
         r"|\bno\s+se\s+(?:cual|que|por\s+donde)\b"
         r"|\bestoy\s+(?:perdido|confundid[oa]|entre)\b"
+        r"|\bcual(?:es)?\s+(?:son|es|tiene|tienen|de\s+(?:esas|esos|estas|estos|ellas|ellos))\b"
+        r"|\bhay\s+(?:alguno|alguna|algun|algunas|algunos)\b"
+        r"|\btien(?:es|e|en)\s+(?:alguno|alguna|algun|algunas|algunos)\b"
+        r"|\bsolo\s+(?:las|los|el|la|una|uno)\b"
+        r"|\bde\s+(?:esas|esos|estas|estos|ellas|ellos)\s+cual(?:es)?\b"
         r")",
         re.IGNORECASE,
     )

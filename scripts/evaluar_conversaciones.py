@@ -19,7 +19,9 @@ from evaluador_offline import ReporteConsola, RunnerCaso
 
 def main() -> int:
     args = _parse_args()
-    casos = _cargar_dataset(args.dataset)
+    casos: list[dict] = []
+    for ds in args.dataset:
+        casos.extend(_cargar_dataset(ds))
     runner = RunnerCaso(base_url=args.url)
     resultados = [runner.correr(c) for c in casos]
     return ReporteConsola.imprimir(resultados)
@@ -30,9 +32,14 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--url", default="http://localhost:8000")
     parser.add_argument(
         "--dataset",
-        default=str(Path(__file__).parent / "conversaciones_doradas.json"),
+        action="append",
+        default=None,
+        help="Ruta a un JSON de casos. Se puede repetir.",
     )
-    return parser.parse_args()
+    args = parser.parse_args()
+    if not args.dataset:
+        args.dataset = [str(Path(__file__).parent / "conversaciones_doradas.json")]
+    return args
 
 
 def _cargar_dataset(path: str) -> list[dict]:

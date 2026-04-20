@@ -8,8 +8,14 @@ class PerfilSesionSql:
         "SELECT sesion_id, presupuesto_max, marca_preferida, categoria_foco, "
         "uso_declarado, pulgadas, tipo_panel, resolucion, "
         "ultimos_skus_mostrados, precio_min_mostrado, precio_max_mostrado, "
-        "updated_at "
+        "alternativa_ofrecida, updated_at "
         "FROM perfiles_sesion WHERE sesion_id = :sid"
+    )
+
+    REGISTRAR_ALTERNATIVA = (
+        "INSERT INTO perfiles_sesion (sesion_id, alternativa_ofrecida) "
+        "VALUES (:sid, :alt) "
+        "ON DUPLICATE KEY UPDATE alternativa_ofrecida = VALUES(alternativa_ofrecida)"
     )
 
     UPSERT = (

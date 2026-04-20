@@ -1,0 +1,143 @@
+[
+  {
+    "nombre": "Y01_garantia",
+    "descripcion": "Pregunta de garantia tras ver producto menciona garantia.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "cuanta garantia trae la primera?",
+        "debe_contener_cualquiera": ["garantia", "garantía"],
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "Y02_devoluciones",
+    "descripcion": "Pregunta de devolucion tras ver producto debe aludir a devolucion/cambio/politica.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "cual es la politica de devolucion si no me gusta?",
+        "debe_contener_cualquiera": [
+          "devolu",
+          "cambio",
+          "politica",
+          "política",
+          "reembolso",
+          "plazo",
+          "garantia",
+          "garantía"
+        ],
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "Y03_cambios",
+    "descripcion": "Cambio por otro modelo tras ver producto debe hablar de cambio/politica.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "que politica tiene Dismac para devolver o intercambiar un producto?",
+        "debe_contener_cualquiera": [
+          "cambio",
+          "cambiar",
+          "devolu",
+          "politica",
+          "política",
+          "plazo",
+          "garantia",
+          "garantía",
+          "contact",
+          "WhatsApp",
+          "whatsapp",
+          "tienda",
+          "sucursal",
+          "servicio"
+        ],
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "Y04_servicio_tecnico",
+    "descripcion": "Pregunta por servicio tecnico tras ver producto menciona servicio/garantia.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "tienen servicio tecnico para reparaciones?",
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "Y05_repuestos",
+    "descripcion": "Pregunta por repuestos no debe crashear.",
+    "turnos": [
+      {
+        "mensaje": "manejan repuestos para lavadoras LG?",
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "Y06_instalacion",
+    "descripcion": "Pregunta por instalacion (aplica a refrigerador/lavadora).",
+    "turnos": [
+      {
+        "mensaje": "incluye instalacion la lavadora?",
+        "debe_contener_cualquiera": [
+          "instala",
+          "servicio",
+          "tecnico",
+          "técnico",
+          "incluye",
+          "costo"
+        ],
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "Y07_manual_soporte",
+    "descripcion": "Pedir manual/soporte no debe crashear.",
+    "turnos": [
+      {
+        "mensaje": "donde puedo conseguir el manual del producto?",
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "Y08_estado_pedido",
+    "descripcion": "Pregunta por estado de pedido no debe crashear ni inventar codigos.",
+    "turnos": [
+      {
+        "mensaje": "cual es el estado de mi pedido?",
+        "no_debe_contener": ["error", "pedido #999 confirmado"]
+      }
+    ]
+  },
+  {
+    "nombre": "Y09_seguimiento_compra",
+    "descripcion": "Pedir seguimiento no debe inventar numero de tracking.",
+    "turnos": [
+      {
+        "mensaje": "me das el seguimiento de mi compra?",
+        "no_debe_contener": ["error", "tracking #ABC123 entregado"]
+      }
+    ]
+  }
+]

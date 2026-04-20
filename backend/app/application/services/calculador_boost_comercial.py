@@ -2,14 +2,16 @@ from __future__ import annotations
 
 from ...domain.productos import Producto
 
+BOOST_PANEL_TOP = 1.4
 BOOST_PANEL_PREMIUM = 1.2
 BOOST_PANEL_MEDIO = 0.6
 BOOST_RESOLUCION_4K_8K = 0.8
 BOOST_SMART_TV = 0.7
 BOOST_OFERTA = 0.5
 
+PANEL_TOP = ("OLED",)
 PANEL_PREMIUM = ("MINILED", "QLED")
-PANEL_MEDIO = ("OLED",)
+PANEL_MEDIO = ("NANOCELL",)
 
 RESOLUCION_ALTA = ("8K", "4K")
 
@@ -45,6 +47,8 @@ class CalculadorBoostComercial:
         panel = (p.tipo_panel or "").upper()
         if not panel:
             return 0.0
+        if panel in PANEL_TOP:
+            return BOOST_PANEL_TOP
         if panel in PANEL_PREMIUM:
             return BOOST_PANEL_PREMIUM
         if panel in PANEL_MEDIO:

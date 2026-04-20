@@ -1,0 +1,227 @@
+[
+  {
+    "nombre": "H01_busqueda_exacta",
+    "descripcion": "Producto especifico dispara buscar_productos y devuelve resultados.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops hp pavilion",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener": ["Bs"]
+      }
+    ]
+  },
+  {
+    "nombre": "H02_busqueda_typo",
+    "descripcion": "Typo 'laptp' resuelve a laptops via fuzzy.",
+    "turnos": [
+      {
+        "mensaje": "tienes laptp?",
+        "debe_contener_cualquiera": ["laptop", "Bs"]
+      }
+    ]
+  },
+  {
+    "nombre": "H03_busqueda_por_marca",
+    "descripcion": "Busqueda con marca explicita surfacea la marca en el resultado.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops hp",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener_cualquiera": ["hp", "HP", "Bs"]
+      }
+    ]
+  },
+  {
+    "nombre": "H04_busqueda_modelo_parcial",
+    "descripcion": "Modelo parcial (iphone 15) no crashea.",
+    "turnos": [
+      {
+        "mensaje": "busco iphone 15",
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "H05_busqueda_por_atributos",
+    "descripcion": "Atributos tecnicos (pulgadas, panel) filtran productos.",
+    "turnos": [
+      {
+        "mensaje": "televisor oled 55 pulgadas",
+        "tools_requeridas": ["buscar_productos"]
+      }
+    ]
+  },
+  {
+    "nombre": "H06_ranking_relevancia",
+    "descripcion": "Query con termino claro surfacea productos relevantes (laptop → laptops).",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener_cualquiera": ["laptop", "notebook"]
+      }
+    ]
+  },
+  {
+    "nombre": "H07_ranking_categoria",
+    "descripcion": "Categoria declarada prioriza productos de esa categoria (no mezcla audio con laptops).",
+    "turnos": [
+      {
+        "mensaje": "muestrame celulares",
+        "tools_requeridas": ["buscar_productos"],
+        "no_debe_contener": ["laptop hp", "televisor samsung"]
+      }
+    ]
+  },
+  {
+    "nombre": "H08_ranking_subcategoria",
+    "descripcion": "Subcategoria (ultrabook) se refleja sin arrastrar gaming.",
+    "turnos": [
+      {
+        "mensaje": "laptop ultrabook delgada",
+        "tools_requeridas": ["buscar_productos"]
+      }
+    ]
+  },
+  {
+    "nombre": "H09_ranking_marca_boost",
+    "descripcion": "Marca preferida boost-ea sin excluir otras.",
+    "turnos": [
+      {
+        "mensaje": "prefiero hp, muestrame laptops",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener_cualquiera": ["hp", "HP", "Bs"]
+      }
+    ]
+  },
+  {
+    "nombre": "H10_ranking_presupuesto",
+    "descripcion": "Presupuesto filtra: con tope 3000 no debe mostrar Bs 10.000+.",
+    "turnos": [
+      {
+        "mensaje": "laptops hasta 3000 bolivianos",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener": ["Bs"],
+        "no_debe_contener": ["Bs 10000", "Bs 15000", "Bs 20000"]
+      }
+    ]
+  },
+  {
+    "nombre": "H11_ranking_valor_precio",
+    "descripcion": "Ranking por valor: follow_up_mas_barato prioriza el mejor descuento o precio mas bajo.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "el mas barato",
+        "tools_requeridas_cualquiera": [
+          "follow_up_mas_barato",
+          "buscar_productos"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "H12_ranking_calidad",
+    "descripcion": "Ranking por calidad: 'el mejor' activa follow_up_mas_caro con mejor especificacion.",
+    "turnos": [
+      {
+        "mensaje": "muestrame televisores",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "dame el mejor",
+        "tools_requeridas_cualquiera": [
+          "follow_up_mas_caro",
+          "buscar_productos"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "H13_ranking_atributos_tecnicos",
+    "descripcion": "Atributos especificos (4K OLED) se mantienen en ranking.",
+    "turnos": [
+      {
+        "mensaje": "televisores 4k oled",
+        "tools_requeridas": ["buscar_productos"]
+      }
+    ]
+  },
+  {
+    "nombre": "H14_ranking_disponibilidad",
+    "descripcion": "Solo se muestran productos con stock (default solo_con_stock=True).",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops",
+        "tools_requeridas": ["buscar_productos"],
+        "no_debe_contener": ["sin stock", "no disponible"]
+      }
+    ]
+  },
+  {
+    "nombre": "H15_ranking_intencion_recomendacion",
+    "descripcion": "Intencion de recomendacion produce asesoria + productos.",
+    "turnos": [
+      {
+        "mensaje": "recomiendame una laptop para trabajar",
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "H16_rerank_mas_barato",
+    "descripcion": "Pedido de mas barato re-rankea por precio ascendente.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "alguna mas economica",
+        "tools_requeridas_cualquiera": [
+          "follow_up_mas_barato",
+          "follow_up_mas_barato_vacio",
+          "buscar_productos"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "H17_rerank_mejor_opcion",
+    "descripcion": "Pedido de mejor opcion re-rankea por calidad/precio descendente.",
+    "turnos": [
+      {
+        "mensaje": "muestrame tvs 55",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "dame la mejor",
+        "tools_requeridas_cualquiera": [
+          "follow_up_mas_caro",
+          "follow_up_mas_barato",
+          "follow_up_otra_opcion",
+          "follow_up_comparacion",
+          "buscar_productos",
+          "ver_producto"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "H18_rerank_recomendacion",
+    "descripcion": "'recomiendame' pide opinion consultiva tras mostrar.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "cual me recomiendas?",
+        "no_debe_contener": ["error"]
+      }
+    ]
+  }
+]

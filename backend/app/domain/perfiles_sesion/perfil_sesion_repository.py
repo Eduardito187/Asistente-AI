@@ -24,3 +24,8 @@ class PerfilSesionRepository(ABC):
         precio_min: Optional[float],
         precio_max: Optional[float],
     ) -> None: ...
+
+    @abstractmethod
+    def registrar_alternativa_ofrecida(
+        self, sesion_id: UUID, alternativa: str
+    ) -> None: ...

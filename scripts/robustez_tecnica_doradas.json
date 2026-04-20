@@ -1,0 +1,236 @@
+[
+  {
+    "nombre": "AA01_sesion_nueva",
+    "descripcion": "Sin sesion previa, primer mensaje se atiende sin error.",
+    "turnos": [
+      {
+        "mensaje": "hola buen dia",
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "AA02_sesion_continuada",
+    "descripcion": "Sesion preserva contexto entre turnos consecutivos.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops hp",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "una mas barata",
+        "tools_requeridas_cualquiera": [
+          "follow_up_mas_barato",
+          "follow_up_mas_barato_vacio",
+          "buscar_productos"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "AA03_pocos_resultados",
+    "descripcion": "Busqueda con filtros estrictos puede dar pocos productos; debe responder honesto.",
+    "turnos": [
+      {
+        "mensaje": "muestrame lavadoras samsung",
+        "tools_requeridas": ["buscar_productos"],
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "AA04_cero_resultados",
+    "descripcion": "Busqueda sin matches reales debe caer a ManejadorProductoAusente.",
+    "turnos": [
+      {
+        "mensaje": "muestrame televisores Phantom 200 pulgadas",
+        "debe_contener_cualquiera": [
+          "no tenemos",
+          "no encontr",
+          "no disponi",
+          "similar",
+          "similares",
+          "no hay",
+          "Bs"
+        ],
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "AA05_duplicados_no_en_follow_up",
+    "descripcion": "'otras opciones' no debe repetir exactamente los mismos SKUs.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "muestrame otras distintas",
+        "tools_requeridas_cualquiera": [
+          "follow_up_otra_opcion",
+          "follow_up_otra_opcion_vacio",
+          "buscar_productos"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "AA06_marca_faltante_acepta_generico",
+    "descripcion": "Sin marca, pedido se atiende con marcas disponibles.",
+    "turnos": [
+      {
+        "mensaje": "muestrame televisores 55",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener": ["Bs"]
+      }
+    ]
+  },
+  {
+    "nombre": "AA07_categoria_faltante_pide_aclaracion",
+    "descripcion": "Sin categoria, mensaje ambiguo no debe lanzar busqueda.",
+    "turnos": [
+      {
+        "mensaje": "quiero algo bueno",
+        "tools_prohibidas": ["buscar_productos"]
+      }
+    ]
+  },
+  {
+    "nombre": "AA08_precio_no_inventado_en_cero",
+    "descripcion": "Si no hay producto, no citar Bs fantasma.",
+    "turnos": [
+      {
+        "mensaje": "muestrame yates",
+        "no_debe_contener": ["yate Bs 999"]
+      }
+    ]
+  },
+  {
+    "nombre": "AA09_log_intencion_detectada",
+    "descripcion": "Pasos del turno deben reflejar intencion: buscar_productos para pedido directo.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops hp",
+        "tools_requeridas": ["buscar_productos"]
+      }
+    ]
+  },
+  {
+    "nombre": "AA10_log_slot_marca",
+    "descripcion": "Pedir laptops hp deja HP en respuesta, reflejando slot extraido.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops hp",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener_cualquiera": ["HP", "Hp", "hp"]
+      }
+    ]
+  },
+  {
+    "nombre": "AA11_log_query_estructurada",
+    "descripcion": "Pedir categoria+marca+presupuesto deja evidencia de busqueda estructurada.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops lenovo hasta 5000 bolivianos",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener": ["Bs"]
+      }
+    ]
+  },
+  {
+    "nombre": "AA12_log_fallback_aplicado",
+    "descripcion": "Producto no existe -> pasos incluyen manejador_producto_ausente.",
+    "turnos": [
+      {
+        "mensaje": "muestrame yates",
+        "tools_requeridas_cualquiera": [
+          "manejador_producto_ausente",
+          "buscar_productos"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "AA13_log_follow_up_ruta",
+    "descripcion": "Follow-up 'la mas barata' deja ruta follow_up_mas_barato en pasos.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "la mas barata",
+        "tools_requeridas_cualquiera": [
+          "follow_up_mas_barato",
+          "follow_up_mas_barato_vacio",
+          "buscar_productos"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "AA14_respuesta_final_no_vacia",
+    "descripcion": "Respuesta final siempre tiene texto (no cadena vacia).",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener": ["Bs"]
+      }
+    ]
+  },
+  {
+    "nombre": "AA15_no_crashea_texto_raro",
+    "descripcion": "Caracteres extranos no crashean el endpoint.",
+    "turnos": [
+      {
+        "mensaje": "ñ!@#$% muestrame laptops",
+        "no_debe_contener": ["error interno", "500"]
+      }
+    ]
+  },
+  {
+    "nombre": "AA16_texto_largo",
+    "descripcion": "Mensaje largo se procesa sin crashear.",
+    "turnos": [
+      {
+        "mensaje": "hola buen dia estoy buscando una laptop para trabajar desde mi casa y hacer videollamadas de zoom con mis companeros y tambien quiero que pueda correr excel con hojas de calculo grandes y chrome con veinte pestanas abiertas, mi presupuesto maximo es de seis mil bolivianos y no me importa mucho la marca pero quiero algo que dure al menos cinco anos",
+        "tools_requeridas": ["buscar_productos"]
+      }
+    ]
+  },
+  {
+    "nombre": "AA17_sesion_continuada_3_turnos",
+    "descripcion": "Tres turnos consecutivos mantienen categoria original.",
+    "turnos": [
+      {
+        "mensaje": "muestrame celulares samsung",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "la mas barata",
+        "tools_requeridas_cualquiera": [
+          "follow_up_mas_barato",
+          "follow_up_mas_barato_vacio",
+          "buscar_productos"
+        ]
+      },
+      {
+        "mensaje": "otra opcion",
+        "no_debe_contener": ["laptop", "televisor", "refrigerador"]
+      }
+    ]
+  },
+  {
+    "nombre": "AA18_producto_sin_precio_no_inventa",
+    "descripcion": "No inventar Bs si no hay producto concreto.",
+    "turnos": [
+      {
+        "mensaje": "hola",
+        "tools_prohibidas": ["buscar_productos"],
+        "no_debe_contener": ["Bs "]
+      }
+    ]
+  }
+]

@@ -21,6 +21,7 @@ class FiltrosAtributos:
     tipo_panel: Optional[str] = None
     resolucion: Optional[str] = None
     color: Optional[str] = None
+    es_electrico: Optional[bool] = None
 
     def vacio(self) -> bool:
         return all(getattr(self, f) is None for f in self.__dataclass_fields__)

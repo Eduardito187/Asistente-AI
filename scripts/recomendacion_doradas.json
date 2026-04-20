@@ -1,0 +1,220 @@
+[
+  {
+    "nombre": "I01_recomendacion_principal",
+    "descripcion": "Recomendacion entrega al menos una opcion concreta (Bs).",
+    "turnos": [
+      {
+        "mensaje": "recomiendame una laptop para trabajo",
+        "debe_contener_cualquiera": ["Bs", "laptop"]
+      }
+    ]
+  },
+  {
+    "nombre": "I02_alternativa_precio_calidad",
+    "descripcion": "Pedir relacion precio/calidad no debe crashear.",
+    "turnos": [
+      {
+        "mensaje": "cual tiene mejor relacion precio calidad en laptops",
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "I03_alternativa_economica",
+    "descripcion": "'la mas economica' tras mostrar rankea por precio asc.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "cual es la mas economica",
+        "tools_requeridas_cualquiera": [
+          "follow_up_mas_barato",
+          "follow_up_mas_barato_vacio",
+          "buscar_productos"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "I04_alternativa_premium",
+    "descripcion": "'una premium' tras mostrar rankea por calidad.",
+    "turnos": [
+      {
+        "mensaje": "muestrame audifonos",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "alguna premium",
+        "tools_requeridas_cualquiera": [
+          "follow_up_mas_caro",
+          "buscar_productos"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "I05_justificar_principal",
+    "descripcion": "Agente explica por que conviene (proceso/pantalla/precio/marca).",
+    "turnos": [
+      {
+        "mensaje": "que laptop me conviene para oficina",
+        "debe_contener_cualquiera": [
+          "porque", "por que", "ideal", "conviene", "recomiendo",
+          "buena", "bueno", "ofrece"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "I06_justificar_alternativa",
+    "descripcion": "Agente justifica la alternativa con atributos.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "dame una alternativa mas barata y explicame por que",
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "I07_tradeoff_entre_opciones",
+    "descripcion": "Cliente pide comparar dos — respuesta no crashea.",
+    "turnos": [
+      {
+        "mensaje": "muestrame tvs 55",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "que diferencia hay entre los dos primeros",
+        "tools_requeridas_cualquiera": [
+          "comparar_productos",
+          "follow_up_comparacion",
+          "buscar_productos"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "I08_recom_peliculas",
+    "descripcion": "Uso: ver peliculas → recomienda TV u opcion visual (sin crashear).",
+    "turnos": [
+      {
+        "mensaje": "quiero una tv para ver peliculas en casa",
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "I09_recom_gaming",
+    "descripcion": "Uso: gaming → recomendacion contextual.",
+    "turnos": [
+      {
+        "mensaje": "laptop para gaming",
+        "tools_requeridas": ["buscar_productos"]
+      }
+    ]
+  },
+  {
+    "nombre": "I10_recom_deportes",
+    "descripcion": "Uso: ver futbol/deportes en TV → recomendacion sin crashear.",
+    "turnos": [
+      {
+        "mensaje": "que tv me recomiendas para ver partidos de futbol",
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "I11_recom_trabajo_estudio",
+    "descripcion": "Uso: trabajo/estudio → laptop/pc contextual.",
+    "turnos": [
+      {
+        "mensaje": "quiero una laptop para estudiar en la universidad",
+        "no_debe_contener": ["error"],
+        "debe_contener_cualquiera": ["laptop", "Bs"]
+      }
+    ]
+  },
+  {
+    "nombre": "I12_recom_familiar",
+    "descripcion": "Uso: familia → recomendacion sin crashear.",
+    "turnos": [
+      {
+        "mensaje": "que tv me recomiendas para uso familiar",
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "I13_recom_ahorro",
+    "descripcion": "Usuario prioriza ahorro → rankea economico.",
+    "turnos": [
+      {
+        "mensaje": "busco el celular mas economico que tengas",
+        "tools_requeridas_cualquiera": [
+          "buscar_productos",
+          "follow_up_mas_barato"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "I14_recom_rendimiento",
+    "descripcion": "Usuario prioriza rendimiento → rankea premium.",
+    "turnos": [
+      {
+        "mensaje": "quiero la laptop mas potente que tengas",
+        "tools_requeridas_cualquiera": [
+          "buscar_productos",
+          "follow_up_mas_caro"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "I15_recom_camara",
+    "descripcion": "Celular con foco en camara → no crashea.",
+    "turnos": [
+      {
+        "mensaje": "celular con buena camara",
+        "tools_requeridas": ["buscar_productos"]
+      }
+    ]
+  },
+  {
+    "nombre": "I16_recom_almacenamiento",
+    "descripcion": "Celular con mucho almacenamiento → busqueda con 256 GB.",
+    "turnos": [
+      {
+        "mensaje": "celular con 256 gb de almacenamiento",
+        "tools_requeridas": ["buscar_productos"],
+        "no_debe_contener": ["Bs 256"]
+      }
+    ]
+  },
+  {
+    "nombre": "I17_recom_pantalla",
+    "descripcion": "Laptop con pantalla grande → pulgadas como filtro.",
+    "turnos": [
+      {
+        "mensaje": "laptop con pantalla de 15 pulgadas",
+        "tools_requeridas": ["buscar_productos"]
+      }
+    ]
+  },
+  {
+    "nombre": "I18_recom_consumo_energetico",
+    "descripcion": "Electrodomestico bajo consumo → no crashea.",
+    "turnos": [
+      {
+        "mensaje": "refrigerador bajo consumo energetico",
+        "no_debe_contener": ["error"]
+      }
+    ]
+  }
+]

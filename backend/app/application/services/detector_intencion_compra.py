@@ -20,7 +20,7 @@ class DetectorIntencionCompra:
     _RX_INTENCION = re.compile(
         r"\b(?:"
         r"quiero\s+(?:comprar|llevarlo|llevarla|llevarme|reservar)"
-        r"|me\s+(?:interesa|gusta|convence|convencio)\s+(?:ese|esa|este|esta|el|la)"
+        r"|me\s+(?:interesa|gusta|convence|convencio)\s+(?:ese|esa|este|esta)\b"
         r"|me\s+lo\s+(?:llevo|quedo|compro)"
         r"|me\s+la\s+(?:llevo|quedo|compro)"
         r"|lo\s+(?:compro|llevo|quiero)\s*(?:ya|ahora)?"

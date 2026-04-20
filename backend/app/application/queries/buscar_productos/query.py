@@ -27,5 +27,6 @@ class BuscarProductosQuery:
     tipo_panel: Optional[str] = None
     resolucion: Optional[str] = None
     color: Optional[str] = None
+    es_electrico: Optional[bool] = None
     solo_con_stock: bool = True
     limite: int = 6

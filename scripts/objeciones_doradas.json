@@ -1,0 +1,182 @@
+[
+  {
+    "nombre": "V01_esta_caro",
+    "descripcion": "'esta caro' debe bajar rango o proponer alternativa mas economica.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops hp",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "esta muy caro para mi",
+        "no_debe_contener": ["error", "ultimas unidades", "compra ya"]
+      }
+    ]
+  },
+  {
+    "nombre": "V02_lo_vi_mas_barato",
+    "descripcion": "'lo vi mas barato en X' no debe entrar en guerra de precios fantasma.",
+    "turnos": [
+      {
+        "mensaje": "muestrame tvs 55",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "lo vi mas barato en otro lado",
+        "no_debe_contener": [
+          "error",
+          "igualamos el precio automatico",
+          "100 Bs menos garantizado"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "V03_no_me_convence_marca",
+    "descripcion": "'no me convence la marca' debe sugerir otra marca real.",
+    "turnos": [
+      {
+        "mensaje": "muestrame lavadoras lg",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "no me convence lg, que otras marcas hay?",
+        "no_debe_contener": ["error"],
+        "debe_contener_cualquiera": [
+          "Whirlpool",
+          "Samsung",
+          "Electrolux",
+          "Hisense",
+          "Enxuta",
+          "Consul",
+          "Kernig",
+          "Bs"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "V04_no_se_si_sale_bueno",
+    "descripcion": "'no se si sale bueno' pide reassurance / fichas tecnicas.",
+    "turnos": [
+      {
+        "mensaje": "muestrame audifonos sony",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "no se si sale bueno ese",
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "V05_no_estoy_seguro",
+    "descripcion": "'no estoy seguro' no debe empujar al carrito.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "no estoy seguro todavia",
+        "tools_prohibidas": ["agregar_al_carrito"],
+        "no_debe_contener": ["cerrar compra ya"]
+      }
+    ]
+  },
+  {
+    "nombre": "V06_quiero_pensarlo",
+    "descripcion": "'quiero pensarlo' cierra con respeto, sin presionar.",
+    "turnos": [
+      {
+        "mensaje": "muestrame refrigeradores",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "quiero pensarlo, te aviso",
+        "no_debe_contener": ["error", "no te lo pierdas", "ultimas unidades"]
+      }
+    ]
+  },
+  {
+    "nombre": "V07_no_me_alcanza",
+    "descripcion": "'no me alcanza' debe proponer rango menor o cuotas.",
+    "turnos": [
+      {
+        "mensaje": "muestrame tvs 65 pulgadas",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "no me alcanza, esta fuera de mi presupuesto",
+        "no_debe_contener": ["error"],
+        "debe_contener_cualquiera": [
+          "cuotas",
+          "mas economic",
+          "más económic",
+          "mas barat",
+          "más barat",
+          "presupuesto",
+          "rango",
+          "Bs"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "V08_no_quiero_gastar_tanto",
+    "descripcion": "'no quiero gastar tanto' baja rango de busqueda.",
+    "turnos": [
+      {
+        "mensaje": "muestrame laptops",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "no quiero gastar tanto, algo mas economico por favor",
+        "no_debe_contener": ["error"],
+        "debe_contener_cualquiera": [
+          "economic",
+          "barat",
+          "bajar",
+          "presupuesto",
+          "rango",
+          "Bs"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "V09_algo_bueno_pero_economico",
+    "descripcion": "'bueno pero economico' pide balance calidad/precio.",
+    "turnos": [
+      {
+        "mensaje": "muestrame celulares",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "dame algo bueno pero economico",
+        "tools_requeridas_cualquiera": [
+          "follow_up_mas_barato",
+          "follow_up_mas_barato_vacio",
+          "follow_up_otra_opcion",
+          "follow_up_otra_opcion_vacio",
+          "buscar_productos"
+        ],
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "V10_no_se_cual_elegir",
+    "descripcion": "'no se cual elegir' debe asesorar / comparar.",
+    "turnos": [
+      {
+        "mensaje": "muestrame tvs 55",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "no se cual elegir, ayudame",
+        "no_debe_contener": ["error"]
+      }
+    ]
+  }
+]
