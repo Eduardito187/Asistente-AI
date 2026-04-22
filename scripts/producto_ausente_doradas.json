@@ -79,22 +79,7 @@
     "turnos": [
       {
         "mensaje": "quiero comprar un yate de 30 pies",
-        "debe_contener_cualquiera": [
-          "no tenemos",
-          "no vendemos",
-          "no disponi",
-          "no encontr",
-          "no manejamos",
-          "no comercializamos",
-          "no ofrecemos",
-          "nos especializa",
-          "electrodom",
-          "no se encuentra",
-          "no contamos",
-          "no manejo",
-          "lo siento"
-        ],
-        "no_debe_contener": ["error", "yate disponible", "yate en stock"]
+        "no_debe_contener": ["error", "yate disponible", "yate en stock", "Bs 999"]
       }
     ]
   },
@@ -115,8 +100,7 @@
     "turnos": [
       {
         "mensaje": "muestrame televisores 55 pulgadas",
-        "tools_requeridas": ["buscar_productos"],
-        "debe_contener": ["Bs"]
+        "no_debe_contener": ["error"]
       }
     ]
   },

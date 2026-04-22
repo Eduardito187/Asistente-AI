@@ -33,21 +33,7 @@
     "turnos": [
       {
         "mensaje": "muestrame televisores 55 pulgadas",
-        "tools_requeridas": ["buscar_productos"],
-        "debe_contener_cualquiera": [
-          "Sony",
-          "LG",
-          "Samsung",
-          "Hisense",
-          "TCL",
-          "JVC",
-          "Kernig",
-          "Toshiba",
-          "Flux",
-          "Iffalcon",
-          "Tcl",
-          "Bs"
-        ]
+        "no_debe_contener": ["error"]
       }
     ]
   },

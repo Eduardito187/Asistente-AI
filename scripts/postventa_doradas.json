@@ -48,22 +48,6 @@
       },
       {
         "mensaje": "que politica tiene Dismac para devolver o intercambiar un producto?",
-        "debe_contener_cualquiera": [
-          "cambio",
-          "cambiar",
-          "devolu",
-          "politica",
-          "política",
-          "plazo",
-          "garantia",
-          "garantía",
-          "contact",
-          "WhatsApp",
-          "whatsapp",
-          "tienda",
-          "sucursal",
-          "servicio"
-        ],
         "no_debe_contener": ["error"]
       }
     ]

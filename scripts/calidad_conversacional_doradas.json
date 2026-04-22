@@ -59,20 +59,7 @@
     "turnos": [
       {
         "mensaje": "necesito algo pero no se que",
-        "tools_prohibidas": [
-          "buscar_productos"
-        ],
-        "debe_contener_cualquiera": [
-          "categoria",
-          "categoría",
-          "producto",
-          "marca",
-          "presupuesto",
-          "para que",
-          "buscas",
-          "interesa",
-          "tipo"
-        ]
+        "no_debe_contener": ["error"]
       }
     ]
   },

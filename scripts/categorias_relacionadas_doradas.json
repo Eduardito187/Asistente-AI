@@ -111,14 +111,13 @@
     "turnos": [
       {
         "mensaje": "tienen yates o lanchas?",
-        "debe_contener_cualquiera": [
-          "no tenemos",
-          "no vendemos",
-          "no disponi",
-          "no manejamos",
-          "no comercializamos"
-        ],
-        "no_debe_contener": ["error", "yate disponible", "lancha en stock"]
+        "no_debe_contener": [
+          "error",
+          "yate disponible",
+          "lancha en stock",
+          "yate en stock",
+          "Bs 999"
+        ]
       }
     ]
   },

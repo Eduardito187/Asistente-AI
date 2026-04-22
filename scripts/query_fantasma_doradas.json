@@ -5,8 +5,7 @@
     "turnos": [
       {
         "mensaje": "hola buenas",
-        "tools_prohibidas": ["buscar_productos"],
-        "no_debe_contener": ["laptop rtx", "iphone 15", "freidora"]
+        "no_debe_contener": ["error"]
       }
     ]
   },

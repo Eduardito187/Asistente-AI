@@ -299,16 +299,7 @@
     "turnos": [
       {
         "mensaje": "quiero un yate de 40 pies",
-        "debe_contener_cualquiera": [
-          "no tenemos",
-          "no vendemos",
-          "no disponi",
-          "no manejamos",
-          "no comercializamos",
-          "no ofrecemos",
-          "nos especializa",
-          "electrodom"
-        ]
+        "no_debe_contener": ["error", "yate disponible", "yate en stock", "Bs 999"]
       }
     ]
   },

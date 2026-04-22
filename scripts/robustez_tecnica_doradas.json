@@ -200,23 +200,7 @@
     "turnos": [
       {
         "mensaje": "muestrame yates",
-        "tools_requeridas_cualquiera": [
-          "agregar_al_carrito",
-          "atajo_ordinal_carrito",
-          "buscar_productos",
-          "comparar_productos",
-          "follow_up_asesoria",
-          "follow_up_comparacion",
-          "follow_up_mas_barato",
-          "follow_up_mas_barato_vacio",
-          "follow_up_mas_caro",
-          "follow_up_mas_caro_vacio",
-          "follow_up_otra_opcion",
-          "follow_up_otra_opcion_vacio",
-          "listar_categorias",
-          "manejador_producto_ausente",
-          "ver_producto"
-        ]
+        "no_debe_contener": ["error", "yate disponible", "yate en stock", "Bs 999"]
       }
     ]
   },

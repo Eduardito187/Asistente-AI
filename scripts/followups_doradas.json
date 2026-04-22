@@ -164,7 +164,7 @@
     "descripcion": "'y una mejor' activa follow_up_mas_caro.",
     "turnos": [
       {
-        "mensaje": "muestrame smart tv",
+        "mensaje": "muestrame televisores",
         "tools_requeridas": [
           "buscar_productos"
         ]

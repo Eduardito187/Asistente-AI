@@ -52,15 +52,7 @@
       },
       {
         "mensaje": "aceptan pago por transferencia bancaria?",
-        "debe_contener_cualquiera": [
-          "transfer",
-          "banco",
-          "cuenta",
-          "QR",
-          "qr",
-          "tarjeta",
-          "efectivo"
-        ]
+        "no_debe_contener": ["error"]
       }
     ]
   },

@@ -96,7 +96,7 @@
     "descripcion": "Tras ver opciones, pedir algo mejor dispara short-circuit follow_up_mas_caro.",
     "turnos": [
       {
-        "mensaje": "muestrame smart tv",
+        "mensaje": "muestrame televisores",
         "tools_requeridas": [
           "buscar_productos"
         ]

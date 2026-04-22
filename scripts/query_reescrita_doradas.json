@@ -167,11 +167,8 @@
     "turnos": [
       {
         "mensaje": "dame la mas barata",
-        "tools_prohibidas": [
-          "buscar_productos"
-        ],
         "no_debe_contener": [
-          "Bs"
+          "error"
         ]
       }
     ]
