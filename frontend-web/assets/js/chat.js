@@ -203,18 +203,29 @@
   }
 
   // ========== Flujo ==========
+  // Timeout amplio — el backend puede tardar 5-15s cuando el modelo piensa
+  // una consulta nueva. Abortamos recién después de 60s para no cortar
+  // respuestas válidas pero lentas.
+  const TIMEOUT_MS = 60000;
+
   async function enviarMensaje(mensaje) {
     agregarMensaje("user", mensaje);
     mostrarTyping();
     sendBtn.disabled = true;
 
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
     try {
       const r = await fetch(`${API_BASE}/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ mensaje, sesion_id: sesionId }),
+        signal: controller.signal,
       });
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      if (!r.ok) {
+        const body = await r.text().catch(() => "");
+        throw new Error(`HTTP ${r.status} ${body.slice(0, 120)}`);
+      }
       const d = await r.json();
       if (d.sesion_id) sesionId = d.sesion_id;
       quitarTyping();
@@ -223,12 +234,16 @@
       agregarMensaje("bot", texto, d.productos_citados || [], d.productos_sugeridos || []);
     } catch (err) {
       quitarTyping();
+      const causa = err.name === "AbortError"
+        ? "tardé mucho (timeout 60s)"
+        : (err.message || "error de red");
       agregarMensaje(
         "bot",
-        "Uy, se me complicó la conexión un segundo 🙈 ¿Me lo repetís? Ya vuelvo a estar listo para ayudarte."
+        `Uy, se me complicó la conexión 🙈 (${causa}) ¿Me lo repetís?`
       );
-      console.error(err);
+      console.error("chat fetch error:", err);
     } finally {
+      clearTimeout(timer);
       sendBtn.disabled = false;
       input.focus();
     }
