@@ -74,6 +74,10 @@ class ProductoSql:
         precio_max: Optional[float],
         atributos: FiltrosAtributos,
         solo_con_stock: bool,
+        excluir_accesorios: bool = False,
+        solo_accesorios: bool = False,
+        excluir_skus: Optional[list[str]] = None,
+        genero: Optional[str] = None,
     ) -> tuple[str, dict]:
         """Construye SELECT dinamico para buscar productos. Devuelve (sql, params)."""
         clauses = ["activo = 1"]
@@ -82,6 +86,9 @@ class ProductoSql:
 
         if solo_con_stock:
             clauses.append("stock > 0")
+        cls._agregar_filtro_accesorios(clauses, excluir_accesorios, solo_accesorios)
+        cls._agregar_exclusion_skus(clauses, params, excluir_skus)
+        cls._agregar_filtro_genero(clauses, params, genero)
         q_boolean = cls.tokens_boolean(query_normalizada) if query_normalizada else ""
         if q_boolean:
             clauses.append(cls._MATCH_EXPR)
@@ -123,6 +130,41 @@ class ProductoSql:
             f"ORDER BY {', '.join(order_parts)} LIMIT :limite"
         )
         return sql, params
+
+    @staticmethod
+    def _agregar_filtro_accesorios(
+        clauses: list, excluir_accesorios: bool, solo_accesorios: bool
+    ) -> None:
+        if solo_accesorios:
+            clauses.append("es_accesorio = 1")
+        elif excluir_accesorios:
+            clauses.append("es_accesorio = 0")
+
+    @staticmethod
+    def _agregar_filtro_genero(
+        clauses: list, params: dict, genero: Optional[str]
+    ) -> None:
+        """Filtra ESTRICTO por ENUM productos.genero (acepta unisex junto al
+        pedido, pero NO neutros NULL). Si el caller necesita fallback a
+        neutros cuando no hay match, debe re-ejecutar sin este filtro."""
+        if not genero:
+            return
+        clauses.append("(genero = :genero OR genero = 'unisex')")
+        params["genero"] = genero
+
+    @staticmethod
+    def _agregar_exclusion_skus(
+        clauses: list, params: dict, excluir_skus: Optional[list[str]]
+    ) -> None:
+        if not excluir_skus:
+            return
+        placeholders = []
+        for i, sku in enumerate(excluir_skus):
+            key = f"exs{i}"
+            placeholders.append(f":{key}")
+            params[key] = sku
+        if placeholders:
+            clauses.append(f"sku NOT IN ({', '.join(placeholders)})")
 
     @staticmethod
     def _agregar_filtros_atributos(

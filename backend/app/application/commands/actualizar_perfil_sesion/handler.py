@@ -30,6 +30,8 @@ class ActualizarPerfilSesionHandler:
             tipo_panel=cmd.tipo_panel,
             resolucion=cmd.resolucion,
             updated_at=datetime.utcnow(),
+            subcategoria_foco=cmd.subcategoria_foco,
+            genero_declarado=cmd.genero_declarado,
         )
         try:
             with self._uow_factory() as uow:

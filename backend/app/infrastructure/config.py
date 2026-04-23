@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     ollama_model: str = "qwen2.5:7b-instruct-q4_K_M"
     ollama_embed_model: str = "nomic-embed-text"
 
+    redis_url: str = "redis://redis:6379/0"
+
     app_locale: str = "es_BO"
     app_currency: str = "BOB"
 

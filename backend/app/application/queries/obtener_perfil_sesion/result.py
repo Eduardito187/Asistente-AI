@@ -19,13 +19,15 @@ class ResultadoObtenerPerfilSesion:
     precio_min_mostrado: Optional[float] = None
     precio_max_mostrado: Optional[float] = None
     alternativa_ofrecida: Optional[str] = None
+    subcategoria_foco: Optional[str] = None
+    genero_declarado: Optional[str] = None
 
     def esta_vacio(self) -> bool:
         return not any(
             [
                 self.presupuesto_max, self.marca_preferida, self.categoria_foco,
-                self.uso_declarado, self.pulgadas, self.tipo_panel, self.resolucion,
-                self.alternativa_ofrecida,
+                self.subcategoria_foco, self.uso_declarado, self.pulgadas,
+                self.tipo_panel, self.resolucion, self.alternativa_ofrecida,
             ]
         )
 
@@ -41,6 +43,8 @@ class ResultadoObtenerPerfilSesion:
         return None
 
     def subcategoria_efectiva(self) -> Optional[str]:
+        if self.subcategoria_foco:
+            return self.subcategoria_foco
         if self.alternativa_ofrecida and "/" in self.alternativa_ofrecida:
             return self.alternativa_ofrecida.split("/", 1)[1]
         return None

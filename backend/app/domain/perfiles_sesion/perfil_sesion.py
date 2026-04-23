@@ -25,6 +25,8 @@ class PerfilSesion:
     precio_min_mostrado: Optional[float] = None
     precio_max_mostrado: Optional[float] = None
     alternativa_ofrecida: Optional[str] = None
+    subcategoria_foco: Optional[str] = None
+    genero_declarado: Optional[str] = None
 
     @staticmethod
     def vacio(sesion_id: UUID) -> "PerfilSesion":
@@ -42,13 +44,16 @@ class PerfilSesion:
             precio_min_mostrado=None,
             precio_max_mostrado=None,
             alternativa_ofrecida=None,
+            subcategoria_foco=None,
+            genero_declarado=None,
         )
 
     def esta_vacio(self) -> bool:
         return not any(
             [
                 self.presupuesto_max, self.marca_preferida, self.categoria_foco,
-                self.uso_declarado, self.pulgadas, self.tipo_panel, self.resolucion,
+                self.subcategoria_foco, self.uso_declarado, self.pulgadas,
+                self.tipo_panel, self.resolucion,
             ]
         )
 
@@ -68,4 +73,6 @@ class PerfilSesion:
             precio_min_mostrado=otro.precio_min_mostrado or self.precio_min_mostrado,
             precio_max_mostrado=otro.precio_max_mostrado or self.precio_max_mostrado,
             alternativa_ofrecida=otro.alternativa_ofrecida or self.alternativa_ofrecida,
+            subcategoria_foco=otro.subcategoria_foco or self.subcategoria_foco,
+            genero_declarado=otro.genero_declarado or self.genero_declarado,
         )

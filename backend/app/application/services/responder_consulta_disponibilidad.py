@@ -55,22 +55,37 @@ class ResponderConsultaDisponibilidad:
         tokens = NormalizadorTexto.normalizar(nombre).split()
         return any(t.startswith(raiz) for t in tokens[: cls.TOKENS_CABECERA])
 
-    def _seleccionar_productos(self, cercana: CategoriaCercana):
+    def _seleccionar_productos(
+        self, cercana: CategoriaCercana, genero: Optional[str] = None
+    ) -> tuple[list, bool]:
         """Pool amplio filtrado por keyword+categoria, re-ranked por cabecera:
         asi 'Telefono celular honor' gana a 'Estuche para celular'. Si el
-        pool esta vacio, caemos a categoria pura."""
-        pool = self._buscar_por_keyword_y_categoria(cercana)
+        pool esta vacio, caemos a categoria pura. Si `genero` se pide pero no
+        hay productos marcados en esa subcategoria, re-intenta sin el filtro
+        y devuelve (productos, True) para que el caller avise honestidad."""
+        pool = self._buscar_por_keyword_y_categoria(cercana, genero)
+        sin_metadata_genero = bool(genero) and not pool
+        if sin_metadata_genero:
+            pool = self._buscar_por_keyword_y_categoria(cercana, None)
         if pool:
-            return self._priorizar_nombre_empieza_con(pool, cercana.palabra_clave)[: self.LIMITE]
-        return self._buscar.ejecutar(
-            BuscarProductosQuery(
-                categoria=cercana.categoria,
-                subcategoria=cercana.subcategoria,
-                limite=self.LIMITE,
+            return (
+                self._priorizar_nombre_empieza_con(pool, cercana.palabra_clave)[: self.LIMITE],
+                sin_metadata_genero,
             )
+        return (
+            self._buscar.ejecutar(
+                BuscarProductosQuery(
+                    categoria=cercana.categoria,
+                    subcategoria=cercana.subcategoria,
+                    limite=self.LIMITE,
+                )
+            ),
+            sin_metadata_genero,
         )
 
-    def _buscar_por_keyword_y_categoria(self, cercana: CategoriaCercana):
+    def _buscar_por_keyword_y_categoria(
+        self, cercana: CategoriaCercana, genero: Optional[str] = None
+    ):
         """Primer intento: usar la palabra clave del sinonimo como query para
         que el FULLTEXT priorice productos cuyo nombre realmente coincide
         (evita devolver utensilios cuando preguntan por freidoras). Trae un
@@ -83,17 +98,27 @@ class ResponderConsultaDisponibilidad:
                 categoria=cercana.categoria,
                 subcategoria=cercana.subcategoria,
                 limite=self.POOL,
+                genero=genero,
             )
         )
 
     def responder(
-        self, cercana: CategoriaCercana, etiqueta_foco: Optional[str] = None
+        self,
+        cercana: CategoriaCercana,
+        etiqueta_foco: Optional[str] = None,
+        genero: Optional[str] = None,
     ) -> RespuestaFollowUp | None:
-        productos = self._seleccionar_productos(cercana)
+        productos, sin_metadata_genero = self._seleccionar_productos(cercana, genero)
         if not productos:
             return None
         foco = etiqueta_foco or cercana.palabra_clave or cercana.subcategoria or cercana.categoria
-        lineas = [f"Si, tenemos {foco}. Estas son algunas opciones disponibles:"]
+        lineas: list[str] = []
+        if sin_metadata_genero:
+            lineas.append(
+                f"En {foco} no diferenciamos por genero '{genero}' — son modelos "
+                f"unisex. Igual te muestro los disponibles:"
+            )
+        lineas.append(f"Si, tenemos {foco}. Estas son algunas opciones disponibles:")
         for p in productos:
             extra = (
                 f" (antes Bs {p.precio_anterior.monto:.0f})"

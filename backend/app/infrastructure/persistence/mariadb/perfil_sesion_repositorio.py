@@ -33,6 +33,8 @@ class MariaDbPerfilSesionRepository(PerfilSesionRepository):
                 "pmax": perfil.presupuesto_max,
                 "marca": perfil.marca_preferida,
                 "cat": perfil.categoria_foco,
+                "subcat": perfil.subcategoria_foco,
+                "gen": perfil.genero_declarado,
                 "uso": perfil.uso_declarado,
                 "pulg": perfil.pulgadas,
                 "panel": perfil.tipo_panel,

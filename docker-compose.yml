@@ -131,14 +131,29 @@ services:
       - ./data:/app/data:ro
     restart: unless-stopped
 
+  redis:
+    image: redis:7-alpine
+    container_name: asistente_redis
+    command: ["redis-server", "--maxmemory", "512mb", "--maxmemory-policy", "allkeys-lru", "--save", ""]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
   backend:
     build: ./backend
     container_name: asistente_backend
     env_file: .env
+    environment:
+      - REDIS_URL=redis://redis:6379/0
     depends_on:
       db:
         condition: service_healthy
       ollama:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     ports:
       - "8000:8000"

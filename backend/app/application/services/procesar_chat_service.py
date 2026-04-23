@@ -43,6 +43,9 @@ from .chat_input import ChatInput
 from .chat_output import ChatOutput
 from .clasificador_intencion import ClasificadorIntencion
 from .curador_conversaciones import CuradorConversaciones
+from .detector_consulta_accesorio import DetectorConsultaAccesorio
+from .detector_genero_mencion import DetectorGeneroMencion
+from .sugeridor_accesorios_relacionados import SugeridorAccesoriosRelacionados
 from .detector_consulta_relativa import DetectorConsultaRelativa, TipoConsultaRelativa
 from .detector_consulta_disponibilidad import DetectorConsultaDisponibilidad
 from .detector_intencion_asesoria import DetectorIntencionAsesoria
@@ -62,7 +65,10 @@ from .respuesta_follow_up import RespuestaFollowUp
 from .sanitizador_query_busqueda import SanitizadorQueryBusqueda
 from .tools_mark import ToolsMark
 
-SKU_PATTERN = re.compile(r"\[([A-Z0-9][A-Z0-9\-.#_]{2,40})\]")
+SKU_PATTERN = re.compile(
+    r"\[(?:sku[:\s]+)?([A-ZÑ0-9][A-ZÑ0-9\-.#_/()]{2,60})\]",
+    re.IGNORECASE,
+)
 RX_LISTA_PRODUCTOS = re.compile(
     r"(?:bs\s*[\d\.,]+|\bopcion(?:es)?\b|\brecomiendo\b|\bsugiero\b|\bpodrias\b|\bte ofrec|\baqui (?:van|tienes|tengo))",
     re.IGNORECASE,
@@ -252,12 +258,35 @@ class ProcesarChatService:
             )
         )
 
+        sugeridos = self._extraer_sugeridos_del_trace(trace, productos)
         return ChatOutput(
             sesion_id=sesion_id,
             respuesta=ToolsMark.strip(respuesta),
             productos_citados=productos,
+            productos_sugeridos=sugeridos,
             pasos=[{"tool": p.tool, "args": p.args, "result": p.result} for p in trace],
         )
+
+    @staticmethod
+    def _extraer_sugeridos_del_trace(
+        trace: list, productos_citados: list[dict]
+    ) -> list[dict]:
+        """Consolida los accesorios sugeridos (cross-sell) de todos los
+        buscar_productos del turno, excluyendo los SKUs ya citados en la
+        respuesta principal."""
+        skus_citados = {p.get("sku") for p in productos_citados if p.get("sku")}
+        vistos: set[str] = set()
+        sugeridos: list[dict] = []
+        for paso in trace:
+            if paso.tool != "buscar_productos":
+                continue
+            for s in paso.result.get("sugeridos") or []:
+                sku = s.get("sku")
+                if not sku or sku in skus_citados or sku in vistos:
+                    continue
+                vistos.add(sku)
+                sugeridos.append(s)
+        return sugeridos
 
     async def _short_circuit_resolver(
         self,
@@ -288,7 +317,10 @@ class ProcesarChatService:
         if cercana.fuente == "sinonimo" and DetectorConsultaDisponibilidad.es_consulta_disponibilidad(
             inp.mensaje
         ):
-            respuesta_disp = self._responder_consulta_disp.responder(cercana)
+            genero = DetectorGeneroMencion.detectar(inp.mensaje)
+            respuesta_disp = self._responder_consulta_disp.responder(
+                cercana, genero=genero
+            )
             if respuesta_disp is not None:
                 return self._responder_follow_up(
                     sesion_id, inp.mensaje, respuesta_disp, t0
@@ -753,18 +785,25 @@ class ProcesarChatService:
         mensaje_limpio = SanitizadorQueryBusqueda.sanitizar(mensaje)
         mensaje_norm = NormalizadorTexto.normalizar(mensaje_limpio or "")
         tiene_terminos = bool(mensaje_limpio) and TokensConsulta.hay_terminos(mensaje_norm)
+        cat_ef = perfil.categoria_efectiva() or None
+        subcat_ef = perfil.subcategoria_efectiva() or None
+        es_accesorio = DetectorConsultaAccesorio.es_consulta_accesorio(
+            mensaje_limpio if tiene_terminos else None, cat_ef, subcat_ef
+        )
         query = BuscarProductosQuery(
             query=mensaje_limpio if tiene_terminos else None,
-            categoria=perfil.categoria_efectiva() or None,
-            subcategoria=perfil.subcategoria_efectiva() or None,
+            categoria=cat_ef,
+            subcategoria=subcat_ef,
             marca=perfil.marca_preferida or None,
             precio_max=perfil.presupuesto_max,
             pulgadas=perfil.pulgadas,
             tipo_panel=perfil.tipo_panel,
             resolucion=perfil.resolucion,
             limite=12,
+            excluir_accesorios=not es_accesorio,
+            genero=perfil.genero_declarado or None,
         )
-        if not tiene_terminos and not perfil.categoria_efectiva() and not perfil.pulgadas:
+        if not tiene_terminos and not cat_ef and not perfil.pulgadas:
             return (
                 "Necesito un poco mas de contexto para buscar — decime el producto "
                 "(ej. 'laptop', 'freidora', 'celular') y si tenes marca o presupuesto.",
@@ -772,20 +811,37 @@ class ProcesarChatService:
                 [],
             )
         productos = self._buscar.ejecutar(query)
+        genero_sin_resultados = bool(query.genero) and not productos
+        if genero_sin_resultados:
+            from dataclasses import replace
+            productos = self._buscar.ejecutar(replace(query, genero=None))
         skus_mostrados = {
             s for s in (perfil.ultimos_skus_mostrados or "").split(",") if s
         }
         inedito = [p for p in productos if str(p.sku) not in skus_mostrados]
         productos_efectivos = inedito if inedito else productos
+        sugeridos = (
+            SugeridorAccesoriosRelacionados(self._buscar).sugerir(
+                productos_efectivos, query.categoria, query.subcategoria
+            )
+            if not es_accesorio else []
+        )
         args = {k: v for k, v in {
             "query": query.query, "categoria": query.categoria, "marca": query.marca,
             "precio_max": query.precio_max, "pulgadas": query.pulgadas,
             "tipo_panel": query.tipo_panel, "resolucion": query.resolucion,
+            "genero": query.genero,
         }.items() if v is not None}
         resultado = {
             "productos": [ProductoSerializer.resumen(p) for p in productos_efectivos],
             "total": len(productos_efectivos),
+            "sugeridos": [ProductoSerializer.resumen(p) for p in sugeridos],
         }
+        if genero_sin_resultados:
+            resultado["aviso_sin_metadata_genero"] = (
+                f"El catalogo no marca productos por genero '{query.genero}' "
+                f"en esta subcategoria — son modelos unisex."
+            )
         trace.append(
             PasoAgente(tool="buscar_productos", args=args, result=resultado, fallback=True)
         )
@@ -796,7 +852,13 @@ class ProcesarChatService:
                 trace,
                 [],
             )
-        lineas = ["Mira lo que tengo para vos!"]
+        aviso_prefix = ""
+        if genero_sin_resultados:
+            aviso_prefix = (
+                f"En esta categoria no diferenciamos por genero '{query.genero}', "
+                f"son modelos unisex. Igual te muestro los disponibles:\n"
+            )
+        lineas = [f"{aviso_prefix}Mira lo que tengo para vos!"]
         for p in productos_efectivos[:3]:
             extra = f" (antes Bs {p.precio_anterior.monto:.0f})" if p.precio_anterior else ""
             lineas.append(f"- {p.nombre} — Bs {p.precio.monto:.0f}{extra} [{p.sku}]")

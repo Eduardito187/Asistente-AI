@@ -13,6 +13,8 @@ class ActualizarPerfilSesionCommand:
     presupuesto_max: Optional[float] = None
     marca_preferida: Optional[str] = None
     categoria_foco: Optional[str] = None
+    subcategoria_foco: Optional[str] = None
+    genero_declarado: Optional[str] = None
     uso_declarado: Optional[str] = None
     pulgadas: Optional[float] = None
     tipo_panel: Optional[str] = None
@@ -22,6 +24,7 @@ class ActualizarPerfilSesionCommand:
         return any(
             [
                 self.presupuesto_max, self.marca_preferida, self.categoria_foco,
-                self.uso_declarado, self.pulgadas, self.tipo_panel, self.resolucion,
+                self.subcategoria_foco, self.genero_declarado, self.uso_declarado,
+                self.pulgadas, self.tipo_panel, self.resolucion,
             ]
         )

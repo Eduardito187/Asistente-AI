@@ -50,6 +50,10 @@ class MariaDbProductoRepository(ProductoRepository):
         atributos: FiltrosAtributos,
         solo_con_stock: bool,
         limite: int,
+        excluir_accesorios: bool = False,
+        solo_accesorios: bool = False,
+        excluir_skus: Optional[list[str]] = None,
+        genero: Optional[str] = None,
     ) -> list[Producto]:
         sql, params = ProductoSql.buscar(
             query_normalizada=query_normalizada,
@@ -60,6 +64,10 @@ class MariaDbProductoRepository(ProductoRepository):
             precio_max=precio_max,
             atributos=atributos,
             solo_con_stock=solo_con_stock,
+            excluir_accesorios=excluir_accesorios,
+            solo_accesorios=solo_accesorios,
+            excluir_skus=excluir_skus,
+            genero=genero,
         )
         params["limite"] = limite
         rows = self._s.execute(text(sql), params).mappings().all()

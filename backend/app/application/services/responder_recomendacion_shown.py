@@ -48,12 +48,14 @@ class ResponderRecomendacionShown:
         productos = self._buscar.ejecutar(
             BuscarProductosQuery(
                 categoria=perfil.categoria_foco or None,
+                subcategoria=perfil.subcategoria_foco or None,
                 marca=None if marca_indiferente else (perfil.marca_preferida or None),
                 precio_max=perfil.presupuesto_max,
                 pulgadas=perfil.pulgadas,
                 tipo_panel=perfil.tipo_panel,
                 resolucion=perfil.resolucion,
                 limite=12,
+                excluir_accesorios=True,
             )
         )
         if not productos:

@@ -29,13 +29,29 @@ class ProductoSerializer:
             base["atributos"] = atributos
         return base
 
+    _MAX_DESCRIPCION = 400
+
     @classmethod
     def detalle(cls, p: Producto) -> dict:
-        """Proyeccion extendida con descripcion e imagen para vistas detalle."""
+        """Proyeccion extendida con descripcion e imagen para vistas detalle.
+
+        La descripcion se recorta a `_MAX_DESCRIPCION` caracteres — algunas
+        descripciones reales del catalogo tienen 2000+ caracteres, saturan
+        el ancho de banda y el contexto del LLM sin aportar valor. Si el
+        cliente quiere el detalle completo, el endpoint /productos/{sku} lo
+        devuelve intacto."""
         base = cls.resumen(p)
-        base["descripcion"] = p.descripcion
+        base["descripcion"] = cls._recortar(p.descripcion)
         base["imagen_url"] = p.imagen_url
         return base
+
+    @classmethod
+    def _recortar(cls, texto: str | None) -> str | None:
+        if not texto:
+            return texto
+        if len(texto) <= cls._MAX_DESCRIPCION:
+            return texto
+        return texto[: cls._MAX_DESCRIPCION].rstrip() + "…"
 
     @classmethod
     def _atributos_presentes(cls, p: Producto) -> dict:

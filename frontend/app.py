@@ -19,25 +19,33 @@ import streamlit as st
 BACKEND_URL = os.environ.get("BACKEND_URL", "http://backend:8000")
 
 
-class BackendNoDisponibleError(RuntimeError):
+class BackendNoDisponibleError(httpx.HTTPError):
     """El backend no respondio (caido o reiniciando)."""
+
+    def __init__(self, message: str):
+        super().__init__(message)
 
 
 def _request_con_reintentos(method: str, path: str, *, timeout: int, **kwargs):
-    delays = (0.0, 1.0, 2.0)
+    delays = (0.0, 2.0, 4.0, 6.0)
     ultimo_error: Exception | None = None
     for espera in delays:
         if espera:
             time.sleep(espera)
         try:
             r = httpx.request(method, f"{BACKEND_URL}{path}", timeout=timeout, **kwargs)
-            r.raise_for_status()
-            return r.json()
-        except (httpx.ConnectError, httpx.ReadError, httpx.RemoteProtocolError) as exc:
+        except (httpx.ConnectError, httpx.ReadError, httpx.RemoteProtocolError, httpx.TimeoutException) as exc:
             ultimo_error = exc
             continue
+        if 500 <= r.status_code < 600:
+            ultimo_error = httpx.HTTPStatusError(
+                f"{r.status_code} {r.reason_phrase}", request=r.request, response=r
+            )
+            continue
+        r.raise_for_status()
+        return r.json()
     raise BackendNoDisponibleError(
-        f"El servidor no respondio tras 3 intentos ({method} {path}). "
+        f"El servidor no respondio tras {len(delays)} intentos ({method} {path}). "
         "Probablemente esta reiniciando. Intenta de nuevo en unos segundos."
     ) from ultimo_error
 
@@ -120,6 +128,7 @@ def enviar_chat(mensaje: str):
             "rol": "assistant",
             "contenido": data["respuesta"],
             "productos": data.get("productos_citados", []),
+            "sugeridos": data.get("productos_sugeridos", []),
             "pasos": data.get("pasos", []),
         }
     )
@@ -144,7 +153,7 @@ def stream_chat(mensaje: str):
     El generador solo emite tokens de texto para st.write_stream; el dict con
     productos/pasos/sesion_id se llena por referencia mientras llega el SSE.
     """
-    meta: dict = {"respuesta": "", "productos": [], "pasos": [], "sesion_id": None}
+    meta: dict = {"respuesta": "", "productos": [], "sugeridos": [], "pasos": [], "sesion_id": None}
     payload = {"mensaje": mensaje, "sesion_id": st.session_state.sesion_id}
 
     def generador():
@@ -157,6 +166,7 @@ def stream_chat(mensaje: str):
                     yield texto
                 elif evento == "meta":
                     meta["productos"] = data.get("productos_citados", [])
+                    meta["sugeridos"] = data.get("productos_sugeridos", [])
                     meta["pasos"] = data.get("pasos", [])
                     meta["sesion_id"] = data.get("sesion_id")
 
@@ -456,10 +466,10 @@ def _render_tarjeta_producto(p: dict, key_prefix: str):
         st.rerun()
 
 
-def render_tarjetas(productos: list[dict], key_prefix: str):
+def render_tarjetas(productos: list[dict], key_prefix: str, titulo: str = "Productos sugeridos"):
     if not productos:
         return
-    st.markdown("##### Productos sugeridos")
+    st.markdown(f"##### {titulo}")
     cols_por_fila = 3
     for i in range(0, len(productos), cols_por_fila):
         cols = st.columns(cols_por_fila)
@@ -473,7 +483,11 @@ for idx, m in enumerate(st.session_state.mensajes):
     with st.chat_message(m["rol"]):
         st.markdown(m["contenido"])
         if m.get("productos"):
-            render_tarjetas(m["productos"], key_prefix=f"m{idx}")
+            render_tarjetas(m["productos"], key_prefix=f"m{idx}", titulo="Productos recomendados")
+        if m.get("sugeridos"):
+            render_tarjetas(
+                m["sugeridos"], key_prefix=f"m{idx}-cs", titulo="También podría interesarte"
+            )
 
 # Atajos contextuales
 if st.session_state.mensajes and st.session_state.mensajes[-1]["rol"] == "assistant":

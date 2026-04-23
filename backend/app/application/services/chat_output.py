@@ -11,4 +11,5 @@ class ChatOutput:
     sesion_id: UUID
     respuesta: str
     productos_citados: list[dict] = field(default_factory=list)
+    productos_sugeridos: list[dict] = field(default_factory=list)
     pasos: list[dict] = field(default_factory=list)

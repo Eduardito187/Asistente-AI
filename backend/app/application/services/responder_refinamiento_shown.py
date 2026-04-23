@@ -111,6 +111,7 @@ class ResponderRefinamientoShown:
                 color=refinamiento.color,
                 es_electrico=refinamiento.es_electrico,
                 limite=6,
+                excluir_accesorios=True,
             )
         )
         ya_mostrados = {str(p.sku) for p in productos_mostrados}

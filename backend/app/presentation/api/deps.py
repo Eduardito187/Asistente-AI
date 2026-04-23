@@ -96,6 +96,8 @@ from ...application.services.sugeridor_productos_alternativos import (
     SugeridorProductosAlternativos,
 )
 from ...application.services.validador_producto_real import ValidadorProductoReal
+from ...application.ports import Cache
+from ...infrastructure.cache import CacheNulo, RedisCache
 from ...infrastructure.config import settings
 from ...infrastructure.llm.ollama_adapter import OllamaAdapter
 from ...infrastructure.llm.ollama_embedder_adapter import OllamaEmbedderAdapter
@@ -135,6 +137,19 @@ def buscador_semantico() -> BuscadorSemantico:
     return BuscadorSemantico(embedder=embedder_port(), uow_factory=uow_factory)
 
 
+@lru_cache()
+def cache_port() -> Cache:
+    """Cache compartido del proceso. Usa Redis si REDIS_URL apunta a una
+    instancia alcanzable; en el peor caso cae a NoOp (sin cache, mismos
+    resultados, solo mas latencia)."""
+    try:
+        adapter = RedisCache(settings.redis_url)
+        adapter.set("cache:boot:probe", "ok", ttl_segundos=5)
+        return adapter
+    except Exception:
+        return CacheNulo()
+
+
 # -------- Handlers (uow-based, stateless) --------
 
 def agregar_handler() -> AgregarAlCarritoHandler:
@@ -170,7 +185,7 @@ def marcar_abandonados_handler() -> MarcarCarritosAbandonadosHandler:
 
 
 def buscar_handler() -> BuscarProductosHandler:
-    return BuscarProductosHandler(uow_factory)
+    return BuscarProductosHandler(uow_factory, cache=cache_port())
 
 
 def ver_producto_handler() -> VerProductoHandler:
@@ -230,7 +245,7 @@ def dashboard_metricas_handler() -> DashboardMetricasHandler:
 
 
 def resolver_categoria_sinonimo_handler() -> ResolverCategoriaSinonimoHandler:
-    return ResolverCategoriaSinonimoHandler(uow_factory)
+    return ResolverCategoriaSinonimoHandler(uow_factory, cache=cache_port())
 
 
 def resolvedor_categoria_cercana() -> ResolvedorCategoriaCercana:
@@ -361,7 +376,7 @@ def procesar_chat_service() -> ProcesarChatService:
         registrar_metrica=registrar_metrica_turno_handler(),
         atajo_sku=atajo_sku,
         atajo_ordinal=atajo_ordinal,
-        extractor_perfil=ExtractorPerfilMensaje(),
+        extractor_perfil=ExtractorPerfilMensaje(resolver=resolver_categoria_sinonimo_handler()),
         actualizar_perfil=actualizar_perfil_sesion_handler(),
         obtener_perfil=obtener_perfil,
         cross_sell=cross_sell,

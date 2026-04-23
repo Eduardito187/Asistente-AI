@@ -28,4 +28,6 @@ class PerfilSesionMapper:
             precio_min_mostrado=float(pmin_mostrado) if pmin_mostrado is not None else None,
             precio_max_mostrado=float(pmax_mostrado) if pmax_mostrado is not None else None,
             alternativa_ofrecida=r.get("alternativa_ofrecida"),
+            subcategoria_foco=r.get("subcategoria_foco"),
+            genero_declarado=r.get("genero_declarado"),
         )

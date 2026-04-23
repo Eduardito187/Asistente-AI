@@ -12,4 +12,5 @@ class ChatResponse(BaseModel):
     sesion_id: UUID
     respuesta: str
     productos_citados: List[ProductoOut] = []
+    productos_sugeridos: List[ProductoOut] = []
     pasos: List[dict] = []

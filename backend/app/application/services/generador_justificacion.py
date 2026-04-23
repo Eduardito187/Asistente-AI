@@ -12,21 +12,39 @@ class GeneradorJustificacion:
 
     @classmethod
     def para(cls, producto: Producto, perfil: ResultadoObtenerPerfilSesion) -> str | None:
-        if perfil.esta_vacio():
-            return None
+        """Devuelve una frase corta que argumenta el producto. Si el perfil esta
+        vacio, cae a senales del producto (descuento, oferta) para que el
+        mensaje no quede frio. Prioriza: descuento > marca > uso > presupuesto.
+        """
         partes: list[str] = []
-        frase = cls._frase_marca(producto, perfil.marca_preferida)
+        frase = cls._frase_descuento(producto)
         if frase:
             partes.append(frase)
-        frase = cls._frase_uso(producto, perfil.uso_declarado)
-        if frase:
-            partes.append(frase)
-        frase = cls._frase_presupuesto(producto, perfil.presupuesto_max)
-        if frase:
-            partes.append(frase)
+        if not perfil.esta_vacio():
+            frase = cls._frase_marca(producto, perfil.marca_preferida)
+            if frase:
+                partes.append(frase)
+            frase = cls._frase_uso(producto, perfil.uso_declarado)
+            if frase:
+                partes.append(frase)
+            frase = cls._frase_presupuesto(producto, perfil.presupuesto_max)
+            if frase:
+                partes.append(frase)
         if not partes:
             return None
         return " · ".join(partes[:MAX_FRASES])
+
+    @staticmethod
+    def _frase_descuento(p: Producto) -> str | None:
+        """Si hay rebaja significativa (>=10%), destacala — es palanca comercial
+        fuerte y el cliente lo valora aunque el perfil este vacio."""
+        if not p.precio_anterior or p.precio_anterior.monto <= p.precio.monto:
+            return None
+        ahorro = p.precio_anterior.monto - p.precio.monto
+        pct = ahorro / p.precio_anterior.monto * 100
+        if pct < 10:
+            return None
+        return f"{pct:.0f}% off (ahorrás Bs {ahorro:.0f})"
 
     @staticmethod
     def _frase_marca(p: Producto, marca_pref: str | None) -> str | None:

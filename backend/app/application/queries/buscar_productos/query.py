@@ -30,3 +30,7 @@ class BuscarProductosQuery:
     es_electrico: Optional[bool] = None
     solo_con_stock: bool = True
     limite: int = 6
+    excluir_accesorios: bool = False
+    solo_accesorios: bool = False
+    excluir_skus: Optional[tuple[str, ...]] = None
+    genero: Optional[str] = None

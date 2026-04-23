@@ -30,4 +30,6 @@ class ObtenerPerfilSesionHandler:
             precio_min_mostrado=perfil.precio_min_mostrado,
             precio_max_mostrado=perfil.precio_max_mostrado,
             alternativa_ofrecida=perfil.alternativa_ofrecida,
+            subcategoria_foco=perfil.subcategoria_foco,
+            genero_declarado=perfil.genero_declarado,
         )

@@ -40,6 +40,16 @@ CREATE TABLE IF NOT EXISTS productos (
     tipo_panel              VARCHAR(20)  NULL,
     resolucion              VARCHAR(10)  NULL,
     es_electrico            TINYINT(1)   NULL,
+    -- Marca accesorios "hijos" de otra categoria (ej. correa smartwatch, funda
+    -- celular). Permite separarlos del listado principal y proponerlos como
+    -- cross-sell. Productos cuya subcategoria ya es de accesorios NO llevan
+    -- este flag (ellos son el producto principal de su subcategoria).
+    es_accesorio            TINYINT(1)   NOT NULL DEFAULT 0,
+    -- Audiencia de genero cuando el nombre o descripcion lo marca explicitamente
+    -- (ej. "reloj para mujer", "cepillo electrico para hombre"). NULL = sin marca,
+    -- se considera neutro/unisex. Sirve para filtrar busquedas tipo "para mujer"
+    -- sin adivinar por color u otra heuristica fragil.
+    genero                  ENUM('masculino','femenino','unisex','infantil') NULL,
     created_at              DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     updated_at              DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6)
                                 ON UPDATE CURRENT_TIMESTAMP(6),
@@ -50,6 +60,8 @@ CREATE TABLE IF NOT EXISTS productos (
     INDEX ix_productos_activo    (activo, stock),
     INDEX ix_productos_pulgadas  (pulgadas),
     INDEX ix_productos_capacidad (capacidad_gb),
+    INDEX ix_productos_es_accesorio (es_accesorio, categoria, subcategoria),
+    INDEX ix_productos_genero (genero, categoria, subcategoria),
     FULLTEXT INDEX ft_productos_busqueda (nombre_norm, descripcion_norm, marca_norm, categoria_norm),
     -- Indice usado por el buscador principal: excluye descripcion_norm para
     -- evitar falsos positivos (p.ej. 'soporte de pared para tv' matcheando 'tv').
@@ -217,6 +229,8 @@ CREATE TABLE IF NOT EXISTS perfiles_sesion (
     presupuesto_max         DECIMAL(12,2) NULL,
     marca_preferida         VARCHAR(120) NULL,
     categoria_foco          VARCHAR(120) NULL,
+    subcategoria_foco       VARCHAR(120) NULL,
+    genero_declarado        VARCHAR(20)  NULL,
     uso_declarado           VARCHAR(200) NULL,
     pulgadas                DECIMAL(4,1) NULL,
     tipo_panel              VARCHAR(32)  NULL,

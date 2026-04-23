@@ -45,6 +45,7 @@ class ResponderOtraOpcion:
                 tipo_panel=perfil.tipo_panel,
                 resolucion=perfil.resolucion,
                 limite=12,
+                excluir_accesorios=True,
             )
         )
         nuevos = [p for p in productos if str(p.sku) not in excluidos][:3]

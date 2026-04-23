@@ -53,6 +53,7 @@ class ResponderMasBarato:
                 resolucion=perfil.resolucion,
                 precio_max=techo_nuevo,
                 limite=6,
+                excluir_accesorios=True,
             )
         )
         nuevos = [p for p in productos if str(p.sku) not in excluidos][:3]

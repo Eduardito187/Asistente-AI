@@ -32,6 +32,10 @@ class ProductoRepository(ABC):
         atributos: FiltrosAtributos,
         solo_con_stock: bool,
         limite: int,
+        excluir_accesorios: bool = False,
+        solo_accesorios: bool = False,
+        excluir_skus: Optional[list[str]] = None,
+        genero: Optional[str] = None,
     ) -> list[Producto]: ...
 
     @abstractmethod

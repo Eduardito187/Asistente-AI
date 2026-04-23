@@ -23,9 +23,11 @@ from ..queries.ver_carrito import VerCarritoHandler, VerCarritoQuery
 from ..queries.ver_ordenes_sesion import VerOrdenesSesionHandler, VerOrdenesSesionQuery
 from ..queries.ver_producto import VerProductoHandler, VerProductoQuery
 from ..services.buscador_semantico import BuscadorSemantico
+from ..services.detector_consulta_accesorio import DetectorConsultaAccesorio
 from ..services.generador_justificacion import GeneradorJustificacion
 from ..services.reranker_por_perfil import ReRankerPorPerfil
 from ..services.sanitizador_query_busqueda import SanitizadorQueryBusqueda
+from ..services.sugeridor_accesorios_relacionados import SugeridorAccesoriosRelacionados
 from .helpers import ValueParser
 from .serializers import CarritoSerializer, ComparacionSerializer, OrdenSerializer, ProductoSerializer
 from .validador_filtros_duros import ValidadorFiltrosDuros
@@ -101,17 +103,42 @@ class ToolDispatcher:
                 "productos": [],
                 "total": 0,
             }
+        es_accesorio = DetectorConsultaAccesorio.es_consulta_accesorio(
+            filtros.get("query"), filtros.get("categoria"), filtros.get("subcategoria")
+        )
+        filtros["excluir_accesorios"] = not es_accesorio
         productos = self.buscar.ejecutar(BuscarProductosQuery(**filtros))
+        genero_sin_resultados = bool(filtros.get("genero")) and not productos
+        if genero_sin_resultados:
+            filtros_sin_genero = {**filtros, "genero": None}
+            productos = self.buscar.ejecutar(BuscarProductosQuery(**filtros_sin_genero))
         if filtros["query"] and len(productos) < self.MIN_RESULTADOS_FULLTEXT:
             productos = self._agregar_candidatos_semanticos(filtros["query"], productos)
         productos = [p for p in productos if ValidadorFiltrosDuros.cumple(p, filtros)]
         productos = self.reranker.reordenar(
             list(productos), perfil, marca_indiferente=marca_indiferente
         )
-        return {
+        sugeridos = self._cross_sell_accesorios(filtros, productos) if not es_accesorio else []
+        respuesta = {
             "productos": [self._proyectar(p, perfil) for p in productos],
             "total": len(productos),
+            "sugeridos": [self._proyectar(p, perfil) for p in sugeridos],
         }
+        if genero_sin_resultados:
+            respuesta["aviso_sin_metadata_genero"] = (
+                f"El catalogo no marca productos por genero '{filtros.get('genero')}' "
+                f"en esta subcategoria. Estos son los modelos disponibles sin distincion "
+                f"de genero — comunicalo asi al cliente con honestidad."
+            )
+        return respuesta
+
+    def _cross_sell_accesorios(self, filtros: dict, principales: list) -> list:
+        sugeridor = SugeridorAccesoriosRelacionados(self.buscar)
+        return sugeridor.sugerir(
+            principales,
+            categoria=filtros.get("categoria"),
+            subcategoria=filtros.get("subcategoria"),
+        )
 
     @staticmethod
     def _proyectar(p, perfil) -> dict:
@@ -155,6 +182,7 @@ class ToolDispatcher:
             "resolucion": cls._texto(a, "resolucion", transform=str.upper) or perfil.resolucion,
             "color": cls._texto(a, "color", transform=str.lower),
             "es_electrico": ValueParser.a_bool(a.get("es_electrico")),
+            "genero": cls._texto(a, "genero", transform=str.lower) or perfil.genero_declarado or None,
             "solo_con_stock": True,
         }
 

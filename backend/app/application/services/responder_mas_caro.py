@@ -89,6 +89,7 @@ class ResponderMasCaro:
                     tipo_panel=panel,
                     precio_min=piso,
                     limite=6,
+                    excluir_accesorios=True,
                 )
             )
             nuevos = [p for p in productos if str(p.sku) not in excluidos][:3]
@@ -109,6 +110,7 @@ class ResponderMasCaro:
                 pulgadas=perfil.pulgadas,
                 precio_min=piso,
                 limite=6,
+                excluir_accesorios=True,
             )
         )
         return [p for p in productos if str(p.sku) not in excluidos][:3]

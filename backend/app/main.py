@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 
 from .presentation.api.deps import llm_port
 from .presentation.api.errors import registrar as registrar_errores
@@ -28,6 +29,8 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="Asistente AI Dismac", version="1.0.0", lifespan=lifespan)
+
+app.add_middleware(GZipMiddleware, minimum_size=512, compresslevel=5)
 
 app.add_middleware(
     CORSMiddleware,

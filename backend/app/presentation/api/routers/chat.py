@@ -25,5 +25,6 @@ async def chat(
         sesion_id=out.sesion_id,
         respuesta=out.respuesta,
         productos_citados=out.productos_citados,
+        productos_sugeridos=out.productos_sugeridos,
         pasos=out.pasos,
     )

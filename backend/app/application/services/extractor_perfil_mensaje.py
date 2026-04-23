@@ -1,9 +1,15 @@
 from __future__ import annotations
 
 import re
+from typing import Optional
 from uuid import UUID
 
 from ..commands.actualizar_perfil_sesion import ActualizarPerfilSesionCommand
+from ..queries.resolver_categoria_sinonimo import (
+    ResolverCategoriaSinonimoHandler,
+    ResolverCategoriaSinonimoQuery,
+)
+from .detector_genero_mencion import DetectorGeneroMencion
 from .extractor_atributos_mensaje import ExtractorAtributosMensaje
 from .parser_presupuesto import ParserPresupuesto
 
@@ -15,59 +21,36 @@ RX_MARCAS = re.compile(
     re.IGNORECASE,
 )
 RX_USO = re.compile(
-    r"\b(gaming|juegos?|disenio|disen\u0303o|programaci?on|programar|"
+    r"\b(gaming|juegos?|disenio|disẽno|programaci?on|programar|"
     r"oficina|estudio|estudiar|trabajo|teletrabajo|edicion|edicion de video|"
     r"streaming|cocina|hogar|familia|regalo|viaje|universidad|colegio)\b",
     re.IGNORECASE,
 )
-RX_CATEGORIAS = {
-    "Laptops": re.compile(
-        r"\b(laptops?|notebooks?|portatiles?|portatil|ultrabooks?|macbooks?)\b",
-        re.IGNORECASE,
-    ),
-    "Celulares": re.compile(
-        r"\b(celulares?|smartphones?|telefonos?|iphones?|moviles?|movil|celu|celus)\b",
-        re.IGNORECASE,
-    ),
-    "Televisores": re.compile(
-        r"\b(tv|tvs|televisor(?:es)?|smart\s*tv|pantallas?|teles?)\b",
-        re.IGNORECASE,
-    ),
-    "Electrodomesticos": re.compile(
-        r"\b(freidoras?|licuadoras?|lavadoras?|secadoras?|refrigeradores?|"
-        r"refrigerador|heladeras?|neveras?|microondas|hornos?|cocinas?|"
-        r"aspiradoras?|ventiladores?|ventilador|aire\s+acondicionado|"
-        r"batidoras?|cafeteras?|tostadoras?|planchas?)\b",
-        re.IGNORECASE,
-    ),
-    "Audio": re.compile(
-        r"\b(audifonos?|auriculares?|parlantes?|bocinas?|soundbars?|"
-        r"barra\s+de\s+sonido|home\s*theater)\b",
-        re.IGNORECASE,
-    ),
-    "Computacion": re.compile(
-        r"\b(pc|pcs|desktops?|monitores?|monitor|teclados?|mouse|ratones?|raton|"
-        r"impresoras?)\b",
-        re.IGNORECASE,
-    ),
-}
 
 
 class ExtractorPerfilMensaje:
     """SRP: extraer preferencias (presupuesto, marca, categoria, uso) desde el
     mensaje del cliente y armar el ActualizarPerfilSesionCommand.
 
-    Usa solo regex — es determinista, sin LLM, y solo persiste lo que el
-    cliente DECLARO explicitamente."""
+    La categoria/subcategoria se resuelve contra la tabla `categorias_sinonimos`
+    via ResolverCategoriaSinonimoHandler — asi el vocabulario es data-driven y
+    cubre todo el catalogo (Smartwatch, Relojeria, Cocina Menor, etc.) sin
+    tocar codigo."""
+
+    def __init__(self, resolver: ResolverCategoriaSinonimoHandler) -> None:
+        self._resolver = resolver
 
     def extraer(self, sesion_id: UUID, mensaje: str) -> ActualizarPerfilSesionCommand:
         texto = (mensaje or "").strip()
         atributos = ExtractorAtributosMensaje.extraer(texto)
+        categoria, subcategoria = self._categoria_y_subcategoria(texto)
         return ActualizarPerfilSesionCommand(
             sesion_id=sesion_id,
             presupuesto_max=self._presupuesto(texto),
             marca_preferida=self._marca(texto),
-            categoria_foco=self._categoria(texto),
+            categoria_foco=categoria,
+            subcategoria_foco=subcategoria,
+            genero_declarado=DetectorGeneroMencion.detectar(texto),
             uso_declarado=self._uso(texto),
             pulgadas=atributos.pulgadas,
             tipo_panel=atributos.tipo_panel,
@@ -88,9 +71,15 @@ class ExtractorPerfilMensaje:
         match = RX_USO.search(texto)
         return match.group(1).lower() if match else None
 
-    @staticmethod
-    def _categoria(texto: str) -> str | None:
-        for nombre, rx in RX_CATEGORIAS.items():
-            if rx.search(texto):
-                return nombre
-        return None
+    def _categoria_y_subcategoria(
+        self, texto: str
+    ) -> tuple[Optional[str], Optional[str]]:
+        if not texto:
+            return None, None
+        resultado = self._resolver.ejecutar(
+            ResolverCategoriaSinonimoQuery(texto=texto, limite_relaciones=0)
+        )
+        sin = resultado.sinonimo_directo
+        if sin is None:
+            return None, None
+        return sin.categoria, sin.subcategoria
