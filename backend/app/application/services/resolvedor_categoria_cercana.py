@@ -21,6 +21,7 @@ class CategoriaCercana:
     fuente: str
     palabra_clave: Optional[str] = None
     marca: Optional[str] = None
+    sku_especifico: Optional[str] = None
 
 
 class ResolvedorCategoriaCercana:
@@ -48,6 +49,7 @@ class ResolvedorCategoriaCercana:
                 razon=None,
                 fuente="sinonimo",
                 palabra_clave=sinonimo.palabra_clave,
+                sku_especifico=sinonimo.sku_especifico,
             )
         relacionada = resultado.mejor_relacionada
         if relacionada is not None:

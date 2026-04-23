@@ -21,6 +21,8 @@ class ResultadoObtenerPerfilSesion:
     alternativa_ofrecida: Optional[str] = None
     subcategoria_foco: Optional[str] = None
     genero_declarado: Optional[str] = None
+    sku_foco: Optional[str] = None
+    desired_tier: Optional[str] = None
 
     def esta_vacio(self) -> bool:
         return not any(

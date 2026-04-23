@@ -33,6 +33,13 @@ class Producto:
     tipo_panel: Optional[str] = None
     resolucion: Optional[str] = None
     es_electrico: Optional[bool] = None
+    bateria_mah: Optional[int] = None
+    camara_mp: Optional[int] = None
+    camara_frontal_mp: Optional[int] = None
+    soporta_5g: Optional[bool] = None
+    sistema_operativo: Optional[str] = None
+    refresh_hz: Optional[int] = None
+    gpu: Optional[str] = None
 
     def disponible(self) -> bool:
         return self.activo and self.stock > 0

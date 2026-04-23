@@ -167,6 +167,14 @@ services:
       - backend
     ports:
       - "8501:8501"
+
+  web:
+    build: ./frontend-web
+    container_name: asistente_web
+    depends_on:
+      - backend
+    ports:
+      - "3000:80"
     restart: unless-stopped
 
 volumes:

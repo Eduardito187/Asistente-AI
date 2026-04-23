@@ -22,3 +22,11 @@ class AtributosProducto:
     color: Optional[str] = None
     tipo_panel: Optional[str] = None
     resolucion: Optional[str] = None
+    # Specs que habilitan comparaciones ricas sin depender de parse LLM.
+    bateria_mah: Optional[int] = None
+    camara_mp: Optional[int] = None
+    camara_frontal_mp: Optional[int] = None
+    soporta_5g: Optional[bool] = None
+    sistema_operativo: Optional[str] = None
+    refresh_hz: Optional[int] = None
+    gpu: Optional[str] = None

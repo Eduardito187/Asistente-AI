@@ -27,6 +27,8 @@ class PerfilSesion:
     alternativa_ofrecida: Optional[str] = None
     subcategoria_foco: Optional[str] = None
     genero_declarado: Optional[str] = None
+    sku_foco: Optional[str] = None
+    desired_tier: Optional[str] = None
 
     @staticmethod
     def vacio(sesion_id: UUID) -> "PerfilSesion":
@@ -46,6 +48,8 @@ class PerfilSesion:
             alternativa_ofrecida=None,
             subcategoria_foco=None,
             genero_declarado=None,
+            sku_foco=None,
+            desired_tier=None,
         )
 
     def esta_vacio(self) -> bool:
@@ -75,4 +79,6 @@ class PerfilSesion:
             alternativa_ofrecida=otro.alternativa_ofrecida or self.alternativa_ofrecida,
             subcategoria_foco=otro.subcategoria_foco or self.subcategoria_foco,
             genero_declarado=otro.genero_declarado or self.genero_declarado,
+            sku_foco=otro.sku_foco or self.sku_foco,
+            desired_tier=otro.desired_tier or self.desired_tier,
         )

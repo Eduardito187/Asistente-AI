@@ -12,6 +12,8 @@ class ProductoSql:
         nombre_norm, descripcion_norm, marca_norm, categoria_norm,
         pulgadas, capacidad_gb, ram_gb, capacidad_litros, capacidad_kg,
         potencia_w, procesador, color, tipo_panel, resolucion,
+        bateria_mah, camara_mp, camara_frontal_mp, soporta_5g,
+        sistema_operativo, refresh_hz, gpu,
         updated_at
     ) VALUES (
         :sku, :nombre, :descripcion, :categoria, :subcategoria, :marca,
@@ -20,6 +22,8 @@ class ProductoSql:
         :nombre_norm, :descripcion_norm, :marca_norm, :categoria_norm,
         :pulgadas, :capacidad_gb, :ram_gb, :capacidad_litros, :capacidad_kg,
         :potencia_w, :procesador, :color, :tipo_panel, :resolucion,
+        :bateria_mah, :camara_mp, :camara_frontal_mp, :soporta_5g,
+        :sistema_operativo, :refresh_hz, :gpu,
         NOW(6)
     )
     ON DUPLICATE KEY UPDATE
@@ -49,6 +53,13 @@ class ProductoSql:
         color               = VALUES(color),
         tipo_panel          = VALUES(tipo_panel),
         resolucion          = VALUES(resolucion),
+        bateria_mah         = VALUES(bateria_mah),
+        camara_mp           = VALUES(camara_mp),
+        camara_frontal_mp   = VALUES(camara_frontal_mp),
+        soporta_5g          = VALUES(soporta_5g),
+        sistema_operativo   = VALUES(sistema_operativo),
+        refresh_hz          = VALUES(refresh_hz),
+        gpu                 = VALUES(gpu),
         updated_at          = NOW(6)
     """
 

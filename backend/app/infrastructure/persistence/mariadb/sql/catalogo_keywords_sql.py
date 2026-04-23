@@ -7,7 +7,7 @@ class CatalogoKeywordsSql:
 
     SINONIMO_POR_PALABRA_NORM = (
         "SELECT palabra_clave, palabra_clave_norm, categoria, subcategoria, "
-        "CAST(confianza AS DECIMAL(3,2)) AS confianza "
+        "sku_especifico, CAST(confianza AS DECIMAL(3,2)) AS confianza "
         "FROM categorias_sinonimos WHERE palabra_clave_norm = :palabra "
         "ORDER BY confianza DESC LIMIT 1"
     )
@@ -27,7 +27,7 @@ class CatalogoKeywordsSql:
 
     SINONIMOS_PREFIJO_FUZZY = (
         "SELECT palabra_clave, palabra_clave_norm, categoria, subcategoria, "
-        "CAST(confianza AS DECIMAL(3,2)) AS confianza "
+        "sku_especifico, CAST(confianza AS DECIMAL(3,2)) AS confianza "
         "FROM categorias_sinonimos "
         "WHERE SUBSTRING(palabra_clave_norm, 1, :prefix_len) = :prefijo "
         "AND ABS(CHAR_LENGTH(palabra_clave_norm) - :token_len) <= 2 "
@@ -39,7 +39,7 @@ class CatalogoKeywordsSql:
         placeholders = ", ".join(f":t{i}" for i in range(n))
         return (
             "SELECT palabra_clave, palabra_clave_norm, categoria, subcategoria, "
-            "CAST(confianza AS DECIMAL(3,2)) AS confianza "
+            "sku_especifico, CAST(confianza AS DECIMAL(3,2)) AS confianza "
             "FROM categorias_sinonimos "
             f"WHERE palabra_clave_norm IN ({placeholders}) "
             "ORDER BY confianza DESC LIMIT :limite"

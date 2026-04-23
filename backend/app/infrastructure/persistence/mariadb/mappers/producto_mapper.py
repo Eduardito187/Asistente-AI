@@ -37,4 +37,15 @@ class ProductoMapper:
             es_electrico=(
                 bool(r["es_electrico"]) if r.get("es_electrico") is not None else None
             ),
+            bateria_mah=int(r["bateria_mah"]) if r.get("bateria_mah") is not None else None,
+            camara_mp=int(r["camara_mp"]) if r.get("camara_mp") is not None else None,
+            camara_frontal_mp=(
+                int(r["camara_frontal_mp"]) if r.get("camara_frontal_mp") is not None else None
+            ),
+            soporta_5g=(
+                bool(r["soporta_5g"]) if r.get("soporta_5g") is not None else None
+            ),
+            sistema_operativo=r.get("sistema_operativo"),
+            refresh_hz=int(r["refresh_hz"]) if r.get("refresh_hz") is not None else None,
+            gpu=r.get("gpu"),
         )

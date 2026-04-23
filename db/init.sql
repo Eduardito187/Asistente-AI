@@ -40,6 +40,16 @@ CREATE TABLE IF NOT EXISTS productos (
     tipo_panel              VARCHAR(20)  NULL,
     resolucion              VARCHAR(10)  NULL,
     es_electrico            TINYINT(1)   NULL,
+    -- Specs adicionales para comparativas (ingestor las llena cuando puede
+    -- parsearlas del detalle; el extractor regex las infiere de nombre+desc
+    -- como fallback).
+    bateria_mah             SMALLINT     NULL,
+    camara_mp               SMALLINT     NULL,
+    camara_frontal_mp       SMALLINT     NULL,
+    soporta_5g              TINYINT(1)   NULL,
+    sistema_operativo       VARCHAR(30)  NULL,
+    refresh_hz              SMALLINT     NULL,
+    gpu                     VARCHAR(60)  NULL,
     -- Marca accesorios "hijos" de otra categoria (ej. correa smartwatch, funda
     -- celular). Permite separarlos del listado principal y proponerlos como
     -- cross-sell. Productos cuya subcategoria ya es de accesorios NO llevan
@@ -230,7 +240,9 @@ CREATE TABLE IF NOT EXISTS perfiles_sesion (
     marca_preferida         VARCHAR(120) NULL,
     categoria_foco          VARCHAR(120) NULL,
     subcategoria_foco       VARCHAR(120) NULL,
+    sku_foco                VARCHAR(64)  NULL,
     genero_declarado        VARCHAR(20)  NULL,
+    desired_tier            VARCHAR(20)  NULL,
     uso_declarado           VARCHAR(200) NULL,
     pulgadas                DECIMAL(4,1) NULL,
     tipo_panel              VARCHAR(32)  NULL,
@@ -288,10 +300,15 @@ CREATE TABLE IF NOT EXISTS categorias_sinonimos (
     palabra_clave_norm      VARCHAR(80)  NOT NULL,
     categoria               VARCHAR(120) NOT NULL,
     subcategoria            VARCHAR(120) NULL,
+    -- SKU concreto cuando el alias identifica univocamente un producto
+    -- (ej. "s26 ultra" -> SM-S948BZKKBVO). Si es NULL, el alias apunta
+    -- solo a la categoria/subcategoria.
+    sku_especifico          VARCHAR(64)  NULL,
     confianza               DECIMAL(3,2) NOT NULL DEFAULT 1.00,
 
     UNIQUE KEY uq_palabra_norm (palabra_clave_norm),
-    INDEX ix_cat_sinonimos_categoria (categoria)
+    INDEX ix_cat_sinonimos_categoria (categoria),
+    INDEX ix_sinonimos_sku (sku_especifico)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ------------------------------------------------------------

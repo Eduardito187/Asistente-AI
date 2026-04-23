@@ -60,4 +60,4 @@ class AtajoSkuDirecto:
             else f"a Bs {precio:.0f}"
         )
         partes.append(f"{extra_precio} [{p.get('sku')}]")
-        return f"{' '.join(partes)}. Queres que te lo agregue al carrito?"
+        return f"{' '.join(partes)}. Te cuento las specs o preferis que te compare con alternativas cercanas?"

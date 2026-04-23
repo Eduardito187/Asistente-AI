@@ -100,6 +100,25 @@ class ExtractorAtributos:
         r'\b(' + "|".join(_COLORES) + r')\b', re.IGNORECASE,
     )
 
+    # ------- SPECS para comparativas (batería, cámara, 5G, refresh, SO, GPU) -----
+    # Acepta "5000 mAh", "5,000 mAh", "5.000 mAh"; quita separadores al int().
+    _RX_BATERIA = re.compile(r'(?<!\d)(\d{1,3}(?:[.,]\d{3})?|\d{3,5})\s*mAh\b', re.IGNORECASE)
+    _RX_CAMARA_PRINCIPAL = re.compile(r'(?<!\d)(\d{1,3})\s*MP\b', re.IGNORECASE)
+    _RX_CAMARA_FRONTAL_CONTEXTO = re.compile(r'(?:selfie|frontal|front)', re.IGNORECASE)
+    _RX_MP_NUMERO = re.compile(r'(\d{1,3})\s*MP', re.IGNORECASE)
+    _RX_5G = re.compile(r'\b5\s?G\b', re.IGNORECASE)
+    _RX_REFRESH = re.compile(r'(\d{2,3})\s*Hz\b', re.IGNORECASE)
+    _RX_SO = re.compile(
+        r'\b(android|ios|windows|webos|tizen|wear\s*os|chromeos)\b', re.IGNORECASE
+    )
+    _RX_GPU = re.compile(
+        r'\b(geforce\s+(?:rtx|gtx)\s+\d{3,4}\w*|radeon\s+\w+|mali-\w+|adreno\s+\d+)\b',
+        re.IGNORECASE,
+    )
+
+    _MIN_BATERIA_MAH = 500
+    _MIN_CAMARA_MP = 2
+
     @classmethod
     def extraer(cls, nombre: str, descripcion: Optional[str] = None) -> AtributosProducto:
         """Extrae todos los atributos detectables. Nombre primario, descripcion fallback."""
@@ -107,6 +126,7 @@ class ExtractorAtributos:
             return AtributosProducto()
         n = nombre.strip()
         d = (descripcion or "").strip()[: cls._MAX_DESC_CHARS]
+        texto_nd = f"{n} {d}"
         return AtributosProducto(
             pulgadas=cls.pulgadas(n) or cls.pulgadas(d),
             capacidad_gb=cls.capacidad_gb(n) or cls.capacidad_gb(d),
@@ -118,6 +138,13 @@ class ExtractorAtributos:
             color=cls.color(n),
             tipo_panel=cls.tipo_panel(n),
             resolucion=cls.resolucion(n),
+            bateria_mah=cls.bateria_mah(texto_nd),
+            camara_mp=cls.camara_mp(texto_nd),
+            camara_frontal_mp=cls.camara_frontal_mp(texto_nd),
+            soporta_5g=cls.soporta_5g(texto_nd),
+            refresh_hz=cls.refresh_hz(texto_nd),
+            sistema_operativo=cls.sistema_operativo(texto_nd),
+            gpu=cls.gpu(texto_nd),
         )
 
     @classmethod
@@ -271,3 +298,71 @@ class ExtractorAtributos:
             "violeta": "morado",
         }
         return equivalencias.get(c, c)
+
+    @classmethod
+    def bateria_mah(cls, texto: str) -> Optional[int]:
+        if not texto:
+            return None
+        m = cls._RX_BATERIA.search(texto)
+        if not m:
+            return None
+        try:
+            valor = int(m.group(1).replace(",", "").replace(".", ""))
+        except ValueError:
+            return None
+        return valor if valor >= cls._MIN_BATERIA_MAH else None
+
+    @classmethod
+    def camara_mp(cls, texto: str) -> Optional[int]:
+        """MP más alto que aparezca en el texto, asumiendo que esa es la
+        cámara principal (regla del vendedor: si el texto cita 200 MP y
+        48 MP, la principal es la de 200)."""
+        if not texto:
+            return None
+        candidatos = [int(m) for m in cls._RX_CAMARA_PRINCIPAL.findall(texto)]
+        validos = [c for c in candidatos if c >= cls._MIN_CAMARA_MP]
+        return max(validos) if validos else None
+
+    @classmethod
+    def camara_frontal_mp(cls, texto: str) -> Optional[int]:
+        """Busca un 'N MP' dentro de 40 chars de 'selfie/frontal/front'."""
+        if not texto:
+            return None
+        for ctx in cls._RX_CAMARA_FRONTAL_CONTEXTO.finditer(texto):
+            inicio = max(0, ctx.start() - 40)
+            fin = min(len(texto), ctx.end() + 40)
+            ventana = texto[inicio:fin]
+            mp = cls._RX_MP_NUMERO.search(ventana)
+            if mp:
+                valor = int(mp.group(1))
+                if valor >= cls._MIN_CAMARA_MP:
+                    return valor
+        return None
+
+    @classmethod
+    def soporta_5g(cls, texto: str) -> Optional[bool]:
+        if not texto:
+            return None
+        return True if cls._RX_5G.search(texto) else None
+
+    @classmethod
+    def refresh_hz(cls, texto: str) -> Optional[int]:
+        if not texto:
+            return None
+        # Mayor Hz del texto (descartar Hz ≤ 30 como "ruido" típico)
+        candidatos = [int(m) for m in cls._RX_REFRESH.findall(texto) if int(m) >= 40]
+        return max(candidatos) if candidatos else None
+
+    @classmethod
+    def sistema_operativo(cls, texto: str) -> Optional[str]:
+        if not texto:
+            return None
+        m = cls._RX_SO.search(texto)
+        return m.group(1).lower() if m else None
+
+    @classmethod
+    def gpu(cls, texto: str) -> Optional[str]:
+        if not texto:
+            return None
+        m = cls._RX_GPU.search(texto)
+        return m.group(1) if m else None

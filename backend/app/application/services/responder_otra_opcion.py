@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from uuid import UUID
 
+from ...domain.productos import SKU
 from ..chat.serializers import ProductoSerializer
+from ..ports import UnitOfWork
 from ..queries.buscar_productos import BuscarProductosHandler, BuscarProductosQuery
 from ..queries.obtener_perfil_sesion import (
     ObtenerPerfilSesionHandler,
@@ -10,6 +12,7 @@ from ..queries.obtener_perfil_sesion import (
     ResultadoObtenerPerfilSesion,
 )
 from .respuesta_follow_up import RespuestaFollowUp
+from .umbrales_tier import UmbralesTier
 
 
 class ResponderOtraOpcion:
@@ -23,9 +26,11 @@ class ResponderOtraOpcion:
         self,
         obtener_perfil: ObtenerPerfilSesionHandler,
         buscar_productos: BuscarProductosHandler,
+        uow_factory,
     ) -> None:
         self._obtener_perfil = obtener_perfil
         self._buscar = buscar_productos
+        self._uow_factory = uow_factory
 
     def responder(self, sesion_id: UUID) -> RespuestaFollowUp | None:
         perfil = self._obtener_perfil.ejecutar(
@@ -35,12 +40,14 @@ class ResponderOtraOpcion:
             return None
 
         excluidos = self._skus_mostrados(perfil)
+        piso, techo = self._rango_tier(perfil)
         productos = self._buscar.ejecutar(
             BuscarProductosQuery(
                 categoria=perfil.categoria_efectiva(),
                 subcategoria=perfil.subcategoria_efectiva(),
                 marca=perfil.marca_preferida or None,
-                precio_max=perfil.presupuesto_max,
+                precio_min=piso,
+                precio_max=self._techo(perfil.presupuesto_max, techo),
                 pulgadas=perfil.pulgadas,
                 tipo_panel=perfil.tipo_panel,
                 resolucion=perfil.resolucion,
@@ -87,6 +94,41 @@ class ResponderOtraOpcion:
             skus=[str(p.sku) for p in nuevos],
             ruta="follow_up_otra_opcion",
         )
+
+    def _rango_tier(
+        self, perfil: ResultadoObtenerPerfilSesion
+    ) -> tuple[float | None, float | None]:
+        """Mantiene la gama del turno anterior: si el sku_foco es premium
+        pero el cliente no lo declaró, inferimos el tier del precio del
+        foco y filtramos low-end del siguiente listado."""
+        subcat = perfil.subcategoria_efectiva()
+        precio_foco = self._precio_foco(perfil.sku_foco)
+        tier = perfil.desired_tier or (
+            UmbralesTier.tier_de(precio_foco, subcat) if precio_foco else None
+        )
+        if not tier:
+            return None, None
+        return UmbralesTier.rango(
+            tier=tier, subcategoria=subcat, precio_ancla=precio_foco
+        )
+
+    def _precio_foco(self, sku_foco: str | None) -> float | None:
+        if not sku_foco:
+            return None
+        try:
+            with self._uow_factory() as uow:
+                prod = uow.productos.obtener_por_sku(SKU(sku_foco))
+        except Exception:
+            return None
+        return float(prod.precio.monto) if prod else None
+
+    @staticmethod
+    def _techo(presupuesto: float | None, techo_tier: float | None) -> float | None:
+        if presupuesto is None:
+            return techo_tier
+        if techo_tier is None:
+            return presupuesto
+        return min(presupuesto, techo_tier)
 
     @staticmethod
     def _tiene_contexto(perfil: ResultadoObtenerPerfilSesion) -> bool:

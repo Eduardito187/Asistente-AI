@@ -75,6 +75,9 @@ from ...application.services.reindexador_embeddings import ReindexadorEmbeddings
 from ...application.services.resolvedor_categoria_cercana import (
     ResolvedorCategoriaCercana,
 )
+from ...application.services.responder_comparacion_explicita import (
+    ResponderComparacionExplicita,
+)
 from ...application.services.responder_consulta_disponibilidad import (
     ResponderConsultaDisponibilidad,
 )
@@ -347,7 +350,8 @@ def procesar_chat_service() -> ProcesarChatService:
             obtener_perfil=obtener_perfil, buscar_productos=buscar
         ),
         responder_otra_opcion=ResponderOtraOpcion(
-            obtener_perfil=obtener_perfil, buscar_productos=buscar
+            obtener_perfil=obtener_perfil, buscar_productos=buscar,
+            uow_factory=uow_factory,
         ),
         responder_comparacion=ResponderComparacionMostrados(
             obtener_perfil=obtener_perfil, comparar=comparar_productos_handler()
@@ -385,6 +389,10 @@ def procesar_chat_service() -> ProcesarChatService:
         gestor_follow_ups=gestor_follow_ups,
         registrar_alternativa=registrar_alternativa_ofrecida_handler(),
         resolvedor_categoria=resolvedor_categoria_cercana(),
+        responder_comparacion_explicita=ResponderComparacionExplicita(
+            resolver=resolver_categoria_sinonimo_handler(),
+            comparar=comparar_productos_handler(),
+        ),
         responder_consulta_disponibilidad=ResponderConsultaDisponibilidad(
             buscar=buscar
         ),

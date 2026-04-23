@@ -10,6 +10,13 @@ from ...domain.texto import NormalizadorTexto
 from .sql import ProductoSql
 
 
+def _bool_a_tinyint(valor: bool | None) -> int | None:
+    """Convierte Optional[bool] al TINYINT(1) de MariaDB (NULL-safe)."""
+    if valor is None:
+        return None
+    return 1 if valor else 0
+
+
 class MariaDbProductoRepositorio(ProductoRepository):
     """Implementación MariaDB del repo de productos (upsert por SKU)."""
 
@@ -54,6 +61,13 @@ class MariaDbProductoRepositorio(ProductoRepository):
                     "color": atr.color,
                     "tipo_panel": atr.tipo_panel,
                     "resolucion": atr.resolucion,
+                    "bateria_mah": atr.bateria_mah,
+                    "camara_mp": atr.camara_mp,
+                    "camara_frontal_mp": atr.camara_frontal_mp,
+                    "soporta_5g": _bool_a_tinyint(atr.soporta_5g),
+                    "sistema_operativo": atr.sistema_operativo,
+                    "refresh_hz": atr.refresh_hz,
+                    "gpu": atr.gpu,
                 },
             )
 

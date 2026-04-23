@@ -32,4 +32,6 @@ class ObtenerPerfilSesionHandler:
             alternativa_ofrecida=perfil.alternativa_ofrecida,
             subcategoria_foco=perfil.subcategoria_foco,
             genero_declarado=perfil.genero_declarado,
+            sku_foco=perfil.sku_foco,
+            desired_tier=perfil.desired_tier,
         )

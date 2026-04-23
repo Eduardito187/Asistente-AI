@@ -93,4 +93,5 @@ class MariaDbCatalogoKeywordsRepository(CatalogoKeywordsRepository):
             categoria=row["categoria"],
             subcategoria=row["subcategoria"],
             confianza=float(row["confianza"]),
+            sku_especifico=row.get("sku_especifico"),
         )

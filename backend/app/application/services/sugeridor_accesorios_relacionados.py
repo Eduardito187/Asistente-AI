@@ -41,25 +41,24 @@ class SugeridorAccesoriosRelacionados:
                 limite=limite * self._POOL_MULT,
             )
         )
-        return self._priorizar_por_marca_o_familia(pool, principales)[:limite]
+        return self._filtrar_compatibles(pool, principales)[:limite]
 
     @classmethod
-    def _priorizar_por_marca_o_familia(
+    def _filtrar_compatibles(
         cls, pool: list[Producto], principales: list[Producto]
     ) -> list[Producto]:
-        """Reordena el pool: primero los accesorios compatibles con la marca o
-        tokens del producto principal (ej. 'galaxy watch7' matchea correas
-        'para galaxy watch7'); el resto como fallback al final."""
+        """Devuelve solo accesorios compatibles por marca o por tokens del
+        nombre del principal. Si no hay ninguno compatible, devuelve lista
+        vacia: sugerir accesorios de otra marca (ej. correa Samsung para un
+        Apple Watch) es peor que no sugerir nada."""
         marcas = {(p.marca or "").lower() for p in principales if p.marca}
         tokens_familia = cls._tokens_familia(principales)
-        compatibles: list[Producto] = []
-        resto: list[Producto] = []
-        for acc in pool:
-            if cls._es_compatible(acc, marcas, tokens_familia):
-                compatibles.append(acc)
-            else:
-                resto.append(acc)
-        return compatibles + resto
+        if not marcas and not tokens_familia:
+            return pool
+        return [
+            acc for acc in pool
+            if cls._es_compatible(acc, marcas, tokens_familia)
+        ]
 
     @staticmethod
     def _tokens_familia(principales: list[Producto]) -> set[str]:
@@ -67,9 +66,12 @@ class SugeridorAccesoriosRelacionados:
         'galaxy', 'watch7', 'iphone', 'ipad') ignorando palabras muy comunes."""
         genericas = {
             "smartwatch", "reloj", "telefono", "celular", "laptop", "notebook",
+            "watch", "phone", "tablet", "televisor", "auriculares", "audifono",
             "color", "negro", "blanco", "gris", "azul", "rojo", "rosa", "verde",
-            "bluetooth", "pulgadas", "para", "con", "sin", "de", "el", "la",
-            "hombre", "mujer", "nino", "nina", "unisex", "s/m", "m/l",
+            "crema", "azabache", "medianoche", "medianoch", "oscuro",
+            "bluetooth", "pulgadas", "para", "con", "sin", "los", "las",
+            "hombre", "mujer", "nino", "nina", "unisex", "serie", "generacion",
+            "bateria", "cargador", "bocina",
         }
         tokens: set[str] = set()
         for p in principales:

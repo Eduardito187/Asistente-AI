@@ -30,4 +30,6 @@ class PerfilSesionMapper:
             alternativa_ofrecida=r.get("alternativa_ofrecida"),
             subcategoria_foco=r.get("subcategoria_foco"),
             genero_declarado=r.get("genero_declarado"),
+            sku_foco=r.get("sku_foco"),
+            desired_tier=r.get("desired_tier"),
         )

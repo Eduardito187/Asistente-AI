@@ -28,8 +28,9 @@ from ..services.generador_justificacion import GeneradorJustificacion
 from ..services.reranker_por_perfil import ReRankerPorPerfil
 from ..services.sanitizador_query_busqueda import SanitizadorQueryBusqueda
 from ..services.sugeridor_accesorios_relacionados import SugeridorAccesoriosRelacionados
+from ..services.umbrales_tier import UmbralesTier
 from .helpers import ValueParser
-from .serializers import CarritoSerializer, ComparacionSerializer, OrdenSerializer, ProductoSerializer
+from .serializers import CarritoSerializer, OrdenSerializer, ProductoSerializer
 from .validador_filtros_duros import ValidadorFiltrosDuros
 
 log = logging.getLogger("tool_dispatcher")
@@ -107,6 +108,14 @@ class ToolDispatcher:
             filtros.get("query"), filtros.get("categoria"), filtros.get("subcategoria")
         )
         filtros["excluir_accesorios"] = not es_accesorio
+        self._aplicar_tier_filtros(filtros, perfil)
+        log.info(
+            "buscar_productos intent=%s tier=%s sku_foco=%s filtros=%s",
+            "exact" if perfil.sku_foco else "busqueda",
+            perfil.desired_tier,
+            perfil.sku_foco,
+            {k: v for k, v in filtros.items() if v and k not in ("query", "solo_con_stock")},
+        )
         productos = self.buscar.ejecutar(BuscarProductosQuery(**filtros))
         genero_sin_resultados = bool(filtros.get("genero")) and not productos
         if genero_sin_resultados:
@@ -118,12 +127,16 @@ class ToolDispatcher:
         productos = self.reranker.reordenar(
             list(productos), perfil, marca_indiferente=marca_indiferente
         )
+        productos = self._prepend_producto_foco(productos, perfil.sku_foco)
+        log.info("buscar_productos count_final=%d", len(productos))
         sugeridos = self._cross_sell_accesorios(filtros, productos) if not es_accesorio else []
         respuesta = {
             "productos": [self._proyectar(p, perfil) for p in productos],
             "total": len(productos),
             "sugeridos": [self._proyectar(p, perfil) for p in sugeridos],
         }
+        if perfil.sku_foco and productos and str(productos[0].sku) == perfil.sku_foco:
+            respuesta["producto_foco_sku"] = perfil.sku_foco
         if genero_sin_resultados:
             respuesta["aviso_sin_metadata_genero"] = (
                 f"El catalogo no marca productos por genero '{filtros.get('genero')}' "
@@ -131,6 +144,61 @@ class ToolDispatcher:
                 f"de genero — comunicalo asi al cliente con honestidad."
             )
         return respuesta
+
+    def _prepend_producto_foco(self, productos: list, sku_foco: str | None) -> list:
+        """Si el cliente mencionó un modelo específico (ej. 's26 ultra' resuelto
+        a sku_foco), ese SKU va primero. Si ya viene en la lista, lo movemos
+        arriba; si no, lo vamos a buscar y lo insertamos como principal."""
+        if not sku_foco:
+            return productos
+        por_sku = {str(p.sku): p for p in productos}
+        if sku_foco in por_sku:
+            foco = por_sku[sku_foco]
+            rest = [p for p in productos if str(p.sku) != sku_foco]
+            return [foco, *rest]
+        try:
+            obtener_res = self.ver_prod.ejecutar(VerProductoQuery(sku=sku_foco))
+        except Exception:
+            return productos
+        if obtener_res is None or obtener_res.producto is None:
+            return productos
+        return [obtener_res.producto, *productos]
+
+    def _aplicar_tier_filtros(self, filtros: dict, perfil) -> None:
+        """Convierte `perfil.desired_tier` en piso/techo de precio. Si hay
+        `sku_foco`, su precio se usa como ancla y, si no hay tier explícito,
+        se infiere del propio foco (ej. S26 Ultra a Bs 18.699 en Smartphones
+        → 'flagship'). Respeta `precio_min`/`precio_max` ya en filtros:
+        solo sube el piso o baja el techo si el tier es más restrictivo."""
+        subcat = filtros.get("subcategoria") or getattr(perfil, "subcategoria_foco", None)
+        precio_foco, subcat = self._foco_ancla(perfil, subcat)
+        tier = getattr(perfil, "desired_tier", None) or (
+            UmbralesTier.tier_de(precio_foco, subcat) if precio_foco else None
+        )
+        if not tier:
+            return
+        precio_ancla = precio_foco if precio_foco is not None else filtros.get("precio_max")
+        piso, techo = UmbralesTier.rango(tier=tier, subcategoria=subcat, precio_ancla=precio_ancla)
+        if piso is not None:
+            previo = filtros.get("precio_min")
+            filtros["precio_min"] = max(piso, previo or 0.0) or None
+        if techo is not None:
+            previo = filtros.get("precio_max")
+            filtros["precio_max"] = min(techo, previo) if previo is not None else techo
+
+    def _foco_ancla(self, perfil, subcat_base: str | None) -> tuple[float | None, str | None]:
+        """Resuelve el producto foco y devuelve (precio, subcategoria_resuelta).
+        Devuelve (None, subcat_base) si no hay sku_foco o la tool falla."""
+        sku_foco = getattr(perfil, "sku_foco", None)
+        if not sku_foco:
+            return None, subcat_base
+        try:
+            res = self.ver_prod.ejecutar(VerProductoQuery(sku=sku_foco))
+        except Exception:
+            return None, subcat_base
+        if not res or not res.producto:
+            return None, subcat_base
+        return float(res.producto.precio.monto), subcat_base or res.producto.subcategoria
 
     def _cross_sell_accesorios(self, filtros: dict, principales: list) -> list:
         sugeridor = SugeridorAccesoriosRelacionados(self.buscar)
@@ -289,7 +357,13 @@ class ToolDispatcher:
         if isinstance(skus_arg, str):
             skus_arg = [s.strip() for s in skus_arg.split(",") if s.strip()]
         resultado = self.comparar.ejecutar(CompararProductosQuery(skus=tuple(skus_arg)))
-        salida = ComparacionSerializer.a_dict(resultado.productos)
+        # La tabla + conclusión ya vienen armadas por ComparadorProductos.
+        # El LLM solo debe renderizar, no recalcular.
+        salida: dict = {
+            "productos": [ProductoSerializer.resumen(p) for p in resultado.productos],
+            "tabla": resultado.tabla,
+            "conclusion": resultado.conclusion,
+        }
         if resultado.skus_no_encontrados:
             salida["skus_no_encontrados"] = resultado.skus_no_encontrados
         return salida

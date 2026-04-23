@@ -43,9 +43,11 @@ from .chat_input import ChatInput
 from .chat_output import ChatOutput
 from .clasificador_intencion import ClasificadorIntencion
 from .curador_conversaciones import CuradorConversaciones
+from .detector_comparacion_explicita import DetectorComparacionExplicita
 from .detector_consulta_accesorio import DetectorConsultaAccesorio
 from .detector_genero_mencion import DetectorGeneroMencion
 from .sugeridor_accesorios_relacionados import SugeridorAccesoriosRelacionados
+from .umbrales_tier import UmbralesTier
 from .detector_consulta_relativa import DetectorConsultaRelativa, TipoConsultaRelativa
 from .detector_consulta_disponibilidad import DetectorConsultaDisponibilidad
 from .detector_intencion_asesoria import DetectorIntencionAsesoria
@@ -59,6 +61,7 @@ from .gestor_follow_ups_contextuales import GestorFollowUpsContextuales
 from .manejador_producto_ausente import ManejadorProductoAusente
 from .normalizador_moneda import NormalizadorMoneda
 from .resolvedor_categoria_cercana import ResolvedorCategoriaCercana
+from .responder_comparacion_explicita import ResponderComparacionExplicita
 from .responder_consulta_disponibilidad import ResponderConsultaDisponibilidad
 from .responder_consulta_politica import ResponderConsultaPolitica
 from .respuesta_follow_up import RespuestaFollowUp
@@ -107,6 +110,7 @@ class ProcesarChatService:
         registrar_alternativa: RegistrarAlternativaOfrecidaHandler,
         resolvedor_categoria: ResolvedorCategoriaCercana,
         responder_consulta_disponibilidad: ResponderConsultaDisponibilidad,
+        responder_comparacion_explicita: ResponderComparacionExplicita,
     ) -> None:
         self._uow_factory = uow_factory
         self._crear_sesion = crear_sesion
@@ -132,6 +136,7 @@ class ProcesarChatService:
         self._registrar_alternativa = registrar_alternativa
         self._resolvedor_categoria = resolvedor_categoria
         self._responder_consulta_disp = responder_consulta_disponibilidad
+        self._responder_comparacion_explicita = responder_comparacion_explicita
 
     async def procesar(self, inp: ChatInput) -> ChatOutput:
         t0 = time.monotonic()
@@ -199,6 +204,12 @@ class ProcesarChatService:
                 HistorialChatQuery(sesion_id=sesion_id, limite=MAX_HISTORIAL)
             )
         ]
+        comparacion_explicita = self._short_circuit_comparacion_explicita(
+            inp=inp, sesion_id=sesion_id, t0=t0
+        )
+        if comparacion_explicita is not None:
+            return comparacion_explicita
+
         short_circuit = await self._short_circuit_resolver(
             inp=inp, historial=historial, sesion_id=sesion_id, t0=t0
         )
@@ -226,6 +237,7 @@ class ProcesarChatService:
             respuesta, trace, skus_tool = self._forzar_busqueda(inp.mensaje, sesion_id, trace)
 
         respuesta = NormalizadorMoneda.normalizar(respuesta)
+        respuesta = self._inyectar_foco_si_falta(respuesta, trace)
         respuesta, productos = self._sanear_skus_y_enriquecer(respuesta, skus_tool)
 
         if self._necesita_manejo_ausente(respuesta, productos, trace):
@@ -267,6 +279,87 @@ class ProcesarChatService:
             pasos=[{"tool": p.tool, "args": p.args, "result": p.result} for p in trace],
         )
 
+    _TOKENS_PREMIUM = (
+        "tope de gama", "tope gama", "alta gama", "gama alta", "premium",
+        "flagship", "lo mejor", "el mejor", "la mejor", "high end",
+        "ultra", "pro max",
+    )
+    _RATIO_PISO_PREMIUM = 0.5
+
+    @classmethod
+    def _filtrar_por_gama(
+        cls, productos: list, mensaje: str, sku_foco: str | None
+    ) -> list:
+        """Cuando el cliente pidió gama alta o ya hay un producto foco premium,
+        filtra del listado los productos cuyo precio esté muy por debajo del
+        foco (o del top de la lista si no hay foco). Evita mezclar S26 Ultra
+        con Huavi H-120 en el mismo bloque."""
+        if not productos:
+            return productos
+        norm = NormalizadorTexto.normalizar(mensaje or "")
+        pidio_premium = any(tok in norm for tok in cls._TOKENS_PREMIUM)
+        foco = None
+        if sku_foco:
+            foco = next((p for p in productos if str(p.sku) == sku_foco), None)
+        if foco is None and not pidio_premium:
+            return productos
+        anchor_precio = foco.precio.monto if foco else max(p.precio.monto for p in productos)
+        piso = anchor_precio * cls._RATIO_PISO_PREMIUM
+        filtrados = [p for p in productos if p.precio.monto >= piso]
+        return filtrados or productos[:1]
+
+    def _precio_del_foco(self, sku_foco: str | None) -> float | None:
+        """Fetch el precio del producto foco cuando hay sku_foco. Silencioso
+        ante errores — no bloquea la búsqueda si la tool falla."""
+        if not sku_foco:
+            return None
+        try:
+            with self._uow_factory() as uow:
+                from ...domain.productos import SKU
+                prod = uow.productos.obtener_por_sku(SKU(sku_foco))
+        except Exception:
+            return None
+        return float(prod.precio.monto) if prod else None
+
+    def _prepend_sku_foco(self, productos: list, sku_foco: str | None) -> list:
+        """Mismo patron que ToolDispatcher._prepend_producto_foco pero para
+        _forzar_busqueda: si el cliente mencionó un modelo (ej. 's26 ultra' →
+        sku_foco), ese SKU va primero. Si ya viene, lo subimos; si no, lo
+        buscamos por SKU exacto y lo insertamos."""
+        if not sku_foco:
+            return productos
+        por_sku = {str(p.sku): p for p in productos}
+        if sku_foco in por_sku:
+            foco = por_sku[sku_foco]
+            rest = [p for p in productos if str(p.sku) != sku_foco]
+            return [foco, *rest]
+        with self._uow_factory() as uow:
+            from ...domain.productos import SKU
+            try:
+                foco = uow.productos.obtener_por_sku(SKU(sku_foco))
+            except Exception:
+                foco = None
+        if foco is None:
+            return productos
+        return [foco, *productos]
+
+    @staticmethod
+    def _inyectar_foco_si_falta(respuesta: str, trace: list[PasoAgente]) -> str:
+        """Safety net: si el dispatcher identifico un `producto_foco_sku` y el
+        LLM se olvido de citarlo entre corchetes en su texto, le agregamos la
+        cita al final para que la tarjeta aparezca igual."""
+        focos = {
+            paso.result.get("producto_foco_sku")
+            for paso in trace
+            if paso.tool == "buscar_productos" and paso.result.get("producto_foco_sku")
+        }
+        if not focos:
+            return respuesta
+        for sku in focos:
+            if sku and f"[{sku}]" not in respuesta:
+                respuesta = f"{respuesta.rstrip()}\n[{sku}]"
+        return respuesta
+
     @staticmethod
     def _extraer_sugeridos_del_trace(
         trace: list, productos_citados: list[dict]
@@ -287,6 +380,60 @@ class ProcesarChatService:
                 vistos.add(sku)
                 sugeridos.append(s)
         return sugeridos
+
+    def _short_circuit_comparacion_explicita(
+        self,
+        inp: ChatInput,
+        sesion_id: UUID,
+        t0: float,
+    ) -> ChatOutput | None:
+        """Cuando el cliente nombra 2+ modelos para comparar (ej. 's26 ultra
+        vs iphone 17 pro max'), short-circuit: resolvemos cada uno a su SKU
+        via aliases, llamamos al comparador estructurado y devolvemos la
+        tabla + conclusión formateada. El LLM no participa — es determinista."""
+        intent = DetectorComparacionExplicita.detectar(inp.mensaje)
+        if intent is None:
+            return None
+        respuesta = self._responder_comparacion_explicita.responder(intent)
+        if respuesta is None:
+            return None
+        productos_citados = [
+            ProductoSerializer.detalle(p) for p in respuesta.resultado.productos
+        ]
+        skus_tool = [str(p.sku) for p in respuesta.resultado.productos]
+        resultado_tool = {
+            "productos": [ProductoSerializer.resumen(p) for p in respuesta.resultado.productos],
+            "tabla": respuesta.resultado.tabla,
+            "conclusion": respuesta.resultado.conclusion,
+        }
+        trace = [
+            PasoAgente(
+                tool="comparar_productos",
+                args={"skus": skus_tool},
+                result=resultado_tool,
+                fallback=True,
+            )
+        ]
+        self._registrar_respuesta(sesion_id, respuesta.texto, trace)
+        self._persistir_turno_mostrado(sesion_id, productos_citados)
+        self._registrar_metrica.ejecutar(
+            RegistrarMetricaTurnoCommand(
+                sesion_id=sesion_id,
+                mensaje_usuario_len=len(inp.mensaje),
+                respuesta_len=len(respuesta.texto),
+                tool_calls=1,
+                mentiras_detectadas=0,
+                productos_citados=len(productos_citados),
+                ruta="comparacion_explicita",
+                tiempo_ms=int((time.monotonic() - t0) * 1000),
+            )
+        )
+        return ChatOutput(
+            sesion_id=sesion_id,
+            respuesta=respuesta.texto,
+            productos_citados=productos_citados,
+            pasos=[{"tool": p.tool, "args": p.args, "result": p.result} for p in trace],
+        )
 
     async def _short_circuit_resolver(
         self,
@@ -790,12 +937,28 @@ class ProcesarChatService:
         es_accesorio = DetectorConsultaAccesorio.es_consulta_accesorio(
             mensaje_limpio if tiene_terminos else None, cat_ef, subcat_ef
         )
+        precio_foco = self._precio_del_foco(perfil.sku_foco)
+        tier_efectivo = perfil.desired_tier or (
+            UmbralesTier.tier_de(precio_foco, subcat_ef) if precio_foco else None
+        )
+        piso_tier, techo_tier = UmbralesTier.rango(
+            tier=tier_efectivo,
+            subcategoria=subcat_ef,
+            precio_ancla=precio_foco or perfil.presupuesto_max,
+        )
+        precio_min = piso_tier
+        precio_max_final = perfil.presupuesto_max
+        if techo_tier is not None:
+            precio_max_final = (
+                min(techo_tier, precio_max_final) if precio_max_final else techo_tier
+            )
         query = BuscarProductosQuery(
             query=mensaje_limpio if tiene_terminos else None,
             categoria=cat_ef,
             subcategoria=subcat_ef,
             marca=perfil.marca_preferida or None,
-            precio_max=perfil.presupuesto_max,
+            precio_min=precio_min,
+            precio_max=precio_max_final,
             pulgadas=perfil.pulgadas,
             tipo_panel=perfil.tipo_panel,
             resolucion=perfil.resolucion,
@@ -815,6 +978,8 @@ class ProcesarChatService:
         if genero_sin_resultados:
             from dataclasses import replace
             productos = self._buscar.ejecutar(replace(query, genero=None))
+        productos = self._prepend_sku_foco(productos, perfil.sku_foco)
+        productos = self._filtrar_por_gama(productos, mensaje, perfil.sku_foco)
         skus_mostrados = {
             s for s in (perfil.ultimos_skus_mostrados or "").split(",") if s
         }
@@ -837,6 +1002,8 @@ class ProcesarChatService:
             "total": len(productos_efectivos),
             "sugeridos": [ProductoSerializer.resumen(p) for p in sugeridos],
         }
+        if perfil.sku_foco and productos_efectivos and str(productos_efectivos[0].sku) == perfil.sku_foco:
+            resultado["producto_foco_sku"] = perfil.sku_foco
         if genero_sin_resultados:
             resultado["aviso_sin_metadata_genero"] = (
                 f"El catalogo no marca productos por genero '{query.genero}' "
@@ -858,11 +1025,11 @@ class ProcesarChatService:
                 f"En esta categoria no diferenciamos por genero '{query.genero}', "
                 f"son modelos unisex. Igual te muestro los disponibles:\n"
             )
-        lineas = [f"{aviso_prefix}Mira lo que tengo para vos!"]
+        lineas = [f"{aviso_prefix}Estas son las opciones que te puedo ofrecer:"]
         for p in productos_efectivos[:3]:
             extra = f" (antes Bs {p.precio_anterior.monto:.0f})" if p.precio_anterior else ""
             lineas.append(f"- {p.nombre} — Bs {p.precio.monto:.0f}{extra} [{p.sku}]")
-        lineas.append("Queres que te lo agregue al carrito o te muestro mas opciones?")
+        lineas.append("Contame que te importa mas (presupuesto, marca, uso) y te ayudo a elegir.")
         return (
             "\n".join(lineas),
             trace,

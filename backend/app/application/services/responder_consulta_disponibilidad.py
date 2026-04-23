@@ -63,6 +63,10 @@ class ResponderConsultaDisponibilidad:
         pool esta vacio, caemos a categoria pura. Si `genero` se pide pero no
         hay productos marcados en esa subcategoria, re-intenta sin el filtro
         y devuelve (productos, True) para que el caller avise honestidad."""
+        if cercana.sku_especifico:
+            exacto = self._obtener_y_complementar(cercana, genero)
+            if exacto:
+                return (exacto, False)
         pool = self._buscar_por_keyword_y_categoria(cercana, genero)
         sin_metadata_genero = bool(genero) and not pool
         if sin_metadata_genero:
@@ -82,6 +86,37 @@ class ResponderConsultaDisponibilidad:
             ),
             sin_metadata_genero,
         )
+
+    _RATIO_PISO_PREMIUM = 0.5
+
+    def _obtener_y_complementar(
+        self, cercana: CategoriaCercana, genero: Optional[str]
+    ) -> list:
+        """Si el sinónimo apunta a un SKU concreto (ej. 's26 ultra' →
+        SM-S948BZKKBVO), traemos ese producto primero y agregamos 1-2
+        alternativas de misma subcategoría/gama. No mezclamos con low-end."""
+        from ...domain.productos import SKU
+        try:
+            foco_sku = SKU(cercana.sku_especifico)
+        except Exception:
+            return []
+        with self._buscar._uow_factory() as uow:  # noqa: SLF001
+            foco = uow.productos.obtener_por_sku(foco_sku)
+        if foco is None:
+            return []
+        complementos = self._buscar.ejecutar(
+            BuscarProductosQuery(
+                categoria=cercana.categoria,
+                subcategoria=cercana.subcategoria,
+                marca=foco.marca,
+                genero=genero,
+                precio_min=foco.precio.monto * self._RATIO_PISO_PREMIUM,
+                excluir_skus=(str(foco.sku),),
+                excluir_accesorios=True,
+                limite=self.LIMITE - 1,
+            )
+        )
+        return [foco, *complementos[: self.LIMITE - 1]]
 
     def _buscar_por_keyword_y_categoria(
         self, cercana: CategoriaCercana, genero: Optional[str] = None

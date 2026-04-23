@@ -32,6 +32,8 @@ class ActualizarPerfilSesionHandler:
             updated_at=datetime.utcnow(),
             subcategoria_foco=cmd.subcategoria_foco,
             genero_declarado=cmd.genero_declarado,
+            sku_foco=cmd.sku_foco,
+            desired_tier=cmd.desired_tier,
         )
         try:
             with self._uow_factory() as uow:

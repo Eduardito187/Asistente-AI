@@ -10,6 +10,7 @@ from ..queries.resolver_categoria_sinonimo import (
     ResolverCategoriaSinonimoQuery,
 )
 from .detector_genero_mencion import DetectorGeneroMencion
+from .detector_tier_deseado import DetectorTierDeseado
 from .extractor_atributos_mensaje import ExtractorAtributosMensaje
 from .parser_presupuesto import ParserPresupuesto
 
@@ -43,14 +44,16 @@ class ExtractorPerfilMensaje:
     def extraer(self, sesion_id: UUID, mensaje: str) -> ActualizarPerfilSesionCommand:
         texto = (mensaje or "").strip()
         atributos = ExtractorAtributosMensaje.extraer(texto)
-        categoria, subcategoria = self._categoria_y_subcategoria(texto)
+        categoria, subcategoria, sku_foco = self._resolver_entidad(texto)
         return ActualizarPerfilSesionCommand(
             sesion_id=sesion_id,
             presupuesto_max=self._presupuesto(texto),
             marca_preferida=self._marca(texto),
             categoria_foco=categoria,
             subcategoria_foco=subcategoria,
+            sku_foco=sku_foco,
             genero_declarado=DetectorGeneroMencion.detectar(texto),
+            desired_tier=DetectorTierDeseado.detectar(texto),
             uso_declarado=self._uso(texto),
             pulgadas=atributos.pulgadas,
             tipo_panel=atributos.tipo_panel,
@@ -71,15 +74,19 @@ class ExtractorPerfilMensaje:
         match = RX_USO.search(texto)
         return match.group(1).lower() if match else None
 
-    def _categoria_y_subcategoria(
+    def _resolver_entidad(
         self, texto: str
-    ) -> tuple[Optional[str], Optional[str]]:
+    ) -> tuple[Optional[str], Optional[str], Optional[str]]:
+        """Resuelve el texto del cliente contra categorias_sinonimos y devuelve
+        (categoria, subcategoria, sku_especifico). Si el alias identifica un
+        producto concreto (ej. 's26 ultra'), sku_especifico != None; si apunta
+        solo a una categoria (ej. 'celular'), sku es None."""
         if not texto:
-            return None, None
+            return None, None, None
         resultado = self._resolver.ejecutar(
             ResolverCategoriaSinonimoQuery(texto=texto, limite_relaciones=0)
         )
         sin = resultado.sinonimo_directo
         if sin is None:
-            return None, None
-        return sin.categoria, sin.subcategoria
+            return None, None, None
+        return sin.categoria, sin.subcategoria, sin.sku_especifico
