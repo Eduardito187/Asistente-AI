@@ -23,7 +23,9 @@ from ..queries.ver_carrito import VerCarritoHandler, VerCarritoQuery
 from ..queries.ver_ordenes_sesion import VerOrdenesSesionHandler, VerOrdenesSesionQuery
 from ..queries.ver_producto import VerProductoHandler, VerProductoQuery
 from ..services.buscador_semantico import BuscadorSemantico
+from ..services.clasificador_etapa_conversacional import ClasificadorEtapaConversacional
 from ..services.detector_consulta_accesorio import DetectorConsultaAccesorio
+from ..services.detector_exclusiones_mensaje import DetectorExclusionesMensaje
 from ..services.generador_justificacion import GeneradorJustificacion
 from ..services.reranker_por_perfil import ReRankerPorPerfil
 from ..services.sanitizador_query_busqueda import SanitizadorQueryBusqueda
@@ -56,25 +58,59 @@ class ToolDispatcher:
 
     MIN_RESULTADOS_FULLTEXT = 3
 
+    _TOOLS_TRANSACCIONALES = frozenset({"agregar_al_carrito", "confirmar_orden"})
+
     def ejecutar(
         self,
         nombre: str,
         args: dict,
         sesion_id: UUID,
         marca_indiferente: bool = False,
+        mensaje_usuario: str = "",
+        trace_actual: list | None = None,
     ) -> dict:
         handler = self._ruta(nombre)
         if handler is None:
             return {"error": f"herramienta desconocida: {nombre}"}
+        if nombre in self._TOOLS_TRANSACCIONALES:
+            gate = self._gate_transaccional(mensaje_usuario, sesion_id, trace_actual or [])
+            if gate is not None:
+                return gate
         try:
             if nombre == "buscar_productos":
-                return self._buscar(args, sesion_id, marca_indiferente=marca_indiferente)
+                return self._buscar(
+                    args,
+                    sesion_id,
+                    marca_indiferente=marca_indiferente,
+                    mensaje_usuario=mensaje_usuario,
+                )
             return handler(args, sesion_id)
         except DomainError as exc:
             return {"error": str(exc)}
         except Exception as exc:
             log.exception("tool %s fallo", nombre)
             return {"error": str(exc)}
+
+    def _gate_transaccional(
+        self, mensaje: str, sesion_id: UUID, trace: list
+    ) -> dict | None:
+        """Bloquea agregar_al_carrito / confirmar_orden si la etapa no es de
+        compra y el cliente no dio señal explícita. Devuelve dict de error
+        que el LLM ve como tool result (no excepción), así el LLM ajusta la
+        respuesta sin romper el flujo."""
+        perfil = self.obtener_perfil.ejecutar(ObtenerPerfilSesionQuery(sesion_id=sesion_id))
+        etapa = ClasificadorEtapaConversacional.clasificar(mensaje, perfil, trace)
+        if ClasificadorEtapaConversacional.permite_transaccion(etapa, mensaje):
+            return None
+        return {
+            "error": (
+                f"accion transaccional bloqueada en etapa '{etapa.value}'. "
+                f"El cliente todavia esta en modo asesor — no uso el carrito "
+                f"hasta que diga explicitamente 'lo llevo' / 'agregalo' / "
+                f"'quiero comprarlo'. Seguinos conversando."
+            ),
+            "etapa": etapa.value,
+        }
 
     def _ruta(self, nombre: str) -> Callable[[dict, UUID], dict] | None:
         return {
@@ -90,9 +126,19 @@ class ToolDispatcher:
             "comparar_productos": self._comparar,
         }.get(nombre)
 
-    def _buscar(self, a: dict, sid: UUID, *, marca_indiferente: bool = False) -> dict:
+    def _buscar(
+        self,
+        a: dict,
+        sid: UUID,
+        *,
+        marca_indiferente: bool = False,
+        mensaje_usuario: str = "",
+    ) -> dict:
         perfil = self.obtener_perfil.ejecutar(ObtenerPerfilSesionQuery(sesion_id=sid))
         filtros = self._filtros_enriquecidos(a, perfil, marca_indiferente=marca_indiferente)
+        exclusiones = DetectorExclusionesMensaje.detectar(mensaje_usuario)
+        if exclusiones:
+            filtros["nombre_excluye"] = tuple(exclusiones)
         if self._filtros_vacios(filtros):
             return {
                 "error": (
@@ -124,6 +170,7 @@ class ToolDispatcher:
         if filtros["query"] and len(productos) < self.MIN_RESULTADOS_FULLTEXT:
             productos = self._agregar_candidatos_semanticos(filtros["query"], productos)
         productos = [p for p in productos if ValidadorFiltrosDuros.cumple(p, filtros)]
+        productos = self._fallback_sin_query(productos, filtros)
         productos = self.reranker.reordenar(
             list(productos), perfil, marca_indiferente=marca_indiferente
         )
@@ -144,6 +191,21 @@ class ToolDispatcher:
                 f"de genero — comunicalo asi al cliente con honestidad."
             )
         return respuesta
+
+    def _fallback_sin_query(self, productos: list, filtros: dict) -> list:
+        """Si el LLM mando la oracion entera como `query` (ej. 'un reloj para
+        ponerme en la mano') el FULLTEXT no matchea y devuelve 0. Cuando
+        tenemos `categoria` o `subcategoria` resueltas, el query verbose solo
+        agrega ruido — relanzamos la busqueda sin query. Evita falso positivo
+        de 'no lo tenemos tal cual' en ManejadorProductoAusente."""
+        if productos:
+            return productos
+        if not filtros.get("query"):
+            return productos
+        if not (filtros.get("categoria") or filtros.get("subcategoria")):
+            return productos
+        filtros_sin_query = {**filtros, "query": None}
+        return self.buscar.ejecutar(BuscarProductosQuery(**filtros_sin_query))
 
     def _prepend_producto_foco(self, productos: list, sku_foco: str | None) -> list:
         """Si el cliente mencionó un modelo específico (ej. 's26 ultra' resuelto

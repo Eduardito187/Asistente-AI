@@ -43,13 +43,22 @@ from .chat_input import ChatInput
 from .chat_output import ChatOutput
 from .clasificador_intencion import ClasificadorIntencion
 from .curador_conversaciones import CuradorConversaciones
+from .detector_asesoria_mostrados import DetectorAsesoriaMostrados
 from .detector_comparacion_explicita import DetectorComparacionExplicita
 from .detector_consulta_accesorio import DetectorConsultaAccesorio
 from .detector_genero_mencion import DetectorGeneroMencion
+from .bloqueador_lista_repetida import BloqueadorListaRepetida
 from .sugeridor_accesorios_relacionados import SugeridorAccesoriosRelacionados
 from .umbrales_tier import UmbralesTier
+from .verificador_claims_producto import VerificadorClaimsProducto
 from .detector_consulta_relativa import DetectorConsultaRelativa, TipoConsultaRelativa
 from .detector_consulta_disponibilidad import DetectorConsultaDisponibilidad
+from .detector_exclusiones_mensaje import DetectorExclusionesMensaje
+from .clasificador_etapa_conversacional import ClasificadorEtapaConversacional
+from .recortador_cierres_comerciales import RecortadorCierresComerciales
+from .renderizador_tabla_comparacion import RenderizadorTablaComparacion
+from .silenciador_preguntas_redundantes import SilenciadorPreguntasRedundantes
+from .normalizador_formato_producto import NormalizadorFormatoProducto
 from .detector_intencion_asesoria import DetectorIntencionAsesoria
 from .detector_intencion_compra import DetectorIntencionCompra
 from .detector_mentiras import DetectorMentiras
@@ -210,6 +219,12 @@ class ProcesarChatService:
         if comparacion_explicita is not None:
             return comparacion_explicita
 
+        asesoria_mostrados = self._short_circuit_asesoria_mostrados(
+            inp=inp, sesion_id=sesion_id, t0=t0
+        )
+        if asesoria_mostrados is not None:
+            return asesoria_mostrados
+
         short_circuit = await self._short_circuit_resolver(
             inp=inp, historial=historial, sesion_id=sesion_id, t0=t0
         )
@@ -239,13 +254,21 @@ class ProcesarChatService:
         respuesta = NormalizadorMoneda.normalizar(respuesta)
         respuesta = self._inyectar_foco_si_falta(respuesta, trace)
         respuesta, productos = self._sanear_skus_y_enriquecer(respuesta, skus_tool)
+        respuesta = VerificadorClaimsProducto.corregir(respuesta, productos)
+        respuesta = NormalizadorFormatoProducto.normalizar(respuesta)
+
+        respuesta, trace, productos, skus_tool = self._evitar_lista_repetida(
+            respuesta, productos, trace, skus_tool, inp.mensaje, sesion_id
+        )
 
         if self._necesita_manejo_ausente(respuesta, productos, trace):
             respuesta, trace, productos = await self._delegar_a_manejador_ausente(
                 inp.mensaje, historial, trace, sesion_id
             )
 
+        respuesta = self._reemplazar_tabla_comparacion(respuesta, trace)
         respuesta = self._cross_sell.aplicar(respuesta, trace, productos)
+        respuesta = self._recortar_cierres(respuesta, inp.mensaje, sesion_id, trace)
 
         self._persistir_turno_mostrado(sesion_id, productos)
 
@@ -307,6 +330,37 @@ class ProcesarChatService:
         piso = anchor_precio * cls._RATIO_PISO_PREMIUM
         filtrados = [p for p in productos if p.precio.monto >= piso]
         return filtrados or productos[:1]
+
+    def _evitar_lista_repetida(
+        self,
+        respuesta: str,
+        productos: list[dict],
+        trace: list,
+        skus_tool: list[str],
+        mensaje: str,
+        sesion_id: UUID,
+    ) -> tuple[str, list, list[dict], list[str]]:
+        """Si el cliente pidió 'otra opción / distintas' y la respuesta
+        repite SKUs ya mostrados, re-ejecuta forzar_busqueda excluyendo los
+        vistos. Solo corrige cuando hay señal de follow-up — no toca
+        búsquedas nuevas."""
+        if not BloqueadorListaRepetida.es_follow_up_de_repeticion(mensaje):
+            return respuesta, trace, productos, skus_tool
+        skus_nuevos = [p["sku"] for p in productos if p.get("sku")]
+        if not skus_nuevos:
+            return respuesta, trace, productos, skus_tool
+        perfil = self._obtener_perfil.ejecutar(ObtenerPerfilSesionQuery(sesion_id=sesion_id))
+        mostrados = BloqueadorListaRepetida.skus_del_perfil(perfil.ultimos_skus_mostrados)
+        if not BloqueadorListaRepetida.lista_repetida(skus_nuevos, mostrados):
+            return respuesta, trace, productos, skus_tool
+        respuesta_nueva, trace_nuevo, skus_tool_nuevo = self._forzar_busqueda(
+            mensaje, sesion_id, list(trace), excluir_skus=tuple(mostrados)
+        )
+        respuesta_nueva = NormalizadorMoneda.normalizar(respuesta_nueva)
+        respuesta_nueva, productos_nuevos = self._sanear_skus_y_enriquecer(
+            respuesta_nueva, skus_tool_nuevo
+        )
+        return respuesta_nueva, trace_nuevo, productos_nuevos, skus_tool_nuevo
 
     def _precio_del_foco(self, sku_foco: str | None) -> float | None:
         """Fetch el precio del producto foco cuando hay sku_foco. Silencioso
@@ -380,6 +434,68 @@ class ProcesarChatService:
                 vistos.add(sku)
                 sugeridos.append(s)
         return sugeridos
+
+    def _short_circuit_asesoria_mostrados(
+        self,
+        inp: ChatInput,
+        sesion_id: UUID,
+        t0: float,
+    ) -> ChatOutput | None:
+        """Cuando el cliente pide 'ayudame a decidir / cual me conviene'
+        sobre productos ya mostrados, dispara una comparación estructurada
+        con los `ultimos_skus_mostrados` del perfil. Sin LLM, sin búsqueda
+        nueva: tabla + conclusión directa sobre lo que el cliente ya vio."""
+        if not DetectorAsesoriaMostrados.es_asesoria_sobre_mostrados(inp.mensaje):
+            return None
+        perfil = self._obtener_perfil.ejecutar(
+            ObtenerPerfilSesionQuery(sesion_id=sesion_id)
+        )
+        mostrados = [
+            s for s in (perfil.ultimos_skus_mostrados or "").split(",") if s.strip()
+        ]
+        if len(mostrados) < 2:
+            return None
+        respuesta = self._responder_comparacion_explicita.responder_por_skus(
+            mostrados[:4]
+        )
+        if respuesta is None:
+            return None
+        productos_citados = [
+            ProductoSerializer.detalle(p) for p in respuesta.resultado.productos
+        ]
+        resultado_tool = {
+            "productos": [ProductoSerializer.resumen(p) for p in respuesta.resultado.productos],
+            "tabla": respuesta.resultado.tabla,
+            "conclusion": respuesta.resultado.conclusion,
+        }
+        trace = [
+            PasoAgente(
+                tool="comparar_productos",
+                args={"skus": [str(p.sku) for p in respuesta.resultado.productos]},
+                result=resultado_tool,
+                fallback=True,
+            )
+        ]
+        self._registrar_respuesta(sesion_id, respuesta.texto, trace)
+        self._persistir_turno_mostrado(sesion_id, productos_citados)
+        self._registrar_metrica.ejecutar(
+            RegistrarMetricaTurnoCommand(
+                sesion_id=sesion_id,
+                mensaje_usuario_len=len(inp.mensaje),
+                respuesta_len=len(respuesta.texto),
+                tool_calls=1,
+                mentiras_detectadas=0,
+                productos_citados=len(productos_citados),
+                ruta="asesoria_mostrados",
+                tiempo_ms=int((time.monotonic() - t0) * 1000),
+            )
+        )
+        return ChatOutput(
+            sesion_id=sesion_id,
+            respuesta=respuesta.texto,
+            productos_citados=productos_citados,
+            pasos=[{"tool": p.tool, "args": p.args, "result": p.result} for p in trace],
+        )
 
     def _short_circuit_comparacion_explicita(
         self,
@@ -487,6 +603,8 @@ class ProcesarChatService:
         ResolvedorCategoriaCercana ya decidio la respuesta. Persiste el
         mensaje, metricas y devuelve ChatOutput sin pasar por el LLM."""
         respuesta = NormalizadorMoneda.normalizar(respuesta)
+        respuesta = NormalizadorFormatoProducto.normalizar(respuesta)
+        respuesta = self._recortar_cierres(respuesta, inp.mensaje, sesion_id, trace)
         self._persistir_turno_mostrado(sesion_id, productos)
         self._registrar_respuesta(sesion_id, respuesta, trace)
         self._registrar_metrica.ejecutar(
@@ -507,6 +625,56 @@ class ProcesarChatService:
             productos_citados=productos,
             pasos=[{"tool": p.tool, "args": p.args, "result": p.result} for p in trace],
         )
+
+    @staticmethod
+    def _reemplazar_tabla_comparacion(respuesta: str, trace: list[PasoAgente]) -> str:
+        """Si el LLM invoco comparar_productos, usamos la tabla+conclusion
+        del tool result (construida por ComparadorProductos) y reemplazamos
+        cualquier tabla/resumen que el LLM haya redactado. Evita que el LLM
+        invente valores o bullets de conclusion."""
+        paso = next(
+            (
+                p for p in reversed(trace or [])
+                if p.tool == "comparar_productos" and not (p.result or {}).get("error")
+            ),
+            None,
+        )
+        if paso is None:
+            return respuesta
+        result = paso.result or {}
+        tabla = result.get("tabla")
+        conclusion = result.get("conclusion")
+        if not tabla or not conclusion:
+            return respuesta
+        # productos vienen como dicts desde ProductoSerializer.resumen —
+        # armamos un shim con atributo .nombre para que el renderer funcione.
+        productos = result.get("productos") or []
+        por_sku: dict = {}
+        for p in productos:
+            sku = p.get("sku")
+            if sku:
+                por_sku[str(sku)] = type("P", (), {"nombre": p.get("nombre", "")})()
+        rendered = RenderizadorTablaComparacion.render(
+            tabla=tabla, conclusion=conclusion, productos_por_sku=por_sku
+        )
+        return rendered or respuesta
+
+    def _recortar_cierres(
+        self,
+        respuesta: str,
+        mensaje: str,
+        sesion_id: UUID,
+        trace: list[PasoAgente],
+    ) -> str:
+        """Computa la etapa del turno, recorta cierres plantilla y silencia
+        preguntas sobre slots ya declarados. Single point para aplicar reglas
+        5/6/7 del prompt como codigo post-LLM."""
+        perfil = self._obtener_perfil.ejecutar(
+            ObtenerPerfilSesionQuery(sesion_id=sesion_id)
+        )
+        etapa = ClasificadorEtapaConversacional.clasificar(mensaje, perfil, trace)
+        respuesta = SilenciadorPreguntasRedundantes.silenciar(respuesta, perfil)
+        return RecortadorCierresComerciales.recortar(respuesta, etapa)
 
     def _contexto_del_turno(self, mensaje: str, sesion_id: UUID) -> str | None:
         bloques = [
@@ -889,12 +1057,32 @@ class ProcesarChatService:
         perfil = self._obtener_perfil.ejecutar(
             ObtenerPerfilSesionQuery(sesion_id=sesion_id)
         )
+        precio_foco = self._precio_del_foco(perfil.sku_foco)
+        tier_efectivo = perfil.desired_tier or (
+            UmbralesTier.tier_de(precio_foco, perfil.subcategoria_efectiva())
+            if precio_foco else None
+        )
+        piso_tier, techo_tier = UmbralesTier.rango(
+            tier=tier_efectivo,
+            subcategoria=perfil.subcategoria_efectiva(),
+            precio_ancla=precio_foco or perfil.presupuesto_max,
+        )
+        precio_max_efectivo = perfil.presupuesto_max
+        if techo_tier is not None:
+            precio_max_efectivo = (
+                min(techo_tier, precio_max_efectivo) if precio_max_efectivo else techo_tier
+            )
+        nombre_excluye = tuple(DetectorExclusionesMensaje.detectar(mensaje)) or None
         res = await self._manejador_ausente.manejar(
             mensaje,
             contexto,
             categoria_activa=perfil.categoria_efectiva() or None,
             subcategoria_activa=perfil.subcategoria_efectiva() or None,
             refinamiento=DetectorRefinamientoShown.detectar(mensaje),
+            marca_preferida=perfil.marca_preferida or None,
+            precio_max=precio_max_efectivo,
+            precio_min=piso_tier,
+            nombre_excluye=nombre_excluye,
         )
         if res.categoria_ofrecida:
             self._registrar_alternativa.ejecutar(
@@ -926,7 +1114,11 @@ class ProcesarChatService:
         return "\n".join(partes)[:2000]
 
     def _forzar_busqueda(
-        self, mensaje: str, sesion_id: UUID, trace: list[PasoAgente]
+        self,
+        mensaje: str,
+        sesion_id: UUID,
+        trace: list[PasoAgente],
+        excluir_skus: tuple[str, ...] | None = None,
     ) -> tuple[str, list[PasoAgente], list[str]]:
         perfil = self._obtener_perfil.ejecutar(ObtenerPerfilSesionQuery(sesion_id=sesion_id))
         mensaje_limpio = SanitizadorQueryBusqueda.sanitizar(mensaje)
@@ -952,6 +1144,7 @@ class ProcesarChatService:
             precio_max_final = (
                 min(techo_tier, precio_max_final) if precio_max_final else techo_tier
             )
+        nombre_excluye = tuple(DetectorExclusionesMensaje.detectar(mensaje)) or None
         query = BuscarProductosQuery(
             query=mensaje_limpio if tiene_terminos else None,
             categoria=cat_ef,
@@ -965,6 +1158,8 @@ class ProcesarChatService:
             limite=12,
             excluir_accesorios=not es_accesorio,
             genero=perfil.genero_declarado or None,
+            excluir_skus=excluir_skus,
+            nombre_excluye=nombre_excluye,
         )
         if not tiene_terminos and not cat_ef and not perfil.pulgadas:
             return (
@@ -978,6 +1173,12 @@ class ProcesarChatService:
         if genero_sin_resultados:
             from dataclasses import replace
             productos = self._buscar.ejecutar(replace(query, genero=None))
+        # Si el LLM metio una frase entera como query ("un reloj para ponerme
+        # en la mano"), el FULLTEXT no matchea. Con categoria/subcategoria
+        # resuelta, reintentamos sin query — evita el falso "no lo tenemos".
+        if not productos and query.query and (query.categoria or query.subcategoria):
+            from dataclasses import replace
+            productos = self._buscar.ejecutar(replace(query, query=None))
         productos = self._prepend_sku_foco(productos, perfil.sku_foco)
         productos = self._filtrar_por_gama(productos, mensaje, perfil.sku_foco)
         skus_mostrados = {

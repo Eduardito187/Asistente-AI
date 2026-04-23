@@ -20,7 +20,10 @@ class DetectorTierDeseado:
     _RX_FLAGSHIP = re.compile(
         r"\b(?:tope\s+de\s+gama|tope\s+gama|alta\s+gama|gama\s+alta|premium|"
         r"flagship|high[\s-]?end|lo\s+mejor|el\s+mejor|la\s+mejor|"
-        r"maxima\s+gama|gama\s+maxima)\b",
+        r"maxima\s+gama|gama\s+maxima|"
+        r"ultima\s+generacion|ultimo\s+modelo|ultimos?\s+modelos?|"
+        r"mas\s+reciente|recientes|nuevo\s+modelo|novedad|"
+        r"lanzamiento|reci[eé]n\s+sali[oó])\b",
         re.IGNORECASE,
     )
     _RX_ALTO = re.compile(

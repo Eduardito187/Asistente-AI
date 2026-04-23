@@ -34,3 +34,4 @@ class BuscarProductosQuery:
     solo_accesorios: bool = False
     excluir_skus: Optional[tuple[str, ...]] = None
     genero: Optional[str] = None
+    nombre_excluye: Optional[tuple[str, ...]] = None

@@ -20,8 +20,14 @@ class SugeridorProductosAlternativos:
         marca: str | None,
         nombre_canonico: str | None = None,
         subcategoria: str | None = None,
+        precio_max: float | None = None,
+        precio_min: float | None = None,
+        nombre_excluye: tuple[str, ...] | None = None,
     ) -> list[Producto]:
-        intentos = self._armar_intentos(categoria, subcategoria, marca, nombre_canonico)
+        intentos = self._armar_intentos(
+            categoria, subcategoria, marca, nombre_canonico,
+            precio_max, precio_min, nombre_excluye,
+        )
         for q in intentos:
             productos = self._buscar.ejecutar(q)
             if productos:
@@ -45,6 +51,9 @@ class SugeridorProductosAlternativos:
         subcategoria: str | None,
         marca: str | None,
         nombre_canonico: str | None,
+        precio_max: float | None = None,
+        precio_min: float | None = None,
+        nombre_excluye: tuple[str, ...] | None = None,
     ) -> list[BuscarProductosQuery]:
         valores = {
             "query": (nombre_canonico or "").strip() or None,
@@ -57,7 +66,9 @@ class SugeridorProductosAlternativos:
         intentos: list[BuscarProductosQuery] = []
         vistos: set[tuple] = set()
         for combo in combos:
-            query = self._intento_para(combo, valores, vistos)
+            query = self._intento_para(
+                combo, valores, vistos, precio_max, precio_min, nombre_excluye
+            )
             if query is not None:
                 intentos.append(query)
         return intentos
@@ -68,6 +79,9 @@ class SugeridorProductosAlternativos:
         combo: tuple[str, ...],
         valores: dict[str, str | None],
         vistos: set[tuple],
+        precio_max: float | None = None,
+        precio_min: float | None = None,
+        nombre_excluye: tuple[str, ...] | None = None,
     ) -> BuscarProductosQuery | None:
         kwargs = {k: valores[k] for k in combo if valores[k]}
         if len(kwargs) != len(combo):
@@ -76,4 +90,10 @@ class SugeridorProductosAlternativos:
         if clave in vistos:
             return None
         vistos.add(clave)
+        if precio_max is not None:
+            kwargs["precio_max"] = precio_max
+        if precio_min is not None:
+            kwargs["precio_min"] = precio_min
+        if nombre_excluye:
+            kwargs["nombre_excluye"] = nombre_excluye
         return BuscarProductosQuery(limite=cls.LIMITE, **kwargs)

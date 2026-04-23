@@ -1,7 +1,12 @@
 (() => {
   const API_BASE = "/api";
-  const STORAGE_KEY = "dismi_chat_state";
+  // Bump la versión cuando cambie el formato de la historia persistida (ej.
+  // agregamos campos a los cards). El `v2` invalida cualquier estado viejo
+  // que se haya guardado antes de esta versión.
+  const STORAGE_KEY = "dismi_chat_state_v2";
   const TTL_MS = 60 * 60 * 1000; // 1 hora de inactividad
+  // Limpiar versión anterior si aún existe
+  try { localStorage.removeItem("dismi_chat_state"); } catch {}
 
   const toggleBtn = document.getElementById("chat-toggle");
   const widget = document.getElementById("chat-widget");
@@ -102,14 +107,47 @@
     const px = `<strong>${formatoMoneda(p.precio_bob)}</strong>` +
       (p.precio_anterior_bob && p.precio_anterior_bob > p.precio_bob
         ? ` <s>${formatoMoneda(p.precio_anterior_bob)}</s>` : "");
+    const skuEsc = escapeHtml(p.sku);
     return `
-      <div class="chat-card" data-sku="${escapeHtml(p.sku)}">
-        <div class="chat-card-thumb">${imagenProducto(p)}</div>
-        <div class="chat-card-info">
-          <div class="nm">${escapeHtml(p.nombre)}</div>
-          <div class="px">${px}</div>
+      <div class="chat-card" data-sku="${skuEsc}">
+        <div class="chat-card-top">
+          <div class="chat-card-thumb">${imagenProducto(p)}</div>
+          <div class="chat-card-info">
+            <div class="nm">${escapeHtml(p.nombre)}</div>
+            <div class="px">${px}</div>
+          </div>
+        </div>
+        <div class="chat-card-actions">
+          <button type="button" class="chat-card-action primary" data-action="agregar" data-sku="${skuEsc}" title="Agregar al carrito">
+            <span class="ico">🛒</span><span class="lbl">Agregar</span>
+          </button>
+          <button type="button" class="chat-card-action" data-action="info" data-sku="${skuEsc}" title="Más información">
+            <span class="ico">ℹ️</span><span class="lbl">Detalle</span>
+          </button>
+          <button type="button" class="chat-card-action" data-action="similares" data-sku="${skuEsc}" title="Opciones similares">
+            <span class="ico">🔍</span><span class="lbl">Similares</span>
+          </button>
         </div>
       </div>`;
+  }
+
+  // Plantillas de mensaje para cada acción (van como user message al backend,
+  // así el perfil y el contexto se actualizan como en cualquier turno normal).
+  const MENSAJE_ACCION = {
+    agregar:   (sku, nombre) => `Agregame al carrito el ${nombre} [${sku}], lo llevo.`,
+    info:      (sku, nombre) => `Contame más del ${nombre} [${sku}] — specs clave.`,
+    similares: (sku, nombre) => `Mostrame opciones similares al ${nombre} [${sku}], distintas a esa.`,
+  };
+
+  function nombrePorSku(sku) {
+    // Busca el último nombre asociado al SKU en la historia renderizada.
+    for (let i = historia.length - 1; i >= 0; i--) {
+      const m = historia[i];
+      const match = (m.productos || []).concat(m.sugeridos || [])
+        .find(p => p.sku === sku);
+      if (match) return match.nombre;
+    }
+    return "ese producto";
   }
 
   function dibujarMensaje(tipo, texto, productos = [], sugeridos = []) {
@@ -234,5 +272,18 @@
     if (!msg) return;
     input.value = "";
     enviarMensaje(msg);
+  });
+
+  // Delegación de click sobre las tarjetas de producto: un solo listener
+  // atiende todos los cards (presentes y futuros).
+  messagesEl.addEventListener("click", (e) => {
+    const btn = e.target.closest(".chat-card-action");
+    if (!btn) return;
+    const accion = btn.dataset.action;
+    const sku = btn.dataset.sku;
+    const builder = MENSAJE_ACCION[accion];
+    if (!builder || !sku) return;
+    const nombre = nombrePorSku(sku);
+    enviarMensaje(builder(sku, nombre));
   });
 })();

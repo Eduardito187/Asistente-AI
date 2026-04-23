@@ -8,6 +8,7 @@ from ..queries.obtener_perfil_sesion import (
     ObtenerPerfilSesionHandler,
     ObtenerPerfilSesionQuery,
 )
+from .renderizador_tabla_comparacion import RenderizadorTablaComparacion
 from .respuesta_follow_up import RespuestaFollowUp
 
 
@@ -43,51 +44,17 @@ class ResponderComparacionMostrados:
         if len(productos) < 2:
             return None
 
-        lineas = ["Te los pongo lado a lado:"]
-        for p in productos:
-            lineas.append(
-                f"- [{p.sku}] {p.nombre}: "
-                f"{self._atributos_clave(p)} · Bs {p.precio.monto:.0f}"
-            )
-        lineas.append(
-            "En resumen: el mas barato es "
-            f"[{self._mas_barato(productos)}]; el de mejor ficha tecnica es "
-            f"[{self._mejor_ficha(productos)}]. Cual te cierra?"
+        texto = RenderizadorTablaComparacion.render(
+            tabla=resultado.tabla,
+            conclusion=resultado.conclusion,
+            productos_por_sku={str(p.sku): p for p in productos},
+            encabezado="Te los pongo lado a lado:",
         )
+        if not texto:
+            return None
         return RespuestaFollowUp(
-            texto="\n".join(lineas),
+            texto=texto,
             productos=[ProductoSerializer.detalle(p) for p in productos],
             skus=[str(p.sku) for p in productos],
             ruta="follow_up_comparacion",
         )
-
-    @staticmethod
-    def _atributos_clave(p) -> str:
-        partes: list[str] = []
-        if p.pulgadas:
-            partes.append(f"{p.pulgadas:g}\"")
-        if p.tipo_panel:
-            partes.append(p.tipo_panel)
-        if p.resolucion:
-            partes.append(p.resolucion)
-        if p.marca:
-            partes.append(p.marca)
-        return " · ".join(partes) or "sin specs registradas"
-
-    @staticmethod
-    def _mas_barato(productos) -> str:
-        return str(min(productos, key=lambda p: p.precio.monto).sku)
-
-    @staticmethod
-    def _mejor_ficha(productos):
-        ranking_panel = {"OLED": 4, "QLED": 3, "MINILED": 3, "LED": 1, "NANOCELL": 2}
-        ranking_reso = {"8K": 4, "4K": 3, "FHD": 2, "HD": 1}
-
-        def puntaje(p) -> tuple[int, int, float]:
-            return (
-                ranking_panel.get((p.tipo_panel or "").upper(), 0),
-                ranking_reso.get((p.resolucion or "").upper(), 0),
-                p.precio.monto,
-            )
-
-        return str(max(productos, key=puntaje).sku)

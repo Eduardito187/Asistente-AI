@@ -78,6 +78,7 @@ class ProductoSql:
         solo_accesorios: bool = False,
         excluir_skus: Optional[list[str]] = None,
         genero: Optional[str] = None,
+        nombre_excluye: Optional[list[str]] = None,
     ) -> tuple[str, dict]:
         """Construye SELECT dinamico para buscar productos. Devuelve (sql, params)."""
         clauses = ["activo = 1"]
@@ -89,6 +90,7 @@ class ProductoSql:
         cls._agregar_filtro_accesorios(clauses, excluir_accesorios, solo_accesorios)
         cls._agregar_exclusion_skus(clauses, params, excluir_skus)
         cls._agregar_filtro_genero(clauses, params, genero)
+        cls._agregar_exclusion_nombre(clauses, params, nombre_excluye)
         q_boolean = cls.tokens_boolean(query_normalizada) if query_normalizada else ""
         if q_boolean:
             clauses.append(cls._MATCH_EXPR)
@@ -165,6 +167,24 @@ class ProductoSql:
             params[key] = sku
         if placeholders:
             clauses.append(f"sku NOT IN ({', '.join(placeholders)})")
+
+    @staticmethod
+    def _agregar_exclusion_nombre(
+        clauses: list, params: dict, nombre_excluye: Optional[list[str]]
+    ) -> None:
+        """Excluye productos cuyo nombre_norm contenga alguna de las keywords.
+        Usado para separar 'reloj de pared' cuando el cliente pide 'reloj'
+        a secas: el catalogo no distingue subcategorias finas, pero el
+        nombre si — atmosphera reloj pared d30 contiene 'pared'."""
+        if not nombre_excluye:
+            return
+        for i, kw in enumerate(nombre_excluye):
+            kw_norm = kw.strip().lower()
+            if not kw_norm:
+                continue
+            key = f"exn{i}"
+            clauses.append(f"nombre_norm NOT LIKE :{key}")
+            params[key] = f"%{kw_norm}%"
 
     @staticmethod
     def _agregar_filtros_atributos(

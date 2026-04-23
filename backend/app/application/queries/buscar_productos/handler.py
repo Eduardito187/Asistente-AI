@@ -69,6 +69,7 @@ class BuscarProductosHandler:
                 solo_accesorios=q.solo_accesorios,
                 excluir_skus=list(q.excluir_skus) if q.excluir_skus else None,
                 genero=q.genero,
+                nombre_excluye=list(q.nombre_excluye) if q.nombre_excluye else None,
             )
         self._cache_set(cache_key, [str(p.sku) for p in productos])
         return productos

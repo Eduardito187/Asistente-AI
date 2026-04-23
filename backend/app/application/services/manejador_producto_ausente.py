@@ -58,6 +58,10 @@ class ManejadorProductoAusente:
         categoria_activa: str | None = None,
         subcategoria_activa: str | None = None,
         refinamiento: RefinamientoShown | None = None,
+        marca_preferida: str | None = None,
+        precio_max: float | None = None,
+        precio_min: float | None = None,
+        nombre_excluye: tuple[str, ...] | None = None,
     ) -> RespuestaProductoAusente:
         cercana = self._resolvedor.resolver(texto_cliente)
         validacion = None
@@ -68,9 +72,13 @@ class ManejadorProductoAusente:
             )
 
         filtros = self._elegir_filtros(
-            categoria_activa, subcategoria_activa, cercana, validacion
+            categoria_activa, subcategoria_activa, cercana, validacion,
+            marca_preferida=marca_preferida,
         )
-        alternativas = self._buscar_alternativas(filtros)
+        alternativas = self._buscar_alternativas(
+            filtros, precio_max=precio_max, precio_min=precio_min,
+            nombre_excluye=nombre_excluye,
+        )
         alternativas = self._aplicar_refinamiento(alternativas, refinamiento)
 
         if not alternativas:
@@ -133,7 +141,11 @@ class ManejadorProductoAusente:
             return validacion, False
 
     def _buscar_alternativas(
-        self, filtros: tuple[str | None, str | None, str | None, str | None]
+        self,
+        filtros: tuple[str | None, str | None, str | None, str | None],
+        precio_max: float | None = None,
+        precio_min: float | None = None,
+        nombre_excluye: tuple[str, ...] | None = None,
     ):
         categoria, subcategoria, marca, nombre = filtros
         return self._sugeridor.sugerir(
@@ -141,6 +153,9 @@ class ManejadorProductoAusente:
             marca=marca,
             nombre_canonico=nombre,
             subcategoria=subcategoria,
+            precio_max=precio_max,
+            precio_min=precio_min,
+            nombre_excluye=nombre_excluye,
         )
 
     @staticmethod
@@ -169,19 +184,27 @@ class ManejadorProductoAusente:
         subcategoria_activa: str | None,
         cercana: CategoriaCercana | None,
         validacion,
+        marca_preferida: str | None = None,
     ) -> tuple[str | None, str | None, str | None, str | None]:
         if cercana is not None:
+            # Si el cliente declaró una marca (ej. "marca apple"), se prioriza
+            # sobre la marca inferida por la relación cross-categoría.
             return (
                 cercana.categoria,
                 cercana.subcategoria,
-                cercana.marca,
+                marca_preferida or cercana.marca,
                 cercana.palabra_clave,
             )
         if categoria_activa:
-            return categoria_activa, subcategoria_activa, None, None
+            return categoria_activa, subcategoria_activa, marca_preferida, None
         if validacion is not None:
-            return validacion.categoria, None, validacion.marca, validacion.nombre_canonico
-        return None, None, None, None
+            return (
+                validacion.categoria,
+                None,
+                marca_preferida or validacion.marca,
+                validacion.nombre_canonico,
+            )
+        return None, None, marca_preferida, None
 
     @staticmethod
     def _alguna_alternativa_es_de_marca(alternativas, cercana: CategoriaCercana | None) -> bool:
@@ -256,5 +279,4 @@ class ManejadorProductoAusente:
             lineas.append(
                 f"- {p['nombre']} — Bs {p['precio_bob']:.0f}{extra} [{p['sku']}]"
             )
-        lineas.append("¿Te sirve alguna? Si queres te la agrego al carrito.")
         return "\n".join(lineas)

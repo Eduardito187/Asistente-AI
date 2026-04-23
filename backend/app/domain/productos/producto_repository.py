@@ -36,6 +36,7 @@ class ProductoRepository(ABC):
         solo_accesorios: bool = False,
         excluir_skus: Optional[list[str]] = None,
         genero: Optional[str] = None,
+        nombre_excluye: Optional[list[str]] = None,
     ) -> list[Producto]: ...
 
     @abstractmethod

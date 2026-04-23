@@ -456,14 +456,18 @@ img { max-width: 100%; display: block; }
   border-radius: 12px;
   padding: 10px 12px;
   display: flex;
+  flex-direction: column;
   gap: 10px;
-  align-items: center;
   transition: border-color .2s, box-shadow .15s;
-  cursor: pointer;
 }
 .chat-card:hover {
   border-color: var(--brand);
   box-shadow: 0 4px 10px rgba(0,0,0,.06);
+}
+.chat-card-top {
+  display: flex;
+  gap: 10px;
+  align-items: center;
 }
 .chat-card .chat-card-thumb {
   width: 52px;
@@ -494,6 +498,55 @@ img { max-width: 100%; display: block; }
   margin-top: 2px;
 }
 .chat-card-info .px s { color: var(--muted); font-weight: 400; margin-left: 4px; font-size: 11px; }
+.chat-card-actions {
+  display: flex;
+  gap: 6px;
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+}
+.chat-card-action {
+  flex: 1;
+  background: #f8f9fb;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 6px 4px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink-2);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  transition: background .15s, color .15s, border-color .15s;
+  min-width: 0;
+}
+.chat-card-action:hover {
+  background: var(--brand-soft);
+  color: var(--brand-dark);
+  border-color: var(--brand);
+}
+.chat-card-action.primary {
+  background: var(--brand);
+  color: #fff;
+  border-color: var(--brand);
+}
+.chat-card-action.primary:hover {
+  background: var(--brand-dark);
+  border-color: var(--brand-dark);
+}
+.chat-card-action .ico {
+  font-size: 14px;
+  line-height: 1;
+}
+.chat-card-action .lbl {
+  font-size: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
 .chat-sugeridos-title {
   font-size: 12px;
   color: var(--muted);

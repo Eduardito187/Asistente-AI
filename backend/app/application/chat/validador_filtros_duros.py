@@ -34,7 +34,19 @@ class ValidadorFiltrosDuros:
             and cls._cumple_potencia_max(p, filtros)
             and cls._cumple_iguales(p, filtros)
             and cls._cumple_es_electrico(p, filtros)
+            and cls._cumple_nombre_excluye(p, filtros)
         )
+
+    @staticmethod
+    def _cumple_nombre_excluye(p, filtros: dict) -> bool:
+        """Excluye productos cuyo nombre contiene alguna keyword vetada por
+        el cliente ('no para pared', 'reloj' => no pared/mural). Los candidatos
+        semanticos se filtran aqui igual que los fulltext."""
+        excluir = filtros.get("nombre_excluye")
+        if not excluir:
+            return True
+        nombre = (getattr(p, "nombre", None) or "").lower()
+        return not any(kw.lower() in nombre for kw in excluir if kw)
 
     @staticmethod
     def _cumple_textuales(p, filtros: dict) -> bool:

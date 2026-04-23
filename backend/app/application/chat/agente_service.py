@@ -45,6 +45,12 @@ class AgenteService:
         mensajes: list[dict] = [{"role": "system", "content": system_content}, *historial]
         trace: list[PasoAgente] = []
         skus: list[str] = []
+        # último mensaje del cliente — necesario para que el dispatcher aplique
+        # gates conversacionales (ej. no agregar al carrito sin señal de compra).
+        mensaje_usuario = next(
+            (m["content"] for m in reversed(historial) if m.get("role") == "user"),
+            "",
+        )
 
         for _ in range(self._max_iter):
             msg = await self._llm.chat(mensajes, TOOLS_SPEC)
@@ -62,7 +68,10 @@ class AgenteService:
                 nombre = fn.get("name", "")
                 args = ValueParser.parse_args(fn.get("arguments"))
                 resultado = self._dispatcher.ejecutar(
-                    nombre, args, sesion_id, marca_indiferente=marca_indiferente
+                    nombre, args, sesion_id,
+                    marca_indiferente=marca_indiferente,
+                    mensaje_usuario=mensaje_usuario,
+                    trace_actual=trace,
                 )
 
                 trace.append(PasoAgente(tool=nombre, args=args, result=resultado))
