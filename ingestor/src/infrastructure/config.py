@@ -15,6 +15,7 @@ class Settings:
     origen: str
     intervalo_seg: int
     dismac_csv_path: str
+    akeneo_csv_path: str
     csv_path: str
     rest_url: str
     graphql_url: str
@@ -37,6 +38,9 @@ class Settings:
             intervalo_seg=int(os.environ.get("INGEST_INTERVAL_SECONDS", "86400")),
             dismac_csv_path=os.environ.get(
                 "INGEST_DISMAC_CSV_PATH", "/app/data/feed_meta_scz.csv"
+            ),
+            akeneo_csv_path=os.environ.get(
+                "INGEST_AKENEO_CSV_PATH", "/app/data/process/akeneo_processed.csv"
             ),
             csv_path=os.environ.get("INGEST_CSV_PATH", "/app/data/productos_sample.csv"),
             rest_url=os.environ.get("INGEST_REST_URL", ""),

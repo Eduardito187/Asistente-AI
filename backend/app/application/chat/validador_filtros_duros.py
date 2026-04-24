@@ -35,7 +35,21 @@ class ValidadorFiltrosDuros:
             and cls._cumple_iguales(p, filtros)
             and cls._cumple_es_electrico(p, filtros)
             and cls._cumple_nombre_excluye(p, filtros)
+            and cls._cumple_tipo_producto_excluye(p, filtros)
         )
+
+    @staticmethod
+    def _cumple_tipo_producto_excluye(p, filtros: dict) -> bool:
+        """Filtra candidatos semánticos cuyo tipo_producto esté en la lista de
+        exclusión. NULL-safe: si el producto no tiene tipo_producto clasificado
+        pasa siempre — solo se rechaza cuando hay un valor explícito excluido."""
+        excluir = filtros.get("tipo_producto_excluye")
+        if not excluir:
+            return True
+        tp = getattr(p, "tipo_producto", None)
+        if tp is None:
+            return True
+        return tp.lower() not in {e.lower() for e in excluir}
 
     @staticmethod
     def _cumple_nombre_excluye(p, filtros: dict) -> bool:

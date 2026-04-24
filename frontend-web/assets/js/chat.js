@@ -131,13 +131,42 @@
       </div>`;
   }
 
-  // Plantillas de mensaje para cada acción (van como user message al backend,
-  // así el perfil y el contexto se actualizan como en cualquier turno normal).
+  // Plantillas de mensaje para acciones que van al chat (info, similares).
+  // "agregar" NO va al chat — se maneja directamente contra la API del carrito.
   const MENSAJE_ACCION = {
-    agregar:   (sku, nombre) => `Agregame al carrito el ${nombre} [${sku}], lo llevo.`,
     info:      (sku, nombre) => `Contame más del ${nombre} [${sku}] — specs clave.`,
     similares: (sku, nombre) => `Mostrame opciones similares al ${nombre} [${sku}], distintas a esa.`,
   };
+
+  async function agregarAlCarrito(btn, sku) {
+    if (!sesionId) return;
+    btn.disabled = true;
+    const lblOriginal = btn.querySelector(".lbl")?.textContent || "Agregar";
+    const lbl = btn.querySelector(".lbl");
+    if (lbl) lbl.textContent = "...";
+    try {
+      const r = await fetch(`${API_BASE}/carrito/${sesionId}/agregar`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sku }),
+      });
+      if (r.ok) {
+        btn.classList.add("agregado");
+        if (lbl) lbl.textContent = "Agregado ✓";
+        setTimeout(() => {
+          btn.classList.remove("agregado");
+          btn.disabled = false;
+          if (lbl) lbl.textContent = lblOriginal;
+        }, 2000);
+      } else {
+        if (lbl) lbl.textContent = lblOriginal;
+        btn.disabled = false;
+      }
+    } catch {
+      if (lbl) lbl.textContent = lblOriginal;
+      btn.disabled = false;
+    }
+  }
 
   function nombrePorSku(sku) {
     // Busca el último nombre asociado al SKU en la historia renderizada.
@@ -296,8 +325,13 @@
     if (!btn) return;
     const accion = btn.dataset.action;
     const sku = btn.dataset.sku;
+    if (!sku) return;
+    if (accion === "agregar") {
+      agregarAlCarrito(btn, sku);
+      return;
+    }
     const builder = MENSAJE_ACCION[accion];
-    if (!builder || !sku) return;
+    if (!builder) return;
     const nombre = nombrePorSku(sku);
     enviarMensaje(builder(sku, nombre));
   });

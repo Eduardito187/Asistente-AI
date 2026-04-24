@@ -46,6 +46,15 @@ class DetectorExclusionesMensaje:
         "reloj":  (("pared", "mural", "cocina"),  ("pared", "mural", "cocina", "decorativo")),
     }
 
+    # Cuando el campo tipo_producto de la BD está poblado, este mapa indica
+    # qué valores excluir para cada keyword gatillo.
+    # NULL-safe: filas con tipo_producto NULL nunca quedan excluidas
+    # (el SQL usa "tipo_producto IS NULL OR tipo_producto NOT IN (...)").
+    _TIPOS_EXCLUIR: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
+        # keyword → (tipos a excluir, anti-keywords que cancelan la exclusión)
+        "reloj": (("pared", "despertador", "decorativo"), ("pared", "despertador", "decorativo")),
+    }
+
     @classmethod
     def detectar(cls, mensaje: str | None) -> list[str]:
         if not mensaje:
@@ -54,8 +63,31 @@ class DetectorExclusionesMensaje:
         negadas = cls._negaciones_explicitas(norm)
         return sorted({
             *negadas,
-            *cls._exclusiones_implicitas(norm, palabras_negadas=set(negadas)),
+            *cls._calcular_exclusiones_implicitas(norm, palabras_negadas=set(negadas)),
         })
+
+    @classmethod
+    def tipos_a_excluir(cls, mensaje: str | None) -> list[str]:
+        """Devuelve valores de tipo_producto a excluir de la búsqueda.
+
+        Complementa detectar(): mientras ese opera sobre nombre_norm (texto),
+        este opera sobre la columna tipo_producto cuando la BD la tiene poblada.
+        La exclusión es NULL-safe en SQL: productos sin tipo_producto clasificado
+        nunca quedan fuera — solo se filtran los que tienen el valor explícito."""
+        if not mensaje:
+            return []
+        norm = NormalizadorTexto.normalizar(mensaje)
+        tokens = set(norm.split())
+        negadas = set(cls._negaciones_explicitas(norm))
+        salida: list[str] = []
+        for gatillo, (tipos, anti) in cls._TIPOS_EXCLUIR.items():
+            if gatillo not in tokens:
+                continue
+            anti_positivas = [a for a in anti if a in norm and a not in negadas]
+            if anti_positivas:
+                continue
+            salida.extend(tipos)
+        return sorted(set(salida))
 
     @classmethod
     def _negaciones_explicitas(cls, norm: str) -> list[str]:
@@ -68,7 +100,7 @@ class DetectorExclusionesMensaje:
         return salida
 
     @classmethod
-    def _exclusiones_implicitas(
+    def _calcular_exclusiones_implicitas(
         cls, norm: str, palabras_negadas: set[str]
     ) -> list[str]:
         """Las anti-keywords ("pared", "cocina"...) solo cancelan la exclusion
@@ -82,7 +114,6 @@ class DetectorExclusionesMensaje:
                 continue
             anti_positivas = [a for a in anti if a in norm and a not in palabras_negadas]
             if anti_positivas:
-                # el cliente pidio explicitamente "reloj de pared" → no excluir
                 continue
             salida.extend(excluir)
         return salida

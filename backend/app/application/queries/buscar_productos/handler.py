@@ -53,6 +53,9 @@ class BuscarProductosHandler:
             resolucion=q.resolucion,
             color=q.color,
             es_electrico=q.es_electrico,
+            tipo_producto=q.tipo_producto,
+            es_vestible=q.es_vestible,
+            tipo_producto_excluye=q.tipo_producto_excluye,
         )
         with self._uow_factory() as uow:
             productos = uow.productos.buscar(

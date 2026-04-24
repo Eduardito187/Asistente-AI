@@ -41,16 +41,23 @@ class ProductoSql:
 
     @classmethod
     def tokens_boolean(cls, query_normalizada: str) -> str:
-        """Convierte 'laptop acer' en '+laptop* +acer' filtrando stopwords.
+        """Convierte 'laptop acer' en '+laptop* acer*' filtrando stopwords.
+
+        Solo el PRIMER token es requerido (+). Los tokens adicionales son
+        boosts opcionales: suben el score pero no matan la búsqueda cuando
+        el cliente incluye palabras de contexto no-producto ('bacin para ninho'
+        → '+bacin* ninho*' — encuentra bacinillas aunque 'ninho' no exista
+        en ningun nombre).
 
         Tokens cortos (<5 chars) se buscan exactos para evitar falsos positivos
         por prefijo (ej. 'acer' no debe matchear 'acero'). Tokens largos
         mantienen el wildcard para aceptar plurales/variantes.
         """
         partes = []
-        for t in TokensConsulta.significativos(query_normalizada):
+        for i, t in enumerate(TokensConsulta.significativos(query_normalizada)):
             sufijo = "*" if len(t) >= cls.LONGITUD_MINIMA_PREFIJO else ""
-            partes.append(f"+{t}{sufijo}")
+            prefijo = "+" if i == 0 else ""
+            partes.append(f"{prefijo}{t}{sufijo}")
         return " ".join(partes)
 
     @staticmethod
@@ -81,7 +88,7 @@ class ProductoSql:
         nombre_excluye: Optional[list[str]] = None,
     ) -> tuple[str, dict]:
         """Construye SELECT dinamico para buscar productos. Devuelve (sql, params)."""
-        clauses = ["activo = 1"]
+        clauses = ["(activo = 1 OR es_descontinuado = 1)"]
         params: dict = {}
         order_parts: list[str] = []
 
@@ -125,6 +132,7 @@ class ProductoSql:
             clauses.append("precio_bob <= :pmax")
             params["pmax"] = precio_max
         cls._agregar_filtros_atributos(clauses, params, atributos)
+        cls._agregar_filtros_tipo_producto(clauses, params, atributos)
 
         order_parts.append("precio_bob ASC")
         sql = (
@@ -187,13 +195,10 @@ class ProductoSql:
             params[key] = f"%{kw_norm}%"
 
     @staticmethod
-    def _agregar_filtros_atributos(
+    def _agregar_filtro_pulgadas(
         clauses: list, params: dict, a: FiltrosAtributos
     ) -> None:
-        """Anade WHERE sobre columnas estructuradas (pulgadas, GB, etc.).
-
-        Tolerancia de +/-0.5 en pulgadas exactas: '55 pulgadas' debe aceptar 55.0 o 55.5.
-        """
+        """Tolerancia de +/-0.5 en pulgadas exactas: '55 pulgadas' acepta 55.0–55.5."""
         if a.pulgadas is not None:
             clauses.append("pulgadas BETWEEN :pul_lo AND :pul_hi")
             params["pul_lo"] = a.pulgadas - 0.5
@@ -204,6 +209,13 @@ class ProductoSql:
         if a.pulgadas_max is not None:
             clauses.append("pulgadas <= :pul_max")
             params["pul_max"] = a.pulgadas_max
+
+    @classmethod
+    def _agregar_filtros_atributos(
+        cls, clauses: list, params: dict, a: FiltrosAtributos
+    ) -> None:
+        """Anade WHERE sobre columnas estructuradas (capacidades, especificaciones)."""
+        cls._agregar_filtro_pulgadas(clauses, params, a)
         if a.capacidad_gb_min is not None:
             clauses.append("capacidad_gb >= :cap_gb_min")
             params["cap_gb_min"] = a.capacidad_gb_min
@@ -237,3 +249,30 @@ class ProductoSql:
         if a.es_electrico is not None:
             clauses.append("es_electrico = :elec")
             params["elec"] = 1 if a.es_electrico else 0
+
+    @staticmethod
+    def _agregar_filtros_tipo_producto(
+        clauses: list, params: dict, a: FiltrosAtributos
+    ) -> None:
+        """Filtros de subtipo (tipo_producto) y vestibilidad (es_vestible).
+
+        tipo_producto_excluye usa NULL-safe NOT IN para que productos sin
+        clasificar (NULL) no queden excluidos — cuando el ingestor aun no
+        ha poblado el campo todos los rows son NULL y no queremos devolver
+        un catalogo vacio."""
+        if a.tipo_producto:
+            clauses.append("tipo_producto = :tipo_producto")
+            params["tipo_producto"] = a.tipo_producto.lower()
+        if a.es_vestible is not None:
+            clauses.append("es_vestible = :vestible")
+            params["vestible"] = 1 if a.es_vestible else 0
+        if a.tipo_producto_excluye:
+            placeholders = []
+            for i, tp in enumerate(a.tipo_producto_excluye):
+                key = f"tpe{i}"
+                placeholders.append(f":{key}")
+                params[key] = tp.lower()
+            joined = ", ".join(placeholders)
+            clauses.append(
+                f"(tipo_producto IS NULL OR tipo_producto NOT IN ({joined}))"
+            )

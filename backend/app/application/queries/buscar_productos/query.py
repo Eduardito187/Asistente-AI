@@ -35,3 +35,6 @@ class BuscarProductosQuery:
     excluir_skus: Optional[tuple[str, ...]] = None
     genero: Optional[str] = None
     nombre_excluye: Optional[tuple[str, ...]] = None
+    tipo_producto: Optional[str] = None
+    es_vestible: Optional[bool] = None
+    tipo_producto_excluye: Optional[tuple[str, ...]] = None

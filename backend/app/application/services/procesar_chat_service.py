@@ -59,6 +59,7 @@ from .recortador_cierres_comerciales import RecortadorCierresComerciales
 from .renderizador_tabla_comparacion import RenderizadorTablaComparacion
 from .silenciador_preguntas_redundantes import SilenciadorPreguntasRedundantes
 from .normalizador_formato_producto import NormalizadorFormatoProducto
+from .limpiador_lista_productos import LimpiadorListaProductos
 from .detector_intencion_asesoria import DetectorIntencionAsesoria
 from .detector_intencion_compra import DetectorIntencionCompra
 from .detector_mentiras import DetectorMentiras
@@ -256,6 +257,8 @@ class ProcesarChatService:
         respuesta, productos = self._sanear_skus_y_enriquecer(respuesta, skus_tool)
         respuesta = VerificadorClaimsProducto.corregir(respuesta, productos)
         respuesta = NormalizadorFormatoProducto.normalizar(respuesta)
+        if productos:
+            respuesta = LimpiadorListaProductos.limpiar(respuesta)
 
         respuesta, trace, productos, skus_tool = self._evitar_lista_repetida(
             respuesta, productos, trace, skus_tool, inp.mensaje, sesion_id
@@ -849,6 +852,8 @@ class ProcesarChatService:
         ficha = self._atajo_sku.ficha_si_existe(mensaje, sesion_id)
         if not ficha:
             return None
+        if ficha.get("solo_tienda_fisica") or ficha.get("es_descontinuado"):
+            return None
         partes = [
             "CONTEXTO DE ESTE TURNO (datos ya verificados por el sistema, usalos sin volver a buscar):",
             f"- SKU: {ficha.get('sku')}",
@@ -1073,6 +1078,7 @@ class ProcesarChatService:
                 min(techo_tier, precio_max_efectivo) if precio_max_efectivo else techo_tier
             )
         nombre_excluye = tuple(DetectorExclusionesMensaje.detectar(mensaje)) or None
+        tipo_producto_excluye = tuple(DetectorExclusionesMensaje.tipos_a_excluir(mensaje)) or None
         res = await self._manejador_ausente.manejar(
             mensaje,
             contexto,
@@ -1083,6 +1089,7 @@ class ProcesarChatService:
             precio_max=precio_max_efectivo,
             precio_min=piso_tier,
             nombre_excluye=nombre_excluye,
+            tipo_producto_excluye=tipo_producto_excluye,
         )
         if res.categoria_ofrecida:
             self._registrar_alternativa.ejecutar(
@@ -1120,6 +1127,43 @@ class ProcesarChatService:
         trace: list[PasoAgente],
         excluir_skus: tuple[str, ...] | None = None,
     ) -> tuple[str, list[PasoAgente], list[str]]:
+        query, es_accesorio, perfil = self._construir_query_forzado(
+            mensaje, sesion_id, excluir_skus
+        )
+        if not query.query and not query.categoria and not perfil.pulgadas:
+            return (
+                "Necesito un poco mas de contexto para buscar — decime el producto "
+                "(ej. 'laptop', 'freidora', 'celular') y si tenes marca o presupuesto.",
+                trace,
+                [],
+            )
+        productos, genero_sin_resultados = self._ejecutar_query_con_fallbacks(query)
+        productos = self._prepend_sku_foco(productos, perfil.sku_foco)
+        productos = self._filtrar_por_gama(productos, mensaje, perfil.sku_foco)
+        skus_mostrados = {s for s in (perfil.ultimos_skus_mostrados or "").split(",") if s}
+        inedito = [p for p in productos if str(p.sku) not in skus_mostrados]
+        productos_efectivos = inedito if inedito else productos
+        sugeridos = (
+            SugeridorAccesoriosRelacionados(self._buscar).sugerir(
+                productos_efectivos, query.categoria, query.subcategoria
+            ) if not es_accesorio else []
+        )
+        self._registrar_paso_forzado(
+            trace, query, productos_efectivos, sugeridos, perfil, genero_sin_resultados
+        )
+        texto = self._texto_resultados_forzados(
+            productos_efectivos, genero_sin_resultados, query
+        )
+        return (texto, trace, [str(p.sku) for p in productos_efectivos[:3]])
+
+    def _construir_query_forzado(
+        self,
+        mensaje: str,
+        sesion_id: UUID,
+        excluir_skus: tuple[str, ...] | None,
+    ):
+        """Construye el BuscarProductosQuery para _forzar_busqueda."""
+        from dataclasses import replace as dc_replace  # noqa: F401 — importado donde se usa
         perfil = self._obtener_perfil.ejecutar(ObtenerPerfilSesionQuery(sesion_id=sesion_id))
         mensaje_limpio = SanitizadorQueryBusqueda.sanitizar(mensaje)
         mensaje_norm = NormalizadorTexto.normalizar(mensaje_limpio or "")
@@ -1129,22 +1173,8 @@ class ProcesarChatService:
         es_accesorio = DetectorConsultaAccesorio.es_consulta_accesorio(
             mensaje_limpio if tiene_terminos else None, cat_ef, subcat_ef
         )
-        precio_foco = self._precio_del_foco(perfil.sku_foco)
-        tier_efectivo = perfil.desired_tier or (
-            UmbralesTier.tier_de(precio_foco, subcat_ef) if precio_foco else None
-        )
-        piso_tier, techo_tier = UmbralesTier.rango(
-            tier=tier_efectivo,
-            subcategoria=subcat_ef,
-            precio_ancla=precio_foco or perfil.presupuesto_max,
-        )
-        precio_min = piso_tier
-        precio_max_final = perfil.presupuesto_max
-        if techo_tier is not None:
-            precio_max_final = (
-                min(techo_tier, precio_max_final) if precio_max_final else techo_tier
-            )
-        nombre_excluye = tuple(DetectorExclusionesMensaje.detectar(mensaje)) or None
+        precio_min, precio_max_final = self._rango_precio_tier(perfil, subcat_ef)
+        ram_gb_min = self._extraer_ram_gb_mensaje(mensaje)
         query = BuscarProductosQuery(
             query=mensaje_limpio if tiene_terminos else None,
             categoria=cat_ef,
@@ -1155,43 +1185,74 @@ class ProcesarChatService:
             pulgadas=perfil.pulgadas,
             tipo_panel=perfil.tipo_panel,
             resolucion=perfil.resolucion,
+            ram_gb_min=ram_gb_min,
             limite=12,
             excluir_accesorios=not es_accesorio,
             genero=perfil.genero_declarado or None,
             excluir_skus=excluir_skus,
-            nombre_excluye=nombre_excluye,
+            nombre_excluye=tuple(DetectorExclusionesMensaje.detectar(mensaje)) or None,
+            tipo_producto_excluye=tuple(DetectorExclusionesMensaje.tipos_a_excluir(mensaje)) or None,
         )
-        if not tiene_terminos and not cat_ef and not perfil.pulgadas:
-            return (
-                "Necesito un poco mas de contexto para buscar — decime el producto "
-                "(ej. 'laptop', 'freidora', 'celular') y si tenes marca o presupuesto.",
-                trace,
-                [],
-            )
+        return query, es_accesorio, perfil
+
+    @staticmethod
+    def _extraer_ram_gb_mensaje(mensaje: str) -> int | None:
+        """Extrae ram_gb_min del mensaje: '16gb ram', 'ram 16gb', '16 gb de ram'."""
+        import re
+        m = re.search(
+            r'\b(\d+)\s*gb\s+(?:de\s+)?ram\b|\bram\s+(?:de\s+)?(\d+)\s*gb\b',
+            mensaje, re.IGNORECASE
+        )
+        if m:
+            val = int(m.group(1) or m.group(2))
+            return val if val in (4, 8, 12, 16, 24, 32, 48, 64) else None
+        return None
+
+    def _rango_precio_tier(self, perfil, subcat_ef: str | None) -> tuple:
+        """Devuelve (precio_min, precio_max) ajustado por tier del perfil."""
+        precio_foco = self._precio_del_foco(perfil.sku_foco)
+        tier = perfil.desired_tier or (
+            UmbralesTier.tier_de(precio_foco, subcat_ef) if precio_foco else None
+        )
+        piso, techo = UmbralesTier.rango(
+            tier=tier,
+            subcategoria=subcat_ef,
+            precio_ancla=precio_foco or perfil.presupuesto_max,
+        )
+        precio_max = perfil.presupuesto_max
+        if techo is not None:
+            precio_max = min(techo, precio_max) if precio_max else techo
+        return piso, precio_max
+
+    def _ejecutar_query_con_fallbacks(
+        self, query: BuscarProductosQuery
+    ) -> tuple[list, bool]:
+        """Ejecuta query con dos fallbacks:
+        1) sin filtro de género cuando no hay resultados con género.
+        2) sin query textual cuando el FULLTEXT falla con frases largas."""
+        from dataclasses import replace
         productos = self._buscar.ejecutar(query)
         genero_sin_resultados = bool(query.genero) and not productos
         if genero_sin_resultados:
-            from dataclasses import replace
             productos = self._buscar.ejecutar(replace(query, genero=None))
-        # Si el LLM metio una frase entera como query ("un reloj para ponerme
-        # en la mano"), el FULLTEXT no matchea. Con categoria/subcategoria
-        # resuelta, reintentamos sin query — evita el falso "no lo tenemos".
+        # Frase larga como query ("un reloj para ponerme en la mano") → FULLTEXT falla.
+        # Con categoria resuelta, reintentamos sin query.
         if not productos and query.query and (query.categoria or query.subcategoria):
-            from dataclasses import replace
             productos = self._buscar.ejecutar(replace(query, query=None))
-        productos = self._prepend_sku_foco(productos, perfil.sku_foco)
-        productos = self._filtrar_por_gama(productos, mensaje, perfil.sku_foco)
-        skus_mostrados = {
-            s for s in (perfil.ultimos_skus_mostrados or "").split(",") if s
-        }
-        inedito = [p for p in productos if str(p.sku) not in skus_mostrados]
-        productos_efectivos = inedito if inedito else productos
-        sugeridos = (
-            SugeridorAccesoriosRelacionados(self._buscar).sugerir(
-                productos_efectivos, query.categoria, query.subcategoria
-            )
-            if not es_accesorio else []
-        )
+        # Filtro de panel (ej. OLED) demasiado restrictivo junto a otros filtros → sin panel.
+        if not productos and query.tipo_panel:
+            productos = self._buscar.ejecutar(replace(query, tipo_panel=None))
+        return productos, genero_sin_resultados
+
+    def _registrar_paso_forzado(
+        self,
+        trace: list[PasoAgente],
+        query: BuscarProductosQuery,
+        productos_efectivos: list,
+        sugeridos: list,
+        perfil,
+        genero_sin_resultados: bool,
+    ) -> None:
         args = {k: v for k, v in {
             "query": query.query, "categoria": query.categoria, "marca": query.marca,
             "precio_max": query.precio_max, "pulgadas": query.pulgadas,
@@ -1210,32 +1271,30 @@ class ProcesarChatService:
                 f"El catalogo no marca productos por genero '{query.genero}' "
                 f"en esta subcategoria — son modelos unisex."
             )
-        trace.append(
-            PasoAgente(tool="buscar_productos", args=args, result=resultado, fallback=True)
-        )
+        trace.append(PasoAgente(tool="buscar_productos", args=args, result=resultado, fallback=True))
+
+    @staticmethod
+    def _texto_resultados_forzados(
+        productos_efectivos: list,
+        genero_sin_resultados: bool,
+        query: BuscarProductosQuery,
+    ) -> str:
         if not productos_efectivos:
             return (
                 "Ups, no encontre nada exacto con eso en el catalogo. "
-                "Me das mas pistas? Marca preferida, presupuesto o tamanio me ayudarian un monton.",
-                trace,
-                [],
+                "Me das mas pistas? Marca preferida, presupuesto o tamanio me ayudarian un monton."
             )
-        aviso_prefix = ""
-        if genero_sin_resultados:
-            aviso_prefix = (
-                f"En esta categoria no diferenciamos por genero '{query.genero}', "
-                f"son modelos unisex. Igual te muestro los disponibles:\n"
-            )
-        lineas = [f"{aviso_prefix}Estas son las opciones que te puedo ofrecer:"]
+        aviso = (
+            f"En esta categoria no diferenciamos por genero '{query.genero}', "
+            f"son modelos unisex. Igual te muestro los disponibles:\n"
+            if genero_sin_resultados else ""
+        )
+        lineas = [f"{aviso}Estas son las opciones que te puedo ofrecer:"]
         for p in productos_efectivos[:3]:
             extra = f" (antes Bs {p.precio_anterior.monto:.0f})" if p.precio_anterior else ""
             lineas.append(f"- {p.nombre} — Bs {p.precio.monto:.0f}{extra} [{p.sku}]")
         lineas.append("Contame que te importa mas (presupuesto, marca, uso) y te ayudo a elegir.")
-        return (
-            "\n".join(lineas),
-            trace,
-            [str(p.sku) for p in productos_efectivos[:3]],
-        )
+        return "\n".join(lineas)
 
     def _ejecutar_fallback_acciones(
         self,

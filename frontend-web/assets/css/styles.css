@@ -535,6 +535,11 @@ img { max-width: 100%; display: block; }
   background: var(--brand-dark);
   border-color: var(--brand-dark);
 }
+.chat-card-action.agregado {
+  background: #1a7a42;
+  border-color: #1a7a42;
+  color: #fff;
+}
 .chat-card-action .ico {
   font-size: 14px;
   line-height: 1;

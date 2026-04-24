@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS productos (
     -- Specs adicionales para comparativas (ingestor las llena cuando puede
     -- parsearlas del detalle; el extractor regex las infiere de nombre+desc
     -- como fallback).
-    bateria_mah             SMALLINT     NULL,
+    bateria_mah             INT          NULL,
     camara_mp               SMALLINT     NULL,
     camara_frontal_mp       SMALLINT     NULL,
     soporta_5g              TINYINT(1)   NULL,
@@ -55,11 +55,49 @@ CREATE TABLE IF NOT EXISTS productos (
     -- cross-sell. Productos cuya subcategoria ya es de accesorios NO llevan
     -- este flag (ellos son el producto principal de su subcategoria).
     es_accesorio            TINYINT(1)   NOT NULL DEFAULT 0,
+    -- Producto dado de baja del catálogo online (Clacom='Cat. X - Descontinuado' en Akeneo).
+    -- Puede buscarse pero NO se ofrece compra online: el agente redirige a tienda física.
+    es_descontinuado        TINYINT(1)   NOT NULL DEFAULT 0,
     -- Audiencia de genero cuando el nombre o descripcion lo marca explicitamente
     -- (ej. "reloj para mujer", "cepillo electrico para hombre"). NULL = sin marca,
     -- se considera neutro/unisex. Sirve para filtrar busquedas tipo "para mujer"
     -- sin adivinar por color u otra heuristica fragil.
     genero                  ENUM('masculino','femenino','unisex','infantil') NULL,
+    -- Subtipo fino dentro de la categoria: permite separar "reloj pulsera" de
+    -- "reloj pared" o "parlante portatil" de "soundbar" sin subcategoria nueva.
+    -- Vocabulario por categoria:
+    --   Relojeria: pulsera | pared | despertador | smart | decorativo
+    --   Audio:     parlante | audifono | soundbar | portatil
+    --   Computo:   desktop | notebook | all_in_one
+    -- NULL = sin clasificar (el ingestor lo llena a partir del nuevo Excel).
+    tipo_producto           VARCHAR(40)  NULL,
+    -- Indica que el producto se lleva puesto (smartwatch, reloj pulsera, auricular
+    -- bluetooth). Permite filtrar "un reloj para la muneca" = es_vestible = 1.
+    es_vestible             TINYINT(1)   NULL,
+    -- ---------------------------------------------------------------
+    -- Campos de alto fill-rate de Akeneo (presentes en >25% del catálogo)
+    -- Se mantienen como columnas fijas para evitar JSON_EXTRACT en filtros.
+    -- ---------------------------------------------------------------
+    -- Número de modelo del fabricante (ej. "Galaxy S26 Ultra", "WH-1000XM5")
+    modelo                  VARCHAR(120) NULL,
+    -- Meses de garantía oficial Dismac
+    meses_garantia          SMALLINT     NULL,
+    -- Texto comercial largo (Speach Comercial de Akeneo) — para comparativas del LLM
+    descripcion_extendida   TEXT         NULL,
+    -- Bullets de características únicas separados por "|" (Característica 1..5)
+    caracteristicas         TEXT         NULL,
+    -- ---------------------------------------------------------------
+    -- Atributos dinámicos: almacén flexible para cualquier atributo
+    -- de Akeneo que no tenga columna fija. El ingestor vuelca aquí
+    -- todo lo demás como {"Potencia": "1500W", "Color de luz": "Blanco", ...}.
+    -- Nunca hay que hacer ALTER TABLE para agregar un atributo nuevo.
+    -- ---------------------------------------------------------------
+    atributos               JSON         NULL,
+    -- Versión plana de `atributos` para FULLTEXT: "Potencia: 1500W\nColor: Blanco\n..."
+    -- El ingestor la regenera cada vez que actualiza el JSON.
+    -- Incluida en ft_productos_busqueda para que el agente encuentre
+    -- specs como "1500W", "noise cancelling" o "inverter" en texto libre.
+    atributos_texto         TEXT         NULL,
     created_at              DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     updated_at              DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6)
                                 ON UPDATE CURRENT_TIMESTAMP(6),
@@ -72,10 +110,40 @@ CREATE TABLE IF NOT EXISTS productos (
     INDEX ix_productos_capacidad (capacidad_gb),
     INDEX ix_productos_es_accesorio (es_accesorio, categoria, subcategoria),
     INDEX ix_productos_genero (genero, categoria, subcategoria),
-    FULLTEXT INDEX ft_productos_busqueda (nombre_norm, descripcion_norm, marca_norm, categoria_norm),
+    INDEX ix_productos_tipo_producto (tipo_producto, categoria),
+    INDEX ix_productos_es_vestible (es_vestible, categoria),
+    INDEX ix_productos_modelo (modelo),
+    FULLTEXT INDEX ft_productos_busqueda (nombre_norm, descripcion_norm, marca_norm, categoria_norm, atributos_texto),
     -- Indice usado por el buscador principal: excluye descripcion_norm para
     -- evitar falsos positivos (p.ej. 'soporte de pared para tv' matcheando 'tv').
     FULLTEXT INDEX ft_productos_nombre (nombre_norm, marca_norm, categoria_norm)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ------------------------------------------------------------
+-- Catálogo de atributos por categoría (registro dinámico)
+-- Permite que el sistema sepa qué atributos existen para cada
+-- categoría sin leer todos los JSON de productos. El ingestor
+-- hace upsert aquí cada vez que procesa el CSV de Akeneo.
+-- El agente puede consultarlo para saber qué filtros ofrecer.
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS catalogo_atributos (
+    id                      INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    categoria               VARCHAR(120) NOT NULL,
+    subcategoria            VARCHAR(120) NULL,
+    nombre                  VARCHAR(200) NOT NULL,
+    -- Tipo del valor para orientar el frontend/agente
+    tipo_valor              ENUM('texto','numero','booleano','lista') NOT NULL DEFAULT 'texto',
+    -- Unidad de medida si aplica (W, kg, pulgadas, mAh…)
+    unidad                  VARCHAR(20)  NULL,
+    -- Cuántos productos activos tienen este atributo (se actualiza en cada ingesta)
+    conteo_productos        INT          NOT NULL DEFAULT 0,
+    created_at              DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    updated_at              DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6)
+                                ON UPDATE CURRENT_TIMESTAMP(6),
+
+    UNIQUE INDEX uq_atributo_cat (categoria, subcategoria, nombre),
+    INDEX ix_atributo_categoria (categoria),
+    INDEX ix_atributo_conteo (conteo_productos DESC)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ------------------------------------------------------------

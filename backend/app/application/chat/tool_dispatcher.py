@@ -139,6 +139,9 @@ class ToolDispatcher:
         exclusiones = DetectorExclusionesMensaje.detectar(mensaje_usuario)
         if exclusiones:
             filtros["nombre_excluye"] = tuple(exclusiones)
+        tipos_excluir = DetectorExclusionesMensaje.tipos_a_excluir(mensaje_usuario)
+        if tipos_excluir:
+            filtros["tipo_producto_excluye"] = tuple(tipos_excluir)
         if self._filtros_vacios(filtros):
             return {
                 "error": (
@@ -176,19 +179,26 @@ class ToolDispatcher:
         )
         productos = self._prepend_producto_foco(productos, perfil.sku_foco)
         log.info("buscar_productos count_final=%d", len(productos))
-        sugeridos = self._cross_sell_accesorios(filtros, productos) if not es_accesorio else []
+        descontinuados = [p for p in productos if getattr(p, "es_descontinuado", False)]
+        productos_web = [p for p in productos if not getattr(p, "es_descontinuado", False)]
+        sugeridos = self._cross_sell_accesorios(filtros, productos_web) if not es_accesorio else []
         respuesta = {
-            "productos": [self._proyectar(p, perfil) for p in productos],
-            "total": len(productos),
+            "productos": [self._proyectar(p, perfil) for p in productos_web],
+            "total": len(productos_web),
             "sugeridos": [self._proyectar(p, perfil) for p in sugeridos],
         }
-        if perfil.sku_foco and productos and str(productos[0].sku) == perfil.sku_foco:
+        if perfil.sku_foco and productos_web and str(productos_web[0].sku) == perfil.sku_foco:
             respuesta["producto_foco_sku"] = perfil.sku_foco
         if genero_sin_resultados:
             respuesta["aviso_sin_metadata_genero"] = (
                 f"El catalogo no marca productos por genero '{filtros.get('genero')}' "
                 f"en esta subcategoria. Estos son los modelos disponibles sin distincion "
                 f"de genero — comunicalo asi al cliente con honestidad."
+            )
+        if descontinuados:
+            respuesta["tienda_fisica"] = (
+                "Este producto ya no está disponible para compra online. "
+                "Para adquirirlo debés acercarte a una tienda física Dismac."
             )
         return respuesta
 

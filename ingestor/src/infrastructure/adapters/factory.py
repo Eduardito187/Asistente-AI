@@ -3,6 +3,7 @@ from __future__ import annotations
 from ...application.ports import SourceAdapter
 from ...domain.clasificacion import Clasificador
 from ..config import Settings
+from .akeneo_enriquecedor import AkeneoEnriquecedor
 from .csv_adapter import CsvAdapter
 from .dismac_csv_adapter import DismacCsvAdapter
 from .graphql_adapter import GraphqlAdapter
@@ -17,7 +18,12 @@ class AdapterFactory:
     def construir(settings: Settings) -> SourceAdapter:
         origen = settings.origen.lower().strip()
         if origen in ("dismac", "dismac_csv", "dismac-csv"):
-            return DismacCsvAdapter(path=settings.dismac_csv_path, clasificador=Clasificador())
+            enriquecedor = AkeneoEnriquecedor(settings.akeneo_csv_path)
+            return DismacCsvAdapter(
+                path=settings.dismac_csv_path,
+                clasificador=Clasificador(),
+                enriquecedor=enriquecedor,
+            )
         if origen == "csv":
             return CsvAdapter(path=settings.csv_path)
         if origen == "mysql":

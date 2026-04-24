@@ -14,6 +14,9 @@ class ProductoSql:
         potencia_w, procesador, color, tipo_panel, resolucion,
         bateria_mah, camara_mp, camara_frontal_mp, soporta_5g,
         sistema_operativo, refresh_hz, gpu,
+        tipo_producto, es_vestible, modelo, meses_garantia,
+        descripcion_extendida, caracteristicas, atributos, atributos_texto,
+        es_descontinuado,
         updated_at
     ) VALUES (
         :sku, :nombre, :descripcion, :categoria, :subcategoria, :marca,
@@ -24,6 +27,9 @@ class ProductoSql:
         :potencia_w, :procesador, :color, :tipo_panel, :resolucion,
         :bateria_mah, :camara_mp, :camara_frontal_mp, :soporta_5g,
         :sistema_operativo, :refresh_hz, :gpu,
+        :tipo_producto, :es_vestible, :modelo, :meses_garantia,
+        :descripcion_extendida, :caracteristicas, :atributos, :atributos_texto,
+        :es_descontinuado,
         NOW(6)
     )
     ON DUPLICATE KEY UPDATE
@@ -60,7 +66,46 @@ class ProductoSql:
         sistema_operativo   = VALUES(sistema_operativo),
         refresh_hz          = VALUES(refresh_hz),
         gpu                 = VALUES(gpu),
+        tipo_producto       = VALUES(tipo_producto),
+        es_vestible         = VALUES(es_vestible),
+        modelo              = VALUES(modelo),
+        meses_garantia      = VALUES(meses_garantia),
+        descripcion_extendida = VALUES(descripcion_extendida),
+        caracteristicas     = VALUES(caracteristicas),
+        atributos           = VALUES(atributos),
+        atributos_texto     = VALUES(atributos_texto),
+        es_descontinuado    = VALUES(es_descontinuado),
         updated_at          = NOW(6)
+    """
+
+    # Inserta productos del catálogo Akeneo que no existen en la DB (feed web).
+    # INSERT IGNORE evita pisar nombre/precio/imagen de productos ya ingresados.
+    INSERT_CATALOGO = """
+    INSERT IGNORE INTO productos (
+        sku, nombre, descripcion, categoria, subcategoria, marca,
+        precio_bob, stock, activo, origen,
+        nombre_norm, marca_norm, categoria_norm,
+        pulgadas, capacidad_gb, ram_gb, capacidad_litros, capacidad_kg,
+        potencia_w, procesador, color, tipo_panel, resolucion,
+        bateria_mah, camara_mp, camara_frontal_mp, soporta_5g,
+        sistema_operativo, refresh_hz, gpu,
+        tipo_producto, es_vestible, modelo, meses_garantia,
+        descripcion_extendida, caracteristicas, atributos, atributos_texto,
+        es_descontinuado,
+        updated_at
+    ) VALUES (
+        :sku, :nombre, :descripcion, :categoria, :subcategoria, :marca,
+        0, 0, 0, :origen,
+        :nombre_norm, :marca_norm, :categoria_norm,
+        :pulgadas, :capacidad_gb, :ram_gb, :capacidad_litros, :capacidad_kg,
+        :potencia_w, :procesador, :color, :tipo_panel, :resolucion,
+        :bateria_mah, :camara_mp, :camara_frontal_mp, :soporta_5g,
+        :sistema_operativo, :refresh_hz, :gpu,
+        :tipo_producto, :es_vestible, :modelo, :meses_garantia,
+        :descripcion_extendida, :caracteristicas, :atributos, :atributos_texto,
+        :es_descontinuado,
+        NOW(6)
+    )
     """
 
     @staticmethod

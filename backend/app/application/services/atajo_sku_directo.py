@@ -21,12 +21,23 @@ class AtajoSkuDirecto:
         self._detector = detector
         self._dispatcher = dispatcher
 
+    _MENSAJE_TIENDA_FISICA = (
+        "Este producto ya no está disponible para compra online. "
+        "Para adquirirlo debés acercarte a una tienda física Dismac."
+    )
+
     def resolver(self, mensaje: str, sesion_id: UUID) -> RespuestaSkuDirecta | None:
         if DetectorPedidoDetalle.es_pedido_detalle(mensaje):
             return None
         ficha = self.ficha_si_existe(mensaje, sesion_id)
         if ficha is None:
             return None
+        if ficha.get("solo_tienda_fisica") or ficha.get("es_descontinuado"):
+            return RespuestaSkuDirecta(
+                sku=str(ficha.get("sku") or ""),
+                texto=self._MENSAJE_TIENDA_FISICA,
+                producto=None,
+            )
         return RespuestaSkuDirecta(
             sku=str(ficha.get("sku") or ""),
             texto=self._formatear(ficha),

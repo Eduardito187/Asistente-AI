@@ -5,11 +5,14 @@ import csv
 import logging
 from typing import Iterable
 
+from typing import Optional
+
 from ...application.ports import SourceAdapter
 from ...domain.atributos import ExtractorAtributos
 from ...domain.clasificacion import Clasificador
 from ...domain.productos import ProductoInvalido, ProductoRaw
 from ...domain.texto import NormalizadorTexto
+from .akeneo_enriquecedor import AkeneoEnriquecedor
 
 log = logging.getLogger("ingestor.dismac_csv")
 
@@ -21,10 +24,16 @@ class DismacCsvAdapter(SourceAdapter):
 
     name = "dismac_csv"
 
-    def __init__(self, path: str, clasificador: Clasificador) -> None:
+    def __init__(
+        self,
+        path: str,
+        clasificador: Clasificador,
+        enriquecedor: Optional[AkeneoEnriquecedor] = None,
+    ) -> None:
         self._path = path
         self._clasificador = clasificador
         self._norm = NormalizadorTexto
+        self._enriquecedor = enriquecedor
 
     def fetch(self) -> Iterable[ProductoRaw]:
         log.info("Leyendo feed Dismac desde %s", self._path)
@@ -44,6 +53,8 @@ class DismacCsvAdapter(SourceAdapter):
                 if producto is None:
                     descartados += 1
                     continue
+                if self._enriquecedor:
+                    producto = self._enriquecedor.enriquecer(producto)
                 emitidos += 1
                 yield producto
         log.info(

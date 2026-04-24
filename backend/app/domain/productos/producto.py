@@ -40,6 +40,14 @@ class Producto:
     sistema_operativo: Optional[str] = None
     refresh_hz: Optional[int] = None
     gpu: Optional[str] = None
+    tipo_producto: Optional[str] = None
+    es_vestible: Optional[bool] = None
+    modelo: Optional[str] = None
+    meses_garantia: Optional[int] = None
+    descripcion_extendida: Optional[str] = None
+    caracteristicas: Optional[str] = None
+    atributos: Optional[dict] = None
+    es_descontinuado: bool = False
 
     def disponible(self) -> bool:
-        return self.activo and self.stock > 0
+        return self.activo and self.stock > 0 and not self.es_descontinuado

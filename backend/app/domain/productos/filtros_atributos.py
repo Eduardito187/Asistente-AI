@@ -22,6 +22,9 @@ class FiltrosAtributos:
     resolucion: Optional[str] = None
     color: Optional[str] = None
     es_electrico: Optional[bool] = None
+    tipo_producto: Optional[str] = None
+    es_vestible: Optional[bool] = None
+    tipo_producto_excluye: Optional[tuple[str, ...]] = None
 
     def vacio(self) -> bool:
         return all(getattr(self, f) is None for f in self.__dataclass_fields__)
