@@ -56,7 +56,10 @@ class ResponderConsultaDisponibilidad:
         return any(t.startswith(raiz) for t in tokens[: cls.TOKENS_CABECERA])
 
     def _seleccionar_productos(
-        self, cercana: CategoriaCercana, genero: Optional[str] = None
+        self,
+        cercana: CategoriaCercana,
+        genero: Optional[str] = None,
+        marca: Optional[str] = None,
     ) -> tuple[list, bool]:
         """Pool amplio filtrado por keyword+categoria, re-ranked por cabecera:
         asi 'Telefono celular honor' gana a 'Estuche para celular'. Si el
@@ -67,10 +70,10 @@ class ResponderConsultaDisponibilidad:
             exacto = self._obtener_y_complementar(cercana, genero)
             if exacto:
                 return (exacto, False)
-        pool = self._buscar_por_keyword_y_categoria(cercana, genero)
+        pool = self._buscar_por_keyword_y_categoria(cercana, genero, marca)
         sin_metadata_genero = bool(genero) and not pool
         if sin_metadata_genero:
-            pool = self._buscar_por_keyword_y_categoria(cercana, None)
+            pool = self._buscar_por_keyword_y_categoria(cercana, None, marca)
         if pool:
             return (
                 self._priorizar_nombre_empieza_con(pool, cercana.palabra_clave)[: self.LIMITE],
@@ -81,6 +84,8 @@ class ResponderConsultaDisponibilidad:
                 BuscarProductosQuery(
                     categoria=cercana.categoria,
                     subcategoria=cercana.subcategoria,
+                    marca=marca,
+                    excluir_accesorios=True,
                     limite=self.LIMITE,
                 )
             ),
@@ -119,7 +124,10 @@ class ResponderConsultaDisponibilidad:
         return [foco, *complementos[: self.LIMITE - 1]]
 
     def _buscar_por_keyword_y_categoria(
-        self, cercana: CategoriaCercana, genero: Optional[str] = None
+        self,
+        cercana: CategoriaCercana,
+        genero: Optional[str] = None,
+        marca: Optional[str] = None,
     ):
         """Primer intento: usar la palabra clave del sinonimo como query para
         que el FULLTEXT priorice productos cuyo nombre realmente coincide
@@ -132,6 +140,8 @@ class ResponderConsultaDisponibilidad:
                 query=self._singularizar(cercana.palabra_clave),
                 categoria=cercana.categoria,
                 subcategoria=cercana.subcategoria,
+                marca=marca,
+                excluir_accesorios=True,
                 limite=self.POOL,
                 genero=genero,
             )
@@ -142,11 +152,15 @@ class ResponderConsultaDisponibilidad:
         cercana: CategoriaCercana,
         etiqueta_foco: Optional[str] = None,
         genero: Optional[str] = None,
+        marca: Optional[str] = None,
     ) -> RespuestaFollowUp | None:
-        productos, sin_metadata_genero = self._seleccionar_productos(cercana, genero)
+        productos, sin_metadata_genero = self._seleccionar_productos(cercana, genero, marca)
         if not productos:
             return None
-        foco = etiqueta_foco or cercana.palabra_clave or cercana.subcategoria or cercana.categoria
+        if marca:
+            foco = f"{cercana.palabra_clave or cercana.subcategoria or cercana.categoria} {marca.title()}"
+        else:
+            foco = etiqueta_foco or cercana.palabra_clave or cercana.subcategoria or cercana.categoria
         lineas: list[str] = []
         if sin_metadata_genero:
             lineas.append(

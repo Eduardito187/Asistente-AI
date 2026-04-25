@@ -5,6 +5,7 @@ from uuid import UUID
 from ..chat.tool_dispatcher import ToolDispatcher
 from .detector_pedido_detalle import DetectorPedidoDetalle
 from .detector_sku_mensaje import DetectorSkuMensaje
+from .detector_solicitud_similares import DetectorSolicitudSimilares
 from .respuesta_sku_directa import RespuestaSkuDirecta
 
 
@@ -28,6 +29,9 @@ class AtajoSkuDirecto:
 
     def resolver(self, mensaje: str, sesion_id: UUID) -> RespuestaSkuDirecta | None:
         if DetectorPedidoDetalle.es_pedido_detalle(mensaje):
+            return None
+        # Mensaje del boton 'Similares' — lo resuelve el short-circuit de similares.
+        if DetectorSolicitudSimilares.sku_si_pide_similares(mensaje):
             return None
         ficha = self.ficha_si_existe(mensaje, sesion_id)
         if ficha is None:

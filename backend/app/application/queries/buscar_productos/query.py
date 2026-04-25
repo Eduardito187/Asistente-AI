@@ -38,3 +38,7 @@ class BuscarProductosQuery:
     tipo_producto: Optional[str] = None
     es_vestible: Optional[bool] = None
     tipo_producto_excluye: Optional[tuple[str, ...]] = None
+    # "asc" (default) muestra los mas baratos primero; "desc" prioriza los
+    # modelos mas caros en rango — apropiado cuando el cliente pide
+    # 'lo mejor' / 'tope de gama' / 'premium' con presupuesto.
+    orden_precio: str = "asc"

@@ -37,6 +37,7 @@ class ProductoRepository(ABC):
         excluir_skus: Optional[list[str]] = None,
         genero: Optional[str] = None,
         nombre_excluye: Optional[list[str]] = None,
+        orden_precio: str = "asc",
     ) -> list[Producto]: ...
 
     @abstractmethod

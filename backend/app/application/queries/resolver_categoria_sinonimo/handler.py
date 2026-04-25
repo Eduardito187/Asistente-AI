@@ -7,6 +7,7 @@ from typing import Callable, Optional
 
 from ....domain.catalogo import CategoriaRelacionada, CategoriaSinonimo
 from ....domain.shared.normalizacion import NormalizadorTexto
+from ....domain.shared.normalizador_fonetico import NormalizadorFonetico
 from ....domain.shared.tokens_consulta import TokensConsulta
 from ...ports import Cache, UnitOfWork
 from .query import ResolverCategoriaSinonimoQuery
@@ -123,13 +124,33 @@ class ResolverCategoriaSinonimoHandler:
     def _match_fuzzy(cls, uow, tokens: list[str]) -> CategoriaSinonimo | None:
         """Tolera typos leves cuando no hubo match exacto ni por token:
         prefiltra por prefijo+longitud en BD y elige el sinonimo con mayor
-        ratio de similitud (>= _FUZZY_RATIO_MIN)."""
+        ratio de similitud (>= _FUZZY_RATIO_MIN).
+
+        Ademas del ratio contra la forma normalizada, calcula el ratio contra
+        la forma fonetica (colapsa b↔v, c↔s, h muda) — asi 'cosinas' matchea
+        'cocinas', 'labadora' matchea 'lavadora', 'haire' matchea 'aire'."""
         mejor: tuple[float, CategoriaSinonimo] | None = None
         for token in tokens:
             if len(token) < 4:
                 continue
-            for cand in uow.catalogo_keywords.buscar_sinonimos_fuzzy(token, limite=10):
-                ratio = SequenceMatcher(None, token, cand.palabra_clave_norm).ratio()
+            token_fon = NormalizadorFonetico.normalizar(token)
+            # Buscamos por el token original Y por el fonetico para cubrir los
+            # casos donde el prefijo de 2 chars cambia tras la normalizacion.
+            candidatos = uow.catalogo_keywords.buscar_sinonimos_fuzzy(token, limite=30)
+            if token_fon != token:
+                candidatos = candidatos + uow.catalogo_keywords.buscar_sinonimos_fuzzy(token_fon, limite=30)
+            vistos_sku = set()
+            for cand in candidatos:
+                clave = (cand.palabra_clave_norm, cand.categoria, cand.subcategoria)
+                if clave in vistos_sku:
+                    continue
+                vistos_sku.add(clave)
+                ratio_raw = SequenceMatcher(None, token, cand.palabra_clave_norm).ratio()
+                ratio_fon = SequenceMatcher(
+                    None, token_fon,
+                    NormalizadorFonetico.normalizar(cand.palabra_clave_norm)
+                ).ratio()
+                ratio = max(ratio_raw, ratio_fon)
                 if ratio < cls._FUZZY_RATIO_MIN:
                     continue
                 score = ratio * float(cand.confianza or 1.0)

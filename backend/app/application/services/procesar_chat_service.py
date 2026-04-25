@@ -65,14 +65,19 @@ from .detector_intencion_compra import DetectorIntencionCompra
 from .detector_mentiras import DetectorMentiras
 from .detector_pedido_detalle import DetectorPedidoDetalle
 from .detector_refinamiento_shown import DetectorRefinamientoShown
+from .detector_sku_mensaje import DetectorSkuMensaje
 from .extractor_perfil_mensaje import ExtractorPerfilMensaje
 from .gestor_feedback_post_orden import GestorFeedbackPostOrden
 from .gestor_follow_ups_contextuales import GestorFollowUpsContextuales
 from .manejador_producto_ausente import ManejadorProductoAusente
 from .normalizador_moneda import NormalizadorMoneda
 from .resolvedor_categoria_cercana import ResolvedorCategoriaCercana
+from .detector_marca_mensaje import DetectorMarcaMensaje
+from .detector_solicitud_similares import DetectorSolicitudSimilares
+from .excluidor_juguetes_default import ExcluidorJuguetesDefault
 from .responder_comparacion_explicita import ResponderComparacionExplicita
 from .responder_consulta_disponibilidad import ResponderConsultaDisponibilidad
+from .responder_productos_similares import ResponderProductosSimilares
 from .responder_consulta_politica import ResponderConsultaPolitica
 from .respuesta_follow_up import RespuestaFollowUp
 from .sanitizador_query_busqueda import SanitizadorQueryBusqueda
@@ -121,6 +126,7 @@ class ProcesarChatService:
         resolvedor_categoria: ResolvedorCategoriaCercana,
         responder_consulta_disponibilidad: ResponderConsultaDisponibilidad,
         responder_comparacion_explicita: ResponderComparacionExplicita,
+        responder_similares: ResponderProductosSimilares,
     ) -> None:
         self._uow_factory = uow_factory
         self._crear_sesion = crear_sesion
@@ -147,6 +153,7 @@ class ProcesarChatService:
         self._resolvedor_categoria = resolvedor_categoria
         self._responder_consulta_disp = responder_consulta_disponibilidad
         self._responder_comparacion_explicita = responder_comparacion_explicita
+        self._responder_similares = responder_similares
 
     async def procesar(self, inp: ChatInput) -> ChatOutput:
         t0 = time.monotonic()
@@ -191,6 +198,14 @@ class ProcesarChatService:
                 )
             )
             return ChatOutput(sesion_id=sesion_id, respuesta=directa.texto)
+
+        # Boton 'Similares' del card: atajo determinista antes de cualquier
+        # otro detector (follow-ups, atajos) que pueda distraer el flujo.
+        similares_sc = self._short_circuit_similares(
+            inp=inp, sesion_id=sesion_id, t0=t0
+        )
+        if similares_sc is not None:
+            return similares_sc
 
         sku_directo = self._atajo_sku.resolver(inp.mensaje, sesion_id)
         if sku_directo is not None:
@@ -255,6 +270,18 @@ class ProcesarChatService:
         respuesta = NormalizadorMoneda.normalizar(respuesta)
         respuesta = self._inyectar_foco_si_falta(respuesta, trace)
         respuesta, productos = self._sanear_skus_y_enriquecer(respuesta, skus_tool)
+        # Si el LLM cito SKUs del cross-sell como productos principales, los
+        # movemos a la seccion "También podría interesarte" donde pertenecen.
+        productos = self._separar_sugeridos_citados(productos, trace)
+        # Si el mensaje tenia un SKU explicito pero la respuesta no lo cito,
+        # igual mostramos la tarjeta (el LLM respondio con datos de la ficha).
+        if not productos:
+            sku_msg = DetectorSkuMensaje.extraer(inp.mensaje)
+            if sku_msg:
+                with self._uow_factory() as uow:
+                    prods_sku = uow.productos.obtener_varios([SKU(sku_msg)])
+                    if prods_sku:
+                        productos = [ProductoSerializer.detalle(prods_sku[0])]
         respuesta = VerificadorClaimsProducto.corregir(respuesta, productos)
         respuesta = NormalizadorFormatoProducto.normalizar(respuesta)
         if productos:
@@ -554,6 +581,57 @@ class ProcesarChatService:
             pasos=[{"tool": p.tool, "args": p.args, "result": p.result} for p in trace],
         )
 
+    def _short_circuit_similares(
+        self,
+        inp: ChatInput,
+        sesion_id: UUID,
+        t0: float,
+    ) -> ChatOutput | None:
+        """Cliente pidio alternativas a un SKU especifico (ej. click en boton
+        'Similares' del card). Busca productos de la misma categoria/subcategoria
+        en rango de precio cercano, excluyendo el SKU original. No pasa por LLM."""
+        sku = DetectorSolicitudSimilares.sku_si_pide_similares(inp.mensaje)
+        if not sku:
+            return None
+        respuesta = self._responder_similares.responder(sku)
+        if respuesta is None:
+            return None
+        productos_citados = [
+            ProductoSerializer.detalle(p) for p in respuesta.productos
+        ]
+        trace = [
+            PasoAgente(
+                tool="buscar_productos",
+                args={"similares_a": respuesta.sku_original},
+                result={
+                    "productos": [ProductoSerializer.resumen(p) for p in respuesta.productos],
+                    "total": len(respuesta.productos),
+                },
+                fallback=True,
+            )
+        ]
+        self._registrar_respuesta(sesion_id, respuesta.texto, trace)
+        self._persistir_turno_mostrado(sesion_id, productos_citados)
+        self._registrar_metrica.ejecutar(
+            RegistrarMetricaTurnoCommand(
+                sesion_id=sesion_id,
+                mensaje_usuario_len=len(inp.mensaje),
+                respuesta_len=len(respuesta.texto),
+                tool_calls=1,
+                mentiras_detectadas=0,
+                productos_citados=len(productos_citados),
+                ruta="similares",
+                tiempo_ms=int((time.monotonic() - t0) * 1000),
+            )
+        )
+        return ChatOutput(
+            sesion_id=sesion_id,
+            respuesta=respuesta.texto,
+            productos_citados=productos_citados,
+            productos_sugeridos=self._sugeridos_para_cards(productos_citados),
+            pasos=[{"tool": p.tool, "args": p.args, "result": p.result} for p in trace],
+        )
+
     async def _short_circuit_resolver(
         self,
         inp: ChatInput,
@@ -584,8 +662,9 @@ class ProcesarChatService:
             inp.mensaje
         ):
             genero = DetectorGeneroMencion.detectar(inp.mensaje)
+            marca = DetectorMarcaMensaje.extraer(inp.mensaje)
             respuesta_disp = self._responder_consulta_disp.responder(
-                cercana, genero=genero
+                cercana, genero=genero, marca=marca
             )
             if respuesta_disp is not None:
                 return self._responder_follow_up(
@@ -626,6 +705,7 @@ class ProcesarChatService:
             sesion_id=sesion_id,
             respuesta=ToolsMark.strip(respuesta),
             productos_citados=productos,
+            productos_sugeridos=self._sugeridos_para_cards(productos),
             pasos=[{"tool": p.tool, "args": p.args, "result": p.result} for p in trace],
         )
 
@@ -867,22 +947,37 @@ class ProcesarChatService:
             partes.append(f"- Precio: Bs {ficha['precio_bob']:.0f}")
         if ficha.get("precio_anterior_bob"):
             partes.append(f"- Precio anterior: Bs {ficha['precio_anterior_bob']:.0f}")
+        # Specs estructuradas (columnas indexadas)
+        if ficha.get("atributos"):
+            partes.append("- Specs:")
+            for k, v in ficha["atributos"].items():
+                partes.append(f"  {k}: {v}")
+        # Descripcion larga (hasta 1200 chars, incluye seccion de caracteristicas)
         if ficha.get("descripcion"):
-            partes.append(f"- Descripcion: {ficha.get('descripcion')}")
+            partes.append(f"- Descripcion: {ficha['descripcion']}")
+        if ficha.get("caracteristicas"):
+            partes.append(f"- Caracteristicas: {ficha['caracteristicas']}")
+        # Atributos Akeneo (datos comerciales extra: peso, idioma teclado, garantia, etc.)
+        if ficha.get("atributos_akeneo"):
+            partes.append("- Atributos comerciales:")
+            for k, v in ficha["atributos_akeneo"].items():
+                partes.append(f"  {k}: {v}")
+        sku = ficha.get("sku", "")
         partes.append(
-            "INSTRUCCION: el cliente ya escribio el SKU en su mensaje. NO le pidas el "
-            "SKU de vuelta ni llames ver_producto: los datos de arriba son verificados."
+            f"INSTRUCCION: el cliente ya escribio el SKU en su mensaje. NO llames "
+            f"ver_producto ni buscar_productos — todos los datos estan en el CONTEXTO. "
+            f"Cita el SKU [{sku}] entre corchetes en tu respuesta para que el sistema "
+            f"muestre la tarjeta del producto."
         )
         if DetectorPedidoDetalle.es_pedido_detalle(mensaje):
             partes.append(
-                "El cliente pidio DETALLES/ESPECIFICACIONES. Enumera de forma completa "
-                "TODAS las caracteristicas que encuentres en la descripcion: procesador, "
-                "memoria RAM, almacenamiento, pantalla (tamanio + resolucion + tipo/panel), "
-                "teclado (iluminacion/layout), GPU/grafica, bateria, puertos, conectividad, "
-                "sistema operativo, peso y cualquier otra spec relevante. No resumas en "
-                "3 bullets — si la descripcion trae 8 datos, lista los 8. Si un dato NO "
-                "esta en la descripcion, no lo inventes: decilo explicitamente (ej: 'no "
-                "tengo ese dato en la ficha'). Cierra con una pregunta que avance la venta."
+                "El cliente pidio DETALLES/ESPECIFICACIONES. Usa exclusivamente los datos "
+                "del CONTEXTO de arriba. Lista TODAS las specs disponibles: procesador, "
+                "RAM, almacenamiento, pantalla (tamanio + tipo + resolucion), GPU, bateria, "
+                "puertos, conectividad, peso, sistema operativo, garantia, color y cualquier "
+                "otro dato presente. No resumas en 3 bullets: si hay 10 datos, lista los 10. "
+                "Si un dato no esta en la ficha, decilo explicitamente. "
+                "Cierra con una pregunta de cierre de venta."
             )
         return "\n".join(partes)
 
@@ -910,11 +1005,34 @@ class ProcesarChatService:
                 tiempo_ms=int((time.monotonic() - t0) * 1000),
             )
         )
+        citados = [directa.producto] if directa.producto else []
         return ChatOutput(
             sesion_id=sesion_id,
             respuesta=directa.texto,
-            productos_citados=[directa.producto] if directa.producto else [],
+            productos_citados=citados,
+            productos_sugeridos=self._sugeridos_para_cards(citados),
         )
+
+    def _sugeridos_para_cards(self, productos_citados: list[dict]) -> list[dict]:
+        """Genera cross-sell para cualquier short-circuit que devuelva productos.
+        Centraliza la logica — asi el boton 'También podría interesarte' aparece
+        consistentemente en todo el catalogo, no solo en la ruta del LLM."""
+        if not productos_citados:
+            return []
+        skus = [str(p.get("sku") or "") for p in productos_citados if p.get("sku")]
+        if not skus:
+            return []
+        with self._uow_factory() as uow:
+            principales = uow.productos.obtener_varios([SKU(s) for s in skus])
+        if not principales:
+            return []
+        sugeridor = SugeridorAccesoriosRelacionados(self._buscar)
+        sugeridos = sugeridor.sugerir(
+            principales,
+            categoria=principales[0].categoria,
+            subcategoria=principales[0].subcategoria,
+        )
+        return [ProductoSerializer.resumen(p) for p in sugeridos]
 
     def _responder_follow_up(
         self,
@@ -958,6 +1076,7 @@ class ProcesarChatService:
             sesion_id=sesion_id,
             respuesta=follow_up.texto,
             productos_citados=list(follow_up.productos),
+            productos_sugeridos=self._sugeridos_para_cards(list(follow_up.productos)),
             pasos=[{"tool": follow_up.ruta, "args": {}, "result": {"skus": follow_up.skus}}],
         )
 
@@ -1009,7 +1128,12 @@ class ProcesarChatService:
           a) respondio listando productos sin haber llamado buscar_productos
              con resultados (alucina productos).
           b) no llamo buscar_productos en absoluto y el mensaje menciona una
-             categoria reconocida (sinonimo en BD)."""
+             categoria reconocida (sinonimo en BD).
+
+        NO se fuerza si el mensaje tiene un SKU explicito: el LLM respondio
+        usando el contexto de la ficha y no necesita buscar."""
+        if DetectorSkuMensaje.extraer(mensaje):
+            return False
         busco_con_resultados = any(
             p.tool == "buscar_productos"
             and not p.result.get("error")
@@ -1175,6 +1299,13 @@ class ProcesarChatService:
         )
         precio_min, precio_max_final = self._rango_precio_tier(perfil, subcat_ef)
         ram_gb_min = self._extraer_ram_gb_mensaje(mensaje)
+        tipos_excluir = list(DetectorExclusionesMensaje.tipos_a_excluir(mensaje))
+        if ExcluidorJuguetesDefault.debe_excluir(
+            mensaje_limpio if tiene_terminos else None,
+            cat_ef, subcat_ef, mensaje
+        ) and "juguete" not in tipos_excluir:
+            tipos_excluir.append("juguete")
+        tier_pide_caros = perfil.desired_tier in ("flagship", "alto")
         query = BuscarProductosQuery(
             query=mensaje_limpio if tiene_terminos else None,
             categoria=cat_ef,
@@ -1191,7 +1322,8 @@ class ProcesarChatService:
             genero=perfil.genero_declarado or None,
             excluir_skus=excluir_skus,
             nombre_excluye=tuple(DetectorExclusionesMensaje.detectar(mensaje)) or None,
-            tipo_producto_excluye=tuple(DetectorExclusionesMensaje.tipos_a_excluir(mensaje)) or None,
+            tipo_producto_excluye=tuple(tipos_excluir) or None,
+            orden_precio="desc" if tier_pide_caros else "asc",
         )
         return query, es_accesorio, perfil
 
@@ -1352,6 +1484,26 @@ class ProcesarChatService:
         else:
             partes.append("Tu carrito quedo vacio.")
         return " ".join(partes), trace
+
+    @staticmethod
+    def _separar_sugeridos_citados(
+        productos: list[dict], trace: list[PasoAgente]
+    ) -> list[dict]:
+        """Si el LLM cito SKUs que el cross-sell marco como 'sugeridos', los
+        quitamos de productos_citados. Asi los accesorios siempre terminan en
+        la seccion 'También podría interesarte' (via _extraer_sugeridos_del_trace),
+        no mezclados con los productos principales."""
+        skus_sugeridos: set[str] = set()
+        for paso in trace:
+            if paso.tool != "buscar_productos":
+                continue
+            for s in paso.result.get("sugeridos") or []:
+                sku = s.get("sku")
+                if sku:
+                    skus_sugeridos.add(sku)
+        if not skus_sugeridos:
+            return productos
+        return [p for p in productos if p.get("sku") not in skus_sugeridos]
 
     def _sanear_skus_y_enriquecer(
         self, respuesta: str, skus_tool: list[str]

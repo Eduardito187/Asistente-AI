@@ -26,6 +26,7 @@ from ..services.buscador_semantico import BuscadorSemantico
 from ..services.clasificador_etapa_conversacional import ClasificadorEtapaConversacional
 from ..services.detector_consulta_accesorio import DetectorConsultaAccesorio
 from ..services.detector_exclusiones_mensaje import DetectorExclusionesMensaje
+from ..services.excluidor_juguetes_default import ExcluidorJuguetesDefault
 from ..services.generador_justificacion import GeneradorJustificacion
 from ..services.reranker_por_perfil import ReRankerPorPerfil
 from ..services.sanitizador_query_busqueda import SanitizadorQueryBusqueda
@@ -139,7 +140,14 @@ class ToolDispatcher:
         exclusiones = DetectorExclusionesMensaje.detectar(mensaje_usuario)
         if exclusiones:
             filtros["nombre_excluye"] = tuple(exclusiones)
-        tipos_excluir = DetectorExclusionesMensaje.tipos_a_excluir(mensaje_usuario)
+        tipos_excluir = list(DetectorExclusionesMensaje.tipos_a_excluir(mensaje_usuario))
+        # Excluir juguetes por default — el catalogo mezcla heladeras de juguete
+        # con heladeras reales bajo la misma subcategoria.
+        if ExcluidorJuguetesDefault.debe_excluir(
+            filtros.get("query"), filtros.get("categoria"),
+            filtros.get("subcategoria"), mensaje_usuario
+        ) and "juguete" not in tipos_excluir:
+            tipos_excluir.append("juguete")
         if tipos_excluir:
             filtros["tipo_producto_excluye"] = tuple(tipos_excluir)
         if self._filtros_vacios(filtros):
@@ -158,6 +166,11 @@ class ToolDispatcher:
         )
         filtros["excluir_accesorios"] = not es_accesorio
         self._aplicar_tier_filtros(filtros, perfil)
+        # Cuando el cliente pidio tope de gama / lo mejor, priorizar los mas
+        # caros en rango — sin esto el ORDER BY precio ASC muestra los
+        # modelos mas baratos primero, contrario a la intencion.
+        if getattr(perfil, "desired_tier", None) in ("flagship", "alto"):
+            filtros["orden_precio"] = "desc"
         log.info(
             "buscar_productos intent=%s tier=%s sku_foco=%s filtros=%s",
             "exact" if perfil.sku_foco else "busqueda",

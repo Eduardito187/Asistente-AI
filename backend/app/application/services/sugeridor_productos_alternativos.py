@@ -101,4 +101,7 @@ class SugeridorProductosAlternativos:
             kwargs["nombre_excluye"] = nombre_excluye
         if tipo_producto_excluye:
             kwargs["tipo_producto_excluye"] = tipo_producto_excluye
+        # Accesorios (portahuevos, fundas, cables) nunca son alternativas
+        # validas de un producto principal ausente en catalogo.
+        kwargs["excluir_accesorios"] = True
         return BuscarProductosQuery(limite=cls.LIMITE, **kwargs)

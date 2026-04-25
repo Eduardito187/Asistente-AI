@@ -43,6 +43,36 @@ class UmbralesTier:
             "medio":    (800.0,  1800.0),
             "budget":   (None,   800.0),
         },
+        "refrigeradores": {
+            "flagship": (7000.0, None),
+            "alto":     (4000.0, 7000.0),
+            "medio":    (2200.0, 4000.0),
+            "budget":   (None,   2200.0),
+        },
+        "lavadoras": {
+            "flagship": (5000.0, None),
+            "alto":     (3000.0, 5000.0),
+            "medio":    (1500.0, 3000.0),
+            "budget":   (None,   1500.0),
+        },
+        "audífonos": {
+            "flagship": (600.0,  None),
+            "alto":     (250.0,  600.0),
+            "medio":    (100.0,  250.0),
+            "budget":   (None,   100.0),
+        },
+        "audifonos": {
+            "flagship": (600.0,  None),
+            "alto":     (250.0,  600.0),
+            "medio":    (100.0,  250.0),
+            "budget":   (None,   100.0),
+        },
+        "cocinas": {
+            "flagship": (3500.0, None),
+            "alto":     (2000.0, 3500.0),
+            "medio":    (800.0,  2000.0),
+            "budget":   (None,   800.0),
+        },
     }
 
     # Fallback genérico cuando no conocemos la subcategoría: ratio sobre un

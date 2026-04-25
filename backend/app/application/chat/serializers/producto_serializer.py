@@ -38,23 +38,33 @@ class ProductoSerializer:
             base["atributos"] = atributos
         return base
 
-    _MAX_DESCRIPCION = 400
+    _MAX_DESCRIPCION = 1200
     _MAX_CARACTERISTICAS = 300
+
+    # Claves de Akeneo de logistica/operaciones que no aportan al cliente.
+    _AKENEO_EXCLUIR = frozenset({
+        "Altura compra", "Alto venta", "Ancho compra", "Ancho venta",
+        "Longitud compra", "Longitud venta", "Volumen compra", "Volumen venta",
+        "Unidad de medida de compra", "Unidad medida venta",
+        "Tiempo Lead", "Etiqueta de producto", "Instalación",
+    })
 
     @classmethod
     def detalle(cls, p: Producto) -> dict:
-        """Proyeccion extendida con descripcion e imagen para vistas detalle.
-
-        La descripcion se recorta a `_MAX_DESCRIPCION` caracteres — algunas
-        descripciones reales del catalogo tienen 2000+ caracteres, saturan
-        el ancho de banda y el contexto del LLM sin aportar valor. Si el
-        cliente quiere el detalle completo, el endpoint /productos/{sku} lo
-        devuelve intacto."""
+        """Proyeccion extendida con descripcion, specs estructuradas y atributos
+        Akeneo para respuestas de detalle. Descripcion hasta 1200 chars — suficiente
+        para cubrir la seccion de specs que suele empezar en el segundo parrafo."""
         base = cls.resumen(p)
         base["descripcion"] = cls._recortar(p.descripcion, cls._MAX_DESCRIPCION)
         base["imagen_url"] = p.imagen_url
         if p.caracteristicas:
             base["caracteristicas"] = cls._recortar(p.caracteristicas, cls._MAX_CARACTERISTICAS)
+        if p.descripcion_extendida:
+            base["descripcion_extendida"] = p.descripcion_extendida
+        if p.atributos:
+            akeneo = {k: v for k, v in p.atributos.items() if k not in cls._AKENEO_EXCLUIR}
+            if akeneo:
+                base["atributos_akeneo"] = akeneo
         return base
 
     @staticmethod

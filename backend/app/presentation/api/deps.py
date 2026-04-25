@@ -81,6 +81,9 @@ from ...application.services.responder_comparacion_explicita import (
 from ...application.services.responder_consulta_disponibilidad import (
     ResponderConsultaDisponibilidad,
 )
+from ...application.services.responder_productos_similares import (
+    ResponderProductosSimilares,
+)
 from ...application.services.reranker_por_perfil import ReRankerPorPerfil
 from ...application.services.responder_comparacion_mostrados import (
     ResponderComparacionMostrados,
@@ -395,5 +398,9 @@ def procesar_chat_service() -> ProcesarChatService:
         ),
         responder_consulta_disponibilidad=ResponderConsultaDisponibilidad(
             buscar=buscar
+        ),
+        responder_similares=ResponderProductosSimilares(
+            uow_factory=uow_factory,
+            sugeridor=SugeridorProductosAlternativos(buscar=buscar_handler()),
         ),
     )

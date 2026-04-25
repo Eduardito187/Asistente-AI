@@ -44,16 +44,19 @@ class MariaDbCatalogoKeywordsRepository(CatalogoKeywordsRepository):
     def buscar_sinonimos_fuzzy(
         self, token_norm: str, limite: int = 10
     ) -> list[CategoriaSinonimo]:
+        """Pool amplio de candidatos por prefijo de 2 chars + longitud similar.
+        Prefijo corto tolera typos que cambian el tercer char (cocinas->cosinas,
+        lavadora->labadora). El caller filtra por ratio de similitud."""
         if len(token_norm) < 4:
             return []
-        prefix_len = 3
+        prefix_len = 2
         rows = self._s.execute(
             text(CatalogoKeywordsSql.SINONIMOS_PREFIJO_FUZZY),
             {
                 "prefijo": token_norm[:prefix_len],
                 "prefix_len": prefix_len,
                 "token_len": len(token_norm),
-                "limite": max(1, min(limite, 20)),
+                "limite": max(1, min(limite, 50)),
             },
         ).mappings().all()
         return [self._fila_a_sinonimo(r) for r in rows]

@@ -179,28 +179,54 @@
     return "ese producto";
   }
 
+  // Renderiza markdown minimo (bold con **, bullets con -) preservando el
+  // escapado HTML previo. Entrada: texto ya escapado con escapeHtml.
+  function renderMarkdown(textoEscapado) {
+    const html = textoEscapado.replaceAll(
+      /\*\*([^*\n]+)\*\*/g,
+      "<strong>$1</strong>"
+    );
+    const lineas = html.split("\n");
+    const out = [];
+    let enLista = false;
+    for (const linea of lineas) {
+      const m = linea.match(/^\s*[-*•]\s+(.*)$/);
+      if (m) {
+        if (!enLista) { out.push("<ul class=\"chat-bullets\">"); enLista = true; }
+        out.push(`<li>${m[1]}</li>`);
+      } else {
+        if (enLista) { out.push("</ul>"); enLista = false; }
+        out.push(linea);
+      }
+    }
+    if (enLista) out.push("</ul>");
+    return out.join("\n")
+      .replaceAll("\n", "<br>")
+      .replaceAll(/<br>(<\/?ul>)/g, "$1")
+      .replaceAll(/(<\/?ul>)<br>/g, "$1");
+  }
+
+  function renderCardsBloque(items, titulo) {
+    if (!items?.length) return;
+    if (titulo) {
+      const h = document.createElement("div");
+      h.className = "chat-sugeridos-title";
+      h.textContent = titulo;
+      messagesEl.appendChild(h);
+    }
+    const cards = document.createElement("div");
+    cards.className = "chat-products";
+    cards.innerHTML = items.map(renderCard).join("");
+    messagesEl.appendChild(cards);
+  }
+
   function dibujarMensaje(tipo, texto, productos = [], sugeridos = []) {
     const wrapper = document.createElement("div");
     wrapper.className = `msg ${tipo}`;
-    wrapper.innerHTML = escapeHtml(texto || "").replace(/\n/g, "<br>");
+    wrapper.innerHTML = renderMarkdown(escapeHtml(texto || ""));
     messagesEl.appendChild(wrapper);
-
-    if (productos && productos.length) {
-      const cards = document.createElement("div");
-      cards.className = "chat-products";
-      cards.innerHTML = productos.map(renderCard).join("");
-      messagesEl.appendChild(cards);
-    }
-    if (sugeridos && sugeridos.length) {
-      const titulo = document.createElement("div");
-      titulo.className = "chat-sugeridos-title";
-      titulo.textContent = "También podría interesarte";
-      messagesEl.appendChild(titulo);
-      const cards = document.createElement("div");
-      cards.className = "chat-products";
-      cards.innerHTML = sugeridos.map(renderCard).join("");
-      messagesEl.appendChild(cards);
-    }
+    renderCardsBloque(productos);
+    renderCardsBloque(sugeridos, "También podría interesarte");
     messagesEl.scrollTop = messagesEl.scrollHeight;
   }
 
@@ -237,6 +263,30 @@
   // respuestas válidas pero lentas.
   const TIMEOUT_MS = 60000;
 
+  // Parser SSE incremental: devuelve eventos completos y el buffer restante
+  // (lo que quedo sin cerrar por el delimitador "\n\n").
+  function parsearSSE(buffer) {
+    const eventos = [];
+    let rest = buffer;
+    let idx = rest.indexOf("\n\n");
+    while (idx >= 0) {
+      const bloque = rest.slice(0, idx);
+      rest = rest.slice(idx + 2);
+      let evento = "message";
+      const dataLines = [];
+      for (const linea of bloque.split("\n")) {
+        if (linea.startsWith("event:")) evento = linea.slice(6).trim();
+        else if (linea.startsWith("data:")) dataLines.push(linea.slice(5).trim());
+      }
+      if (dataLines.length) {
+        try { eventos.push({ evento, data: JSON.parse(dataLines.join("\n")) }); }
+        catch { /* ignorar chunks mal formados */ }
+      }
+      idx = rest.indexOf("\n\n");
+    }
+    return { eventos, rest };
+  }
+
   async function enviarMensaje(mensaje) {
     agregarMensaje("user", mensaje);
     mostrarTyping();
@@ -244,23 +294,68 @@
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+    // Burbuja del bot se crea recien al llegar el primer token — asi el
+    // indicador de typing se mantiene mientras el backend piensa.
+    let botEl = null;
+    let textoAcum = "";
+    let productos = [];
+    let sugeridos = [];
+
+    const asegurarBurbuja = () => {
+      if (botEl) return;
+      quitarTyping();
+      botEl = document.createElement("div");
+      botEl.className = "msg bot";
+      messagesEl.appendChild(botEl);
+    };
+
     try {
-      const r = await fetch(`${API_BASE}/chat`, {
+      const r = await fetch(`${API_BASE}/chat/stream`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
         body: JSON.stringify({ mensaje, sesion_id: sesionId }),
         signal: controller.signal,
       });
-      if (!r.ok) {
+      if (!r.ok || !r.body) {
         const body = await r.text().catch(() => "");
         throw new Error(`HTTP ${r.status} ${body.slice(0, 120)}`);
       }
-      const d = await r.json();
-      if (d.sesion_id) sesionId = d.sesion_id;
-      quitarTyping();
-      const tieneProductos = (d.productos_citados || []).length > 0;
-      const texto = limpiarTextoConProductos(d.respuesta || "", tieneProductos);
-      agregarMensaje("bot", texto, d.productos_citados || [], d.productos_sugeridos || []);
+
+      const manejarEvento = ({ evento, data }) => {
+        if (evento === "token") {
+          asegurarBurbuja();
+          textoAcum += data.texto || "";
+          botEl.innerHTML = renderMarkdown(escapeHtml(textoAcum));
+          messagesEl.scrollTop = messagesEl.scrollHeight;
+        } else if (evento === "meta") {
+          if (data.sesion_id) sesionId = data.sesion_id;
+          productos = data.productos_citados || [];
+          sugeridos = data.productos_sugeridos || [];
+        }
+      };
+
+      const reader = r.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let chunk = await reader.read();
+      while (!chunk.done) {
+        buffer += decoder.decode(chunk.value, { stream: true });
+        const { eventos, rest } = parsearSSE(buffer);
+        eventos.forEach(manejarEvento);
+        buffer = rest;
+        chunk = await reader.read();
+      }
+
+      // Fin: render final con limpieza y tarjetas.
+      asegurarBurbuja();
+      const textoFinal = limpiarTextoConProductos(textoAcum, productos.length > 0);
+      botEl.innerHTML = renderMarkdown(escapeHtml(textoFinal));
+      renderCardsBloque(productos);
+      renderCardsBloque(sugeridos, "También podría interesarte");
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+      historia.push({ tipo: "bot", texto: textoFinal, productos, sugeridos });
+      guardarEstado();
     } catch (err) {
       quitarTyping();
       const causa = err.name === "AbortError"
@@ -270,7 +365,7 @@
         "bot",
         `Uy, se me complicó la conexión 🙈 (${causa}) ¿Me lo repetís?`
       );
-      console.error("chat fetch error:", err);
+      console.error("chat stream error:", err);
     } finally {
       clearTimeout(timer);
       sendBtn.disabled = false;

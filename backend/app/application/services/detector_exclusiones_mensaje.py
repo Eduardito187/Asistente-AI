@@ -53,6 +53,10 @@ class DetectorExclusionesMensaje:
     _TIPOS_EXCLUIR: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
         # keyword → (tipos a excluir, anti-keywords que cancelan la exclusión)
         "reloj": (("pared", "despertador", "decorativo"), ("pared", "despertador", "decorativo")),
+        # Por default "impresora" busca la de hogar/oficina — excluimos las
+        # térmicas (POS/recibos/etiquetas) salvo que el cliente lo pida.
+        "impresora": (("impresora_termica",), ("termica", "termicas", "pos", "recibos", "etiquetas", "etiqueta")),
+        "impresoras": (("impresora_termica",), ("termica", "termicas", "pos", "recibos", "etiquetas", "etiqueta")),
     }
 
     @classmethod

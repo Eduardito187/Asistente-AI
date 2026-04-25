@@ -86,6 +86,7 @@ class ProductoSql:
         excluir_skus: Optional[list[str]] = None,
         genero: Optional[str] = None,
         nombre_excluye: Optional[list[str]] = None,
+        orden_precio: str = "asc",
     ) -> tuple[str, dict]:
         """Construye SELECT dinamico para buscar productos. Devuelve (sql, params)."""
         clauses = ["(activo = 1 OR es_descontinuado = 1)"]
@@ -134,7 +135,8 @@ class ProductoSql:
         cls._agregar_filtros_atributos(clauses, params, atributos)
         cls._agregar_filtros_tipo_producto(clauses, params, atributos)
 
-        order_parts.append("precio_bob ASC")
+        direccion = "DESC" if (orden_precio or "asc").lower() == "desc" else "ASC"
+        order_parts.append(f"precio_bob {direccion}")
         sql = (
             f"SELECT * FROM productos WHERE {' AND '.join(clauses)} "
             f"ORDER BY {', '.join(order_parts)} LIMIT :limite"

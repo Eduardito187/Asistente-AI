@@ -415,8 +415,14 @@ img { max-width: 100%; display: block; }
   color: var(--ink);
   border: 1px solid var(--line);
   border-bottom-left-radius: 4px;
-  white-space: pre-wrap;
 }
+.msg.bot strong { font-weight: 600; color: var(--ink); }
+.msg.bot .chat-bullets {
+  margin: 6px 0;
+  padding-left: 18px;
+  list-style: disc;
+}
+.msg.bot .chat-bullets li { margin: 2px 0; }
 .msg.typing {
   background: #fff;
   color: var(--muted);

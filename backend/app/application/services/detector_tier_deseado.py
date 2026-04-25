@@ -28,7 +28,11 @@ class DetectorTierDeseado:
     )
     _RX_ALTO = re.compile(
         r"\b(?:gama\s+alta[-\s]?media|media[-\s]?alta|mejor\s+de\s+lo\s+medio|"
-        r"bueno\s+pero\s+no\s+tope)\b",
+        r"bueno\s+pero\s+no\s+tope|"
+        # Adjetivos cualitativos ligeros — cuando el cliente dice 'una laptop
+        # buena' (no 'tope de gama'), igual espera algo mejor que lo minimo.
+        r"bueno|buena|buenos|buenas|decente|decentes|"
+        r"de\s+calidad|calidad\s+premium|recomendable)\b",
         re.IGNORECASE,
     )
     _RX_MEDIO = re.compile(
