@@ -23,6 +23,8 @@ class ResultadoObtenerPerfilSesion:
     genero_declarado: Optional[str] = None
     sku_foco: Optional[str] = None
     desired_tier: Optional[str] = None
+    ram_gb_min: Optional[int] = None
+    gpu_dedicada: Optional[bool] = None
 
     def esta_vacio(self) -> bool:
         return not any(

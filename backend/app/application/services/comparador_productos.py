@@ -39,11 +39,29 @@ class ComparadorProductos:
             ("refresh_hz", "Tasa de refresco"),
             ("sistema_operativo", "Sistema"),
         ),
+        "Televisores": (
+            ("pulgadas", "Pulgadas"),
+            ("resolucion", "Resolución"),
+            ("tipo_panel", "Tipo de panel"),
+            ("refresh_hz", "Tasa de refresco"),
+            ("sistema_operativo", "Sistema"),
+        ),
         "Notebooks": (
             ("procesador", "Procesador"),
             ("ram_gb", "RAM"),
             ("almacenamiento_gb", "Almacenamiento"),
+            ("gpu", "GPU"),
             ("pulgadas", "Pantalla"),
+            ("bateria_mah", "Batería"),
+            ("sistema_operativo", "Sistema"),
+        ),
+        "Laptops": (
+            ("procesador", "Procesador"),
+            ("ram_gb", "RAM"),
+            ("almacenamiento_gb", "Almacenamiento"),
+            ("gpu", "GPU"),
+            ("pulgadas", "Pantalla"),
+            ("bateria_mah", "Batería"),
             ("sistema_operativo", "Sistema"),
         ),
         "Lavadoras": (
@@ -51,6 +69,45 @@ class ComparadorProductos:
             ("potencia_w", "Potencia"),
             ("es_electrico", "Eléctrica"),
             ("color", "Color"),
+        ),
+        "Refrigeradores": (
+            ("capacidad_litros", "Capacidad (L)"),
+            ("potencia_w", "Potencia"),
+            ("es_electrico", "Eléctrica"),
+            ("color", "Color"),
+        ),
+        "Freidoras": (
+            ("capacidad_litros", "Capacidad (L)"),
+            ("potencia_w", "Potencia"),
+            ("color", "Color"),
+        ),
+        "Monitores": (
+            ("pulgadas", "Pulgadas"),
+            ("resolucion", "Resolución"),
+            ("tipo_panel", "Tipo de panel"),
+            ("refresh_hz", "Tasa de refresco"),
+        ),
+        "Auriculares": (
+            ("bateria_mah", "Batería"),
+            ("color", "Color"),
+            ("sistema_operativo", "Compatibilidad"),
+        ),
+        "Audífonos": (
+            ("bateria_mah", "Batería"),
+            ("color", "Color"),
+            ("sistema_operativo", "Compatibilidad"),
+        ),
+        "Consolas": (
+            ("almacenamiento_gb", "Almacenamiento"),
+            ("sistema_operativo", "Sistema"),
+            ("color", "Color"),
+        ),
+        "Tablets": (
+            ("ram_gb", "RAM"),
+            ("almacenamiento_gb", "Almacenamiento"),
+            ("pulgadas", "Pantalla"),
+            ("bateria_mah", "Batería"),
+            ("sistema_operativo", "Sistema"),
         ),
     }
 

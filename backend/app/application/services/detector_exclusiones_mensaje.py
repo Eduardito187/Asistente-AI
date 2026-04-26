@@ -28,14 +28,27 @@ class DetectorExclusionesMensaje:
     # keywords a buscar/negar — pensadas por la escasez de subcategorías
     # finas en el catálogo (no hay "reloj pulsera" vs "reloj pared").
     _DICCIONARIO_TOLERANTE = (
+        # Colores
+        "rojo", "negro", "blanco", "azul", "rosa", "verde", "gris",
+        # Partes y ubicaciones
         "pared", "mural", "cocina", "pulsera", "muneca",
-        "rojo", "negro", "blanco", "azul", "rosa",
+        # Categorías de productos (para exclusión por tipo)
+        "consola", "monitor", "parlante", "accesorio", "accesorios",
+        "tablet", "laptop", "televisor", "celular", "impresora",
+        "secadora", "frigobar", "freezer",
     )
     _DISTANCIA_MAX = 1
 
     _RX_NEGACION = re.compile(
-        r"\b(?:menos\s+que\s+sea|que\s+no\s+sea|nada\s+de|tampoco|menos|sin|no)"
-        r"\s+(?:para\s+|sea\s+|de\s+)?([a-zñáéíóúü]{4,})",
+        r"\b(?:"
+        r"menos\s+que\s+sea|que\s+no\s+sea|nada\s+de|tampoco"
+        r"|no\s+quiero\s+(?:una?\s+|el\s+|la\s+|ver\s+|que\s+sea\s+)?"
+        r"|pero\s+no\s+(?:una?\s+|el\s+|la\s+)?"
+        r"|sino\s+(?:una?\s+|el\s+|la\s+)?"
+        r"|excepto\s+(?:una?\s+|el\s+|la\s+)?"
+        r"|no\s+una?\s+|menos|sin|no\s+"
+        r")"
+        r"([a-zñáéíóúü]{3,})",
         re.IGNORECASE,
     )
 

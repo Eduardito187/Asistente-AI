@@ -56,6 +56,8 @@ class BuscarProductosHandler:
             tipo_producto=q.tipo_producto,
             es_vestible=q.es_vestible,
             tipo_producto_excluye=q.tipo_producto_excluye,
+            marca_excluye=q.marca_excluye,
+            gpu_dedicada=q.gpu_dedicada,
         )
         with self._uow_factory() as uow:
             productos = uow.productos.buscar(
@@ -74,6 +76,7 @@ class BuscarProductosHandler:
                 genero=q.genero,
                 nombre_excluye=list(q.nombre_excluye) if q.nombre_excluye else None,
                 orden_precio=q.orden_precio,
+                solo_en_oferta=q.solo_en_oferta,
             )
         self._cache_set(cache_key, [str(p.sku) for p in productos])
         return productos

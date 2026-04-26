@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from ..queries.buscar_productos import BuscarProductosHandler, BuscarProductosQuery
 from ..queries.comparar_productos import CompararProductosHandler, CompararProductosQuery
 from ..queries.comparar_productos.result import ResultadoCompararProductos
 from ..queries.resolver_categoria_sinonimo import (
@@ -31,9 +32,11 @@ class ResponderComparacionExplicita:
         self,
         resolver: ResolverCategoriaSinonimoHandler,
         comparar: CompararProductosHandler,
+        buscar: BuscarProductosHandler | None = None,
     ) -> None:
         self._resolver = resolver
         self._comparar = comparar
+        self._buscar = buscar
 
     def responder(
         self, intent: ComparacionExplicita
@@ -57,8 +60,10 @@ class ResponderComparacionExplicita:
         )
 
     def _fragmentos_a_skus(self, fragmentos: list[str]) -> list[str]:
-        """Cada fragmento pasa por el resolver; nos quedamos solo con los
-        que resolvieron a un SKU concreto (alias → sku_especifico)."""
+        """Cada fragmento pasa por el resolver; si tiene sku_especifico lo usa
+        directamente. Si no, busca en el catálogo por texto para encontrar el
+        producto más relevante — permite comparar 'galaxy s25' con 'iphone 16'
+        aunque no estén mapeados como aliases con SKU específico."""
         skus: list[str] = []
         vistos: set[str] = set()
         for frag in fragmentos:
@@ -67,6 +72,11 @@ class ResponderComparacionExplicita:
             )
             sin = res.sinonimo_directo
             sku = sin.sku_especifico if sin else None
+            if not sku and self._buscar:
+                resultados = self._buscar.ejecutar(
+                    BuscarProductosQuery(query=frag, limite=1, excluir_accesorios=True)
+                )
+                sku = str(resultados[0].sku) if resultados else None
             if sku and sku not in vistos:
                 vistos.add(sku)
                 skus.append(sku)

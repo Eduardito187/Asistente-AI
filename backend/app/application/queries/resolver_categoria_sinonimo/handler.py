@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import asdict
 from difflib import SequenceMatcher
 from typing import Callable, Optional
@@ -48,16 +49,28 @@ class ResolverCategoriaSinonimoHandler:
             return cached
 
         tokens = [t for t in TokensConsulta.significativos(texto_norm) if len(t) >= 3]
+        # Incluir acronimos de 2 chars que no sean stopwords (tv, pc, lg, hp, etc.)
+        tokens2 = [
+            t for t in re.findall(r"\b[a-z]{2}\b", texto_norm)
+            if t not in TokensConsulta.STOPWORDS
+        ]
 
         with self._uow_factory() as uow:
             sinonimo = uow.catalogo_keywords.buscar_sinonimo_exacto(texto_norm)
             if sinonimo is None:
                 sinonimo = self._match_ngrama(uow, texto_norm)
+            if sinonimo is None and len(tokens) >= 2:
+                sinonimo = self._match_ngrama_fuzzy(uow, texto_norm)
             if sinonimo is None and tokens:
                 candidatos = uow.catalogo_keywords.buscar_sinonimos_por_tokens(
                     tokens, limite=5
                 )
                 sinonimo = candidatos[0] if candidatos else None
+            if sinonimo is None and tokens2:
+                candidatos2 = uow.catalogo_keywords.buscar_sinonimos_por_tokens(
+                    tokens2, limite=5
+                )
+                sinonimo = candidatos2[0] if candidatos2 else None
             if sinonimo is None and tokens:
                 sinonimo = self._match_fuzzy(uow, tokens)
 
@@ -119,6 +132,50 @@ class ResolverCategoriaSinonimoHandler:
                 if match is not None:
                     return match
         return None
+
+    @classmethod
+    def _match_ngrama_fuzzy(cls, uow, texto_norm: str) -> CategoriaSinonimo | None:
+        """Fuzzy sobre bi/trigramas completos de la query.
+
+        Permite que 'air frayer' matchee 'air fryer' antes de que el token
+        suelto 'air' matchee exactamente MacBook Air via buscar_sinonimos_por_tokens."""
+        palabras = texto_norm.split()
+        mejor: tuple[float, CategoriaSinonimo] | None = None
+        for tamanio in (3, 2):
+            for i in range(len(palabras) - tamanio + 1):
+                frase = " ".join(palabras[i : i + tamanio])
+                primer = palabras[i]
+                if len(primer) < 3:
+                    continue
+                primer_fon = NormalizadorFonetico.normalizar(primer)
+                if len(primer) >= 4:
+                    candidatos = uow.catalogo_keywords.buscar_sinonimos_fuzzy(primer, limite=30)
+                    if primer_fon != primer:
+                        candidatos = candidatos + uow.catalogo_keywords.buscar_sinonimos_fuzzy(
+                            primer_fon, limite=30
+                        )
+                else:
+                    # Token corto (ej. 'air'): buscar frases que comiencen con ese token
+                    candidatos = uow.catalogo_keywords.buscar_sinonimos_por_primer_token(
+                        primer, limite=50
+                    )
+                frase_fon = " ".join(NormalizadorFonetico.normalizar(w) for w in frase.split())
+                for cand in candidatos:
+                    cand_norm = cand.palabra_clave_norm
+                    if len(cand_norm.split()) != tamanio:
+                        continue
+                    ratio = SequenceMatcher(None, frase, cand_norm).ratio()
+                    cand_fon = " ".join(
+                        NormalizadorFonetico.normalizar(w) for w in cand_norm.split()
+                    )
+                    ratio_fon = SequenceMatcher(None, frase_fon, cand_fon).ratio()
+                    ratio = max(ratio, ratio_fon)
+                    if ratio < cls._FUZZY_RATIO_MIN:
+                        continue
+                    score = ratio * float(cand.confianza or 1.0)
+                    if mejor is None or score > mejor[0]:
+                        mejor = (score, cand)
+        return mejor[1] if mejor else None
 
     @classmethod
     def _match_fuzzy(cls, uow, tokens: list[str]) -> CategoriaSinonimo | None:

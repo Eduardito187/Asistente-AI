@@ -14,6 +14,7 @@ class AtributosMensaje:
     pulgadas: Optional[float] = None
     tipo_panel: Optional[str] = None
     resolucion: Optional[str] = None
+    ram_gb_min: Optional[int] = None
 
 
 class ExtractorAtributosMensaje:
@@ -27,6 +28,10 @@ class ExtractorAtributosMensaje:
     Estrategia paralela a la del ingestor: regex deterministas, sin LLM. La
     idea es que el perfil conserve el 'contexto tecnico' que el cliente dio
     en un turno para que el siguiente turno no lo pierda."""
+
+    _RAM_VALIDOS = frozenset([4, 8, 12, 16, 24, 32, 48, 64])
+    _RX_RAM_A = re.compile(r"\b(\d+)\s*gb\s+(?:de\s+)?ram\b", re.IGNORECASE)
+    _RX_RAM_B = re.compile(r"\bram\s+(?:de\s+)?(\d+)\s*gb\b", re.IGNORECASE)
 
     _RX_PULGADAS = re.compile(
         r"(?<![\d,.])(\d{1,3}(?:[.,]\d)?)\s*(?:\"|pulgadas?|inch(?:es)?|\bin\b)",
@@ -50,7 +55,16 @@ class ExtractorAtributosMensaje:
             pulgadas=cls._pulgadas(texto),
             tipo_panel=cls._panel(texto),
             resolucion=cls._resolucion(texto),
+            ram_gb_min=cls._ram_gb(texto),
         )
+
+    @classmethod
+    def _ram_gb(cls, texto: str) -> Optional[int]:
+        m = cls._RX_RAM_A.search(texto) or cls._RX_RAM_B.search(texto)
+        if not m:
+            return None
+        val = int(m.group(1))
+        return val if val in cls._RAM_VALIDOS else None
 
     @classmethod
     def _pulgadas(cls, texto: str) -> Optional[float]:

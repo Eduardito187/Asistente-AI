@@ -34,4 +34,6 @@ class ObtenerPerfilSesionHandler:
             genero_declarado=perfil.genero_declarado,
             sku_foco=perfil.sku_foco,
             desired_tier=perfil.desired_tier,
+            ram_gb_min=perfil.ram_gb_min,
+            gpu_dedicada=perfil.gpu_dedicada,
         )

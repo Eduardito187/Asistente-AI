@@ -395,6 +395,7 @@ def procesar_chat_service() -> ProcesarChatService:
         responder_comparacion_explicita=ResponderComparacionExplicita(
             resolver=resolver_categoria_sinonimo_handler(),
             comparar=comparar_productos_handler(),
+            buscar=buscar,
         ),
         responder_consulta_disponibilidad=ResponderConsultaDisponibilidad(
             buscar=buscar

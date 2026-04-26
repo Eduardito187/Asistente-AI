@@ -22,6 +22,11 @@ class CatalogoKeywordsRepository(ABC):
     ) -> list[CategoriaSinonimo]: ...
 
     @abstractmethod
+    def buscar_sinonimos_por_primer_token(
+        self, primer_token: str, limite: int = 30
+    ) -> list[CategoriaSinonimo]: ...
+
+    @abstractmethod
     def buscar_sinonimos_fuzzy(
         self, token_norm: str, limite: int = 10
     ) -> list[CategoriaSinonimo]: ...

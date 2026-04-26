@@ -34,6 +34,8 @@ class ActualizarPerfilSesionHandler:
             genero_declarado=cmd.genero_declarado,
             sku_foco=cmd.sku_foco,
             desired_tier=cmd.desired_tier,
+            ram_gb_min=cmd.ram_gb_min,
+            gpu_dedicada=cmd.gpu_dedicada,
         )
         try:
             with self._uow_factory() as uow:

@@ -399,11 +399,24 @@
     widget.classList.contains("open") ? cerrarChat() : abrirChat();
   });
   closeBtn.addEventListener("click", cerrarChat);
-  endBtn?.addEventListener("click", () => {
-    if (confirm("¿Finalizar esta conversación? Se borrarán los mensajes.")) {
-      finalizarConversacion();
-    }
+  const confirmOverlay = document.getElementById("chat-confirm-overlay");
+  const confirmOkBtn   = document.getElementById("chat-confirm-ok");
+  const confirmCancelBtn = document.getElementById("chat-confirm-cancel");
+
+  function mostrarConfirm() {
+    confirmOverlay.removeAttribute("aria-hidden");
+    confirmOkBtn.focus();
+  }
+  function ocultarConfirm() {
+    confirmOverlay.setAttribute("aria-hidden", "true");
+  }
+  confirmOkBtn.addEventListener("click", () => {
+    ocultarConfirm();
+    finalizarConversacion();
   });
+  confirmCancelBtn.addEventListener("click", ocultarConfirm);
+
+  endBtn?.addEventListener("click", mostrarConfirm);
 
   form.addEventListener("submit", (e) => {
     e.preventDefault();

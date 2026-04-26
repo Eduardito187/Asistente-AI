@@ -20,6 +20,7 @@ class DetectorIntencionAsesoria:
 
     _RX_ASESORIA = re.compile(
         r"\b(?:"
+        # Consultas de asesoría clásica
         r"cual(?:es)?\s+me\s+(?:conviene|recomienda|sugiere|serviria|quedaria|iria)"
         r"|que\s+me\s+(?:recomienda|sugiere|aconseja|conviene)"
         r"|cual\s+(?:es\s+)?(?:la\s+)?(?:mejor|mas\s+recomendable|mas\s+conveniente|mas\s+completa|top)"
@@ -41,6 +42,26 @@ class DetectorIntencionAsesoria:
         r"|dime\s+cual"
         r"|no\s+entiendo\s+(?:de|mucho)"
         r"|estoy\s+(?:perdido|confundid[oa]|entre)"
+        # Cierre comercial — sección 17
+        r"|cual\s+(?:me\s+)?(?:recomiendas|recomendarias)\s+(?:comprar|llevar)"
+        r"|dame\s+una\s+(?:conclusion|recomendacion)\s+(?:clara|final)"
+        r"|estoy\s+entre\s+(?:estos|esos|dos|estas)"
+        r"|quiero\s+que\s+me\s+ayudes\s+a\s+decidir"
+        r"|elige\s+(?:uno|una)\s+(?:por\s+mi|para\s+mi|vos)"
+        r"|cual\s+seria\s+tu\s+recomendacion\s+final"
+        r"|dime\s+el\s+ganador"
+        r"|cual\s+es\s+la\s+compra\s+mas\s+inteligente"
+        r"|cual\s+(?:me\s+)?conviene\s+(?:mas\s+)?(?:a\s+largo\s+plazo|para\s+largo\s+plazo)"
+        r"|dame\s+la\s+mejor\s+opcion\s+sin\s+(?:dar\s+)?(?:muchas\s+)?vueltas"
+        r"|cual\s+(?:comprar(?:ia)?|llevar(?:ia)?)\s+(?:vos|tu|usted)"
+        r"|cual\s+elegir(?:ias)?\s+(?:vos|tu|usted)?"
+        r"|recomendacion\s+final"
+        r"|cual\s+es\s+el\s+ganador"
+        # Asesor explícito — sección 8
+        r"|actua(?:r)?\s+como\s+asesor"
+        r"|actua\s+de\s+asesor"
+        r"|como\s+asesor\s+de\s+ventas"
+        r"|necesito\s+que\s+actues\s+como"
         r")\b",
         re.IGNORECASE,
     )

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 from ...domain.productos import Producto
 from ..queries.obtener_perfil_sesion import ResultadoObtenerPerfilSesion
 
@@ -10,12 +12,17 @@ BOOST_DENTRO_PRESUPUESTO = 1.0
 PENALIZACION_FUERA_PRESUPUESTO = 5.0
 
 PALABRAS_CLAVE_USO: dict[str, tuple[str, ...]] = {
-    "gaming": ("gaming", "gamer", "rtx", "gtx", "ryzen", "rog", "nvidia", "geforce"),
-    "oficina": ("oficina", "office", "trabajo", "empresarial", "corporate"),
-    "estudio": ("estudiante", "estudio", "universitario", "escolar"),
-    "diseno": ("diseño", "diseno", "editor", "creador", "4k", "retina"),
-    "cocina": ("cocina", "cocinar", "horno", "freidora", "licuadora"),
-    "hogar": ("hogar", "sala", "dormitorio", "familia"),
+    "gaming": ("gaming", "gamer", "rtx", "gtx", "rog", "tuf", "nvidia", "geforce", "legion", "helios", "predator", "nitro", "alienware", "fps", "moba"),
+    "oficina": ("oficina", "office", "trabajo", "empresarial", "corporate", "excel", "word", "powerpoint", "teams"),
+    "estudio": ("estudiante", "estudio", "universitario", "escolar", "colegio", "universidad", "tarea", "clase"),
+    "diseno": ("diseño", "diseno", "editor", "creador", "4k", "retina", "adobe", "photoshop", "illustrator", "render", "renderizado", "colorimetria", "pantone"),
+    "cocina": ("cocina", "cocinar", "horno", "freidora", "licuadora", "blender", "microondas", "tostadora"),
+    "hogar": ("hogar", "sala", "dormitorio", "familia", "casa", "living", "habitacion"),
+    "streaming": ("streaming", "netflix", "youtube", "twitch", "contenido", "stream", "transmision"),
+    "programacion": ("programacion", "programar", "codigo", "developer", "python", "javascript", "ide", "terminal", "compilar"),
+    "fotografia": ("fotografia", "foto", "camara", "disparo", "lente", "raw", "lightroom"),
+    "musica": ("musica", "audio", "auriculares", "altavoz", "sonido", "dj", "mezcla", "estudio grabacion"),
+    "viaje": ("viaje", "viajero", "portatil", "avion", "mochila", "liviano", "compacto"),
 }
 
 
@@ -60,7 +67,7 @@ class CalculadorBoostPerfil:
         if not claves:
             return 0.0
         texto = f"{p.nombre} {p.descripcion or ''}".lower()
-        return BOOST_USO if any(k in texto for k in claves) else 0.0
+        return BOOST_USO if any(re.search(rf"\b{re.escape(k)}\b", texto) for k in claves) else 0.0
 
     @staticmethod
     def _ajuste_presupuesto(p: Producto, presupuesto: float | None) -> float:

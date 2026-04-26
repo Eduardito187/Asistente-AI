@@ -26,6 +26,7 @@ from ..services.buscador_semantico import BuscadorSemantico
 from ..services.clasificador_etapa_conversacional import ClasificadorEtapaConversacional
 from ..services.detector_consulta_accesorio import DetectorConsultaAccesorio
 from ..services.detector_exclusiones_mensaje import DetectorExclusionesMensaje
+from ..services.detector_marca_excluida import DetectorMarcaExcluida
 from ..services.excluidor_juguetes_default import ExcluidorJuguetesDefault
 from ..services.generador_justificacion import GeneradorJustificacion
 from ..services.reranker_por_perfil import ReRankerPorPerfil
@@ -137,19 +138,7 @@ class ToolDispatcher:
     ) -> dict:
         perfil = self.obtener_perfil.ejecutar(ObtenerPerfilSesionQuery(sesion_id=sid))
         filtros = self._filtros_enriquecidos(a, perfil, marca_indiferente=marca_indiferente)
-        exclusiones = DetectorExclusionesMensaje.detectar(mensaje_usuario)
-        if exclusiones:
-            filtros["nombre_excluye"] = tuple(exclusiones)
-        tipos_excluir = list(DetectorExclusionesMensaje.tipos_a_excluir(mensaje_usuario))
-        # Excluir juguetes por default — el catalogo mezcla heladeras de juguete
-        # con heladeras reales bajo la misma subcategoria.
-        if ExcluidorJuguetesDefault.debe_excluir(
-            filtros.get("query"), filtros.get("categoria"),
-            filtros.get("subcategoria"), mensaje_usuario
-        ) and "juguete" not in tipos_excluir:
-            tipos_excluir.append("juguete")
-        if tipos_excluir:
-            filtros["tipo_producto_excluye"] = tuple(tipos_excluir)
+        self._aplicar_exclusiones(filtros, mensaje_usuario)
         if self._filtros_vacios(filtros):
             return {
                 "error": (
@@ -183,6 +172,12 @@ class ToolDispatcher:
         if genero_sin_resultados:
             filtros_sin_genero = {**filtros, "genero": None}
             productos = self.buscar.ejecutar(BuscarProductosQuery(**filtros_sin_genero))
+        # tipo_panel (QLED/OLED/etc.) puede no estar poblado en la BD — si da 0
+        # con panel, reintentamos sin ese filtro para no caer en ManejadorAusente.
+        if not productos and filtros.get("tipo_panel"):
+            productos = self.buscar.ejecutar(
+                BuscarProductosQuery(**{**filtros, "tipo_panel": None})
+            )
         if filtros["query"] and len(productos) < self.MIN_RESULTADOS_FULLTEXT:
             productos = self._agregar_candidatos_semanticos(filtros["query"], productos)
         productos = [p for p in productos if ValidadorFiltrosDuros.cumple(p, filtros)]
@@ -301,6 +296,26 @@ class ToolDispatcher:
             base["justificacion"] = justificacion
         return base
 
+    @staticmethod
+    def _aplicar_exclusiones(filtros: dict, mensaje_usuario: str) -> None:
+        """Inyecta nombre_excluye, tipo_producto_excluye y marca_excluye en los
+        filtros a partir del mensaje del cliente. Extraído de _buscar para
+        mantener la complejidad ciclomática bajo control."""
+        exclusiones = DetectorExclusionesMensaje.detectar(mensaje_usuario)
+        if exclusiones:
+            filtros["nombre_excluye"] = tuple(exclusiones)
+        tipos_excluir = list(DetectorExclusionesMensaje.tipos_a_excluir(mensaje_usuario))
+        if ExcluidorJuguetesDefault.debe_excluir(
+            filtros.get("query"), filtros.get("categoria"),
+            filtros.get("subcategoria"), mensaje_usuario
+        ) and "juguete" not in tipos_excluir:
+            tipos_excluir.append("juguete")
+        if tipos_excluir:
+            filtros["tipo_producto_excluye"] = tuple(tipos_excluir)
+        marcas_excluidas = DetectorMarcaExcluida.detectar(mensaje_usuario)
+        if marcas_excluidas:
+            filtros["marca_excluye"] = tuple(marcas_excluidas)
+
     _CAMPOS_ESTRUCTURADOS = (
         "categoria", "subcategoria", "marca",
         "pulgadas", "pulgadas_min", "pulgadas_max",
@@ -325,7 +340,7 @@ class ToolDispatcher:
             "pulgadas_min": ValueParser.a_float(a.get("pulgadas_min")),
             "pulgadas_max": ValueParser.a_float(a.get("pulgadas_max")),
             "capacidad_gb_min": ValueParser.a_int(a.get("capacidad_gb_min")),
-            "ram_gb_min": ValueParser.a_int(a.get("ram_gb_min")),
+            "ram_gb_min": ValueParser.a_int(a.get("ram_gb_min")) or perfil.ram_gb_min or None,
             "capacidad_litros_min": ValueParser.a_float(a.get("capacidad_litros_min")),
             "capacidad_kg_min": ValueParser.a_float(a.get("capacidad_kg_min")),
             "potencia_w_min": ValueParser.a_int(a.get("potencia_w_min")),
@@ -336,6 +351,7 @@ class ToolDispatcher:
             "color": cls._texto(a, "color", transform=str.lower),
             "es_electrico": ValueParser.a_bool(a.get("es_electrico")),
             "genero": cls._texto(a, "genero", transform=str.lower) or perfil.genero_declarado or None,
+            "gpu_dedicada": ValueParser.a_bool(a.get("gpu_dedicada")) or perfil.gpu_dedicada or None,
             "solo_con_stock": True,
         }
 

@@ -7,8 +7,9 @@ class PerfilSesionSql:
     POR_ID = (
         "SELECT sesion_id, presupuesto_max, marca_preferida, categoria_foco, "
         "subcategoria_foco, sku_foco, genero_declarado, desired_tier, "
-        "uso_declarado, pulgadas, tipo_panel, resolucion, ultimos_skus_mostrados, "
-        "precio_min_mostrado, precio_max_mostrado, alternativa_ofrecida, updated_at "
+        "uso_declarado, pulgadas, tipo_panel, resolucion, ram_gb_min, gpu_dedicada, "
+        "ultimos_skus_mostrados, precio_min_mostrado, precio_max_mostrado, "
+        "alternativa_ofrecida, updated_at "
         "FROM perfiles_sesion WHERE sesion_id = :sid"
     )
 
@@ -21,8 +22,8 @@ class PerfilSesionSql:
     UPSERT = (
         "INSERT INTO perfiles_sesion "
         "(sesion_id, presupuesto_max, marca_preferida, categoria_foco, subcategoria_foco, "
-        " sku_foco, genero_declarado, desired_tier, uso_declarado, pulgadas, tipo_panel, resolucion) "
-        "VALUES (:sid, :pmax, :marca, :cat, :subcat, :sku, :gen, :tier, :uso, :pulg, :panel, :res) "
+        " sku_foco, genero_declarado, desired_tier, uso_declarado, pulgadas, tipo_panel, resolucion, ram_gb_min, gpu_dedicada) "
+        "VALUES (:sid, :pmax, :marca, :cat, :subcat, :sku, :gen, :tier, :uso, :pulg, :panel, :res, :ram, :gpu) "
         "ON DUPLICATE KEY UPDATE "
         "presupuesto_max   = COALESCE(VALUES(presupuesto_max),   presupuesto_max), "
         "marca_preferida   = COALESCE(VALUES(marca_preferida),   marca_preferida), "
@@ -34,7 +35,9 @@ class PerfilSesionSql:
         "uso_declarado     = COALESCE(VALUES(uso_declarado),     uso_declarado), "
         "pulgadas          = COALESCE(VALUES(pulgadas),          pulgadas), "
         "tipo_panel        = COALESCE(VALUES(tipo_panel),        tipo_panel), "
-        "resolucion        = COALESCE(VALUES(resolucion),        resolucion)"
+        "resolucion        = COALESCE(VALUES(resolucion),        resolucion), "
+        "ram_gb_min        = COALESCE(VALUES(ram_gb_min),        ram_gb_min), "
+        "gpu_dedicada      = COALESCE(VALUES(gpu_dedicada),      gpu_dedicada)"
     )
 
     REGISTRAR_TURNO = (

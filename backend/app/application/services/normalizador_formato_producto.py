@@ -25,10 +25,18 @@ class NormalizadorFormatoProducto:
         re.IGNORECASE,
     )
 
+    # Elimina "**Alternativas:**" cuando el LLM lo emite sin contenido debajo:
+    # aparece solo seguido de líneas en blanco y luego otra sección o el final.
+    _RX_ALTERNATIVAS_VACIO = re.compile(
+        r"\*\*Alternativas:\*\*[ \t]*\n(?:[ \t]*\n)*(?=\*\*|\Z)",
+        re.MULTILINE,
+    )
+
     @classmethod
     def normalizar(cls, respuesta: str) -> str:
         if not respuesta:
             return respuesta
+        respuesta = cls._RX_ALTERNATIVAS_VACIO.sub("", respuesta)
         lineas = respuesta.split("\n")
         salida: list[str] = []
         for linea in lineas:

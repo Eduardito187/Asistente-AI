@@ -2,8 +2,9 @@ from __future__ import annotations
 
 
 class RenderizadorTablaComparacion:
-    """SRP: construye el markdown de una comparación (tabla + 3 bullets) a
-    partir del resultado estructurado de `comparar_productos`. Se usa:
+    """SRP: construye el markdown de una comparación (tabla + ganador por
+    criterio + recomendación final) a partir del resultado estructurado de
+    `comparar_productos`. Se usa:
 
       - en el short-circuit de comparación explícita (sin LLM)
       - como post-processor cuando el LLM invocó comparar_productos, para
@@ -13,11 +14,13 @@ class RenderizadorTablaComparacion:
     Único motivo de cambio: el layout de salida de la comparación.
     """
 
-    _ETIQUETAS = (
-        ("mejor_general", "Mejor opción general"),
-        ("mejor_precio_calidad", "Mejor relación precio/calidad"),
-        ("mas_economica", "Opción más económica"),
+    _ETIQUETAS_GANADOR = (
+        ("mejor_general",       "Mejor rendimiento"),
+        ("mejor_precio_calidad", "Mejor calidad/precio"),
+        ("mas_economica",        "Mejor precio"),
     )
+
+    _ND = "N/D"
 
     @classmethod
     def render(
@@ -34,30 +37,65 @@ class RenderizadorTablaComparacion:
             return ""
         por_sku = productos_por_sku or {}
         lineas = [encabezado + "\n"]
+        lineas.extend(cls._tabla_markdown(nombres, filas))
+        lineas.append("")
+        lineas.extend(cls._seccion_ganadores(conclusion, por_sku, tabla))
+        lineas.extend(cls._seccion_recomendacion_final(conclusion, por_sku, tabla))
+        return "\n".join(lineas)
+
+    @classmethod
+    def _tabla_markdown(cls, nombres: list, filas: list) -> list[str]:
         header = ["**Atributo**", *(f"**{n}**" for n in nombres)]
-        lineas.append("| " + " | ".join(header) + " |")
-        lineas.append("| " + " | ".join(["---"] * (len(nombres) + 1)) + " |")
+        sep = ["---"] * (len(nombres) + 1)
+        lineas = [
+            "| " + " | ".join(header) + " |",
+            "| " + " | ".join(sep) + " |",
+        ]
         for fila in filas:
             campo = fila.get("campo", "")
-            valores = [str(v) for v in fila.get("valores", [])]
+            valores = cls._normalizar_valores(fila.get("valores", []), len(nombres))
             lineas.append(f"| {campo} | " + " | ".join(valores) + " |")
-        lineas.append("")
-        for clave, etiqueta in cls._ETIQUETAS:
+        return lineas
+
+    @classmethod
+    def _normalizar_valores(cls, raw: list, ncols: int) -> list[str]:
+        resultado = [str(v) if v not in (None, "", "null") else cls._ND for v in raw]
+        while len(resultado) < ncols:
+            resultado.append(cls._ND)
+        return resultado
+
+    @classmethod
+    def _seccion_ganadores(
+        cls, conclusion: dict | None, por_sku: dict, tabla: dict
+    ) -> list[str]:
+        ganadores = []
+        for clave, etiqueta in cls._ETIQUETAS_GANADOR:
             bloque = (conclusion or {}).get(clave) or {}
             sku = bloque.get("sku")
-            razon = bloque.get("razon", "")
             nombre = cls._nombre(por_sku, sku, bloque, tabla)
             if sku and nombre:
-                lineas.append(f"- **{etiqueta}:** {nombre} [{sku}] — {razon}")
-        return "\n".join(lineas)
+                razon = bloque.get("razon", "")
+                ganadores.append(f"- **{etiqueta}:** {nombre} — {razon}")
+        if not ganadores:
+            return []
+        return ["**Ganador por criterio:**", *ganadores, ""]
+
+    @classmethod
+    def _seccion_recomendacion_final(
+        cls, conclusion: dict | None, por_sku: dict, tabla: dict
+    ) -> list[str]:
+        mejor = (conclusion or {}).get("mejor_general") or {}
+        sku_rec = mejor.get("sku")
+        nombre_rec = cls._nombre(por_sku, sku_rec, mejor, tabla)
+        if not sku_rec or not nombre_rec:
+            return []
+        razon_rec = mejor.get("razon", "")
+        return [f"**Recomendación final:** {nombre_rec} [{sku_rec}] — {razon_rec}"]
 
     @staticmethod
     def _nombre(
         por_sku: dict[str, object], sku: str | None, bloque: dict, tabla: dict
     ) -> str | None:
-        """Resuelve el nombre por tres vias en orden: diccionario producto,
-        campo `nombre` del bloque conclusion, o mapear sku→nombre en la tabla
-        via posicion (tabla.skus alineado con tabla.nombres)."""
         if not sku:
             return None
         prod = por_sku.get(sku)

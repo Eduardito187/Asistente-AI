@@ -41,6 +41,8 @@ class MariaDbPerfilSesionRepository(PerfilSesionRepository):
                 "pulg": perfil.pulgadas,
                 "panel": perfil.tipo_panel,
                 "res": perfil.resolucion,
+                "ram": perfil.ram_gb_min,
+                "gpu": 1 if perfil.gpu_dedicada else None,
             },
         )
 

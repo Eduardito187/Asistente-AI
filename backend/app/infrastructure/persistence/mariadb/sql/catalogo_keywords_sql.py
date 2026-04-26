@@ -25,6 +25,14 @@ class CatalogoKeywordsSql:
         "WHERE pk.keyword_norm = :kw ORDER BY p.precio_bob DESC LIMIT :limite"
     )
 
+    SINONIMOS_FRASE_PRIMER_TOKEN = (
+        "SELECT palabra_clave, palabra_clave_norm, categoria, subcategoria, "
+        "sku_especifico, CAST(confianza AS DECIMAL(3,2)) AS confianza "
+        "FROM categorias_sinonimos "
+        "WHERE palabra_clave_norm LIKE :prefijo_frase "
+        "ORDER BY confianza DESC LIMIT :limite"
+    )
+
     SINONIMOS_PREFIJO_FUZZY = (
         "SELECT palabra_clave, palabra_clave_norm, categoria, subcategoria, "
         "sku_especifico, CAST(confianza AS DECIMAL(3,2)) AS confianza "

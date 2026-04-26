@@ -194,6 +194,15 @@
       <button id="chat-end" type="button" class="chat-end-link">Finalizar conversación</button>
       <span class="chat-powered-inline">Powered by Dismac</span>
     </div>
+    <div id="chat-confirm-overlay" class="chat-confirm-overlay" aria-hidden="true">
+      <div class="chat-confirm-box">
+        <p>¿Finalizar esta conversación? Se borrarán los mensajes.</p>
+        <div class="chat-confirm-actions">
+          <button id="chat-confirm-cancel" class="chat-confirm-btn-cancel">Cancelar</button>
+          <button id="chat-confirm-ok" class="chat-confirm-btn-ok">Finalizar</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script src="/assets/js/chat.js?v=4"></script>

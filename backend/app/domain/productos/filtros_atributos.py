@@ -25,6 +25,8 @@ class FiltrosAtributos:
     tipo_producto: Optional[str] = None
     es_vestible: Optional[bool] = None
     tipo_producto_excluye: Optional[tuple[str, ...]] = None
+    marca_excluye: Optional[tuple[str, ...]] = None
+    gpu_dedicada: Optional[bool] = None
 
     def vacio(self) -> bool:
         return all(getattr(self, f) is None for f in self.__dataclass_fields__)

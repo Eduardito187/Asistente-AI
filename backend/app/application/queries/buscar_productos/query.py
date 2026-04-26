@@ -42,3 +42,6 @@ class BuscarProductosQuery:
     # modelos mas caros en rango — apropiado cuando el cliente pide
     # 'lo mejor' / 'tope de gama' / 'premium' con presupuesto.
     orden_precio: str = "asc"
+    solo_en_oferta: bool = False
+    marca_excluye: Optional[tuple[str, ...]] = None
+    gpu_dedicada: Optional[bool] = None

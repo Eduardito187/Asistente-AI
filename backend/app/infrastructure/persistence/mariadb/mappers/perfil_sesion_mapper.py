@@ -14,6 +14,8 @@ class PerfilSesionMapper:
         pulg = r.get("pulgadas")
         pmin_mostrado = r.get("precio_min_mostrado")
         pmax_mostrado = r.get("precio_max_mostrado")
+        ram = r.get("ram_gb_min")
+        gpu = r.get("gpu_dedicada")
         return PerfilSesion(
             sesion_id=UUID(r["sesion_id"]),
             presupuesto_max=float(pmax) if pmax is not None else None,
@@ -32,4 +34,6 @@ class PerfilSesionMapper:
             genero_declarado=r.get("genero_declarado"),
             sku_foco=r.get("sku_foco"),
             desired_tier=r.get("desired_tier"),
+            ram_gb_min=int(ram) if ram is not None else None,
+            gpu_dedicada=bool(gpu) if gpu is not None else None,
         )

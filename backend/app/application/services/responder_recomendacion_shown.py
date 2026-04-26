@@ -10,6 +10,7 @@ from ..queries.obtener_perfil_sesion import (
     ObtenerPerfilSesionQuery,
     ResultadoObtenerPerfilSesion,
 )
+from .reranker_por_perfil import ReRankerPorPerfil
 from .respuesta_follow_up import RespuestaFollowUp
 
 
@@ -45,39 +46,64 @@ class ResponderRecomendacionShown:
         if not self._suficiente_contexto(perfil):
             return None
 
-        productos = self._buscar.ejecutar(
-            BuscarProductosQuery(
-                categoria=perfil.categoria_foco or None,
-                subcategoria=perfil.subcategoria_foco or None,
-                marca=None if marca_indiferente else (perfil.marca_preferida or None),
-                precio_max=perfil.presupuesto_max,
-                pulgadas=perfil.pulgadas,
-                tipo_panel=perfil.tipo_panel,
-                resolucion=perfil.resolucion,
-                limite=12,
-                excluir_accesorios=True,
-            )
+        query_base = BuscarProductosQuery(
+            categoria=perfil.categoria_foco or None,
+            subcategoria=perfil.subcategoria_foco or None,
+            marca=None if marca_indiferente else (perfil.marca_preferida or None),
+            precio_max=perfil.presupuesto_max,
+            pulgadas=perfil.pulgadas,
+            tipo_panel=perfil.tipo_panel,
+            resolucion=perfil.resolucion,
+            limite=12,
+            excluir_accesorios=True,
         )
+        if perfil.uso_declarado:
+            from dataclasses import replace as _replace
+            productos = self._buscar.ejecutar(_replace(query_base, query=perfil.uso_declarado))
+            # Cuando el uso_declarado es poco frecuente en nombres (ej. "gaming" solo
+            # aparece en 1 laptop), complementamos con una búsqueda amplia para
+            # tener al menos 3 candidatos que el reranker pueda ordenar.
+            if len(productos) < 3:
+                extras = self._buscar.ejecutar(query_base)
+                skus_vistos = {str(p.sku) for p in productos}
+                productos = productos + [p for p in extras if str(p.sku) not in skus_vistos]
+        else:
+            productos = self._buscar.ejecutar(query_base)
         if not productos:
             return None
 
-        rankeados = sorted(productos, key=self._score, reverse=True)
+        # Ordena por calidad (panel/resolución/discount) como base, luego aplica
+        # el reranker de perfil (uso_declarado, marca) para que productos que
+        # matchean el uso declarado suban sobre accesorios con descuento.
+        por_calidad = sorted(productos, key=self._score, reverse=True)
+        rankeados = ReRankerPorPerfil().reordenar(
+            por_calidad, perfil, marca_indiferente=marca_indiferente
+        )
         principal = rankeados[0]
         alternativas = rankeados[1:3]
 
         lineas = [
-            f"Con lo que me contas{self._resumen_contexto(perfil)}, te recomiendo:",
-            f"**1) {principal.nombre} — Bs {principal.precio.monto:.0f}** [{principal.sku}]",
-            f"   Por que: {self._justificacion(principal)}",
+            f"Con lo que me contas{self._resumen_contexto(perfil)}, te recomiendo:\n",
+            "**Recomendación principal:**",
+            f"- **{principal.nombre} — Bs {principal.precio.monto:.0f}** [{principal.sku}]",
+            f"- Por qué conviene: {self._justificacion(principal)}",
         ]
         if alternativas:
-            lineas.append("Alternativas:")
-            for p in alternativas:
+            lineas.append("\n**Alternativas:**")
+            etiquetas = self._etiquetar_alternativas(alternativas)
+            for etiq, p in etiquetas:
                 lineas.append(
-                    f"- {p.nombre} — Bs {p.precio.monto:.0f} [{p.sku}] "
-                    f"({self._justificacion_corta(p)})"
+                    f"- {etiq}: {p.nombre} — Bs {p.precio.monto:.0f} [{p.sku}]"
+                    f" ({self._justificacion_corta(p)})"
                 )
-        lineas.append("Queres que armemos la principal o te cuento mas de alguna?")
+        lineas.append(self._conclusion(principal, alternativas))
+        if perfil.uso_declarado:
+            lineas.append("\nQuerés que lo agregamos al carrito o te cuento más de alguna?")
+        else:
+            lineas.append(
+                "\n¿La necesitás para estudio, trabajo, diseño, programación o juegos? "
+                "Así puedo ajustar mejor la recomendación."
+            )
 
         elegidos = [principal, *alternativas]
         return RespuestaFollowUp(
@@ -89,9 +115,9 @@ class ResponderRecomendacionShown:
 
     @staticmethod
     def _suficiente_contexto(perfil: ResultadoObtenerPerfilSesion) -> bool:
-        tiene_que = bool(perfil.categoria_foco or perfil.pulgadas)
+        tiene_que = bool(perfil.categoria_foco or perfil.pulgadas or perfil.uso_declarado)
         tiene_ancla = bool(
-            perfil.presupuesto_max or perfil.pulgadas or perfil.tipo_panel
+            perfil.presupuesto_max or perfil.pulgadas or perfil.tipo_panel or perfil.uso_declarado
         )
         return tiene_que and tiene_ancla
 
@@ -123,6 +149,47 @@ class ResponderRecomendacionShown:
         if not partes:
             partes.append("mejor ratio ficha tecnica / precio del catalogo")
         return ", ".join(partes)
+
+    @staticmethod
+    def _etiquetar_alternativas(
+        alternativas: list[Producto],
+    ) -> list[tuple[str, Producto]]:
+        """Asigna etiqueta económica/intermedia/premium según precio relativo."""
+        if not alternativas:
+            return []
+        ordenadas = sorted(alternativas, key=lambda p: p.precio.monto)
+        if len(ordenadas) == 1:
+            return [("Alternativa", ordenadas[0])]
+        etiquetas = ["Opción económica", "Opción intermedia", "Opción premium"]
+        if len(ordenadas) == 2:
+            return [(etiquetas[0], ordenadas[0]), (etiquetas[2], ordenadas[1])]
+        return list(zip(etiquetas, ordenadas))
+
+    @staticmethod
+    def _conclusion(principal: Producto, alternativas: list[Producto]) -> str:
+        todos = sorted([principal, *alternativas], key=lambda p: p.precio.monto)
+        barato = todos[0]
+        caro = todos[-1]
+        medio = principal
+        lineas = ["\n**Conclusión:**"]
+        if barato.sku != medio.sku:
+            diff = medio.precio.monto - barato.precio.monto
+            lineas.append(
+                f"- Si buscás ahorrar, elegiría el **{barato.nombre}** — "
+                f"cumple los requisitos clave a Bs {diff:.0f} menos que la opción principal."
+            )
+        lineas.append(
+            f"- Si buscás la mejor relación calidad/precio, elegiría el **{medio.nombre}** — "
+            f"es la recomendación principal por su balance de specs y precio."
+        )
+        if caro.sku != medio.sku:
+            diff = caro.precio.monto - barato.precio.monto
+            lineas.append(
+                f"- Si querés mejor rendimiento, elegiría el **{caro.nombre}** — "
+                f"mayor potencia, especialmente para tareas más exigentes "
+                f"(Bs {diff:.0f} más que la opción económica)."
+            )
+        return "\n".join(lineas)
 
     @classmethod
     def _justificacion_corta(cls, p: Producto) -> str:

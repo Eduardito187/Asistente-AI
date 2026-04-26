@@ -41,6 +41,17 @@ class MariaDbCatalogoKeywordsRepository(CatalogoKeywordsRepository):
         ).mappings().all()
         return [self._fila_a_sinonimo(r) for r in rows]
 
+    def buscar_sinonimos_por_primer_token(
+        self, primer_token: str, limite: int = 30
+    ) -> list[CategoriaSinonimo]:
+        """Sinónimos multi-palabra que empiezan con primer_token exacto.
+        Útil para tokens cortos como 'air' → 'air fryer', 'air m3', etc."""
+        rows = self._s.execute(
+            text(CatalogoKeywordsSql.SINONIMOS_FRASE_PRIMER_TOKEN),
+            {"prefijo_frase": f"{primer_token} %", "limite": max(1, min(limite, 50))},
+        ).mappings().all()
+        return [self._fila_a_sinonimo(r) for r in rows]
+
     def buscar_sinonimos_fuzzy(
         self, token_norm: str, limite: int = 10
     ) -> list[CategoriaSinonimo]:

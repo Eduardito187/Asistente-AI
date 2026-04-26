@@ -87,6 +87,7 @@ class ProductoSql:
         genero: Optional[str] = None,
         nombre_excluye: Optional[list[str]] = None,
         orden_precio: str = "asc",
+        solo_en_oferta: bool = False,
     ) -> tuple[str, dict]:
         """Construye SELECT dinamico para buscar productos. Devuelve (sql, params)."""
         clauses = ["(activo = 1 OR es_descontinuado = 1)"]
@@ -95,6 +96,8 @@ class ProductoSql:
 
         if solo_con_stock:
             clauses.append("stock > 0")
+        if solo_en_oferta:
+            clauses.append("precio_anterior_bob IS NOT NULL AND precio_anterior_bob > precio_bob")
         cls._agregar_filtro_accesorios(clauses, excluir_accesorios, solo_accesorios)
         cls._agregar_exclusion_skus(clauses, params, excluir_skus)
         cls._agregar_filtro_genero(clauses, params, genero)
@@ -134,6 +137,7 @@ class ProductoSql:
             params["pmax"] = precio_max
         cls._agregar_filtros_atributos(clauses, params, atributos)
         cls._agregar_filtros_tipo_producto(clauses, params, atributos)
+        cls._agregar_exclusion_marca(clauses, params, atributos)
 
         direccion = "DESC" if (orden_precio or "asc").lower() == "desc" else "ASC"
         order_parts.append(f"precio_bob {direccion}")
@@ -236,6 +240,13 @@ class ProductoSql:
         if a.potencia_w_max is not None:
             clauses.append("potencia_w <= :pw_max")
             params["pw_max"] = a.potencia_w_max
+        if a.gpu_dedicada:
+            clauses.append(
+                "(gpu IS NOT NULL AND gpu != '' "
+                "OR nombre_norm LIKE '%rtx%' OR nombre_norm LIKE '%gtx%' "
+                "OR nombre_norm LIKE '%geforce%' OR nombre_norm LIKE '%nvidia%' "
+                "OR nombre_norm LIKE '%radeon rx%')"
+            )
         if a.procesador:
             clauses.append("LOWER(procesador) = :proc")
             params["proc"] = a.procesador.lower()
@@ -278,3 +289,17 @@ class ProductoSql:
             clauses.append(
                 f"(tipo_producto IS NULL OR tipo_producto NOT IN ({joined}))"
             )
+
+    @staticmethod
+    def _agregar_exclusion_marca(
+        clauses: list, params: dict, a: FiltrosAtributos
+    ) -> None:
+        """Excluye marcas que el cliente rechazó explícitamente.
+        NULL-safe: si marca_norm es NULL el producto pasa (no lo excluimos
+        por no tener dato de marca)."""
+        if not a.marca_excluye:
+            return
+        for i, marca in enumerate(a.marca_excluye):
+            key = f"mexn{i}"
+            params[key] = f"%{marca.lower()}%"
+            clauses.append(f"(marca_norm IS NULL OR marca_norm NOT LIKE :{key})")

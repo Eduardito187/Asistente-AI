@@ -10,6 +10,7 @@ from ..queries.resolver_categoria_sinonimo import (
     ResolverCategoriaSinonimoQuery,
 )
 from .detector_genero_mencion import DetectorGeneroMencion
+from .detector_gpu_dedicada import DetectorGpuDedicada
 from .detector_tier_deseado import DetectorTierDeseado
 from .extractor_atributos_mensaje import ExtractorAtributosMensaje
 from .parser_presupuesto import ParserPresupuesto
@@ -22,9 +23,12 @@ RX_MARCAS = re.compile(
     re.IGNORECASE,
 )
 RX_USO = re.compile(
-    r"\b(gaming|juegos?|disenio|disẽno|programaci?on|programar|"
-    r"oficina|estudio|estudiar|trabajo|teletrabajo|edicion|edicion de video|"
-    r"streaming|cocina|hogar|familia|regalo|viaje|universidad|colegio)\b",
+    r"\b(gaming|juegos?|los\s+juegos|para\s+jugar|para\s+el\s+play|play\s+station|ps[45]|xbox|"
+    r"dise[\xf1n]o\s+gr[a\xe1]fico|dise[\xf1n]o|edici[o\xf3]n\s+de\s+video|edici[o\xf3]n|"
+    r"programaci[o\xf3]n|programar|docker|desarrollo|"
+    r"oficina|estudio|estudiar|trabajo\s+pesado|trabajo|teletrabajo|chambear|chambeo|"
+    r"streaming|cocina|hogar|para\s+la\s+casa|familia|regalo|"
+    r"viaje|universidad|colegio|renderizado|fotograf[i\xed]a|m[u\xfa]sica)\b",
     re.IGNORECASE,
 )
 
@@ -58,6 +62,8 @@ class ExtractorPerfilMensaje:
             pulgadas=atributos.pulgadas,
             tipo_panel=atributos.tipo_panel,
             resolucion=atributos.resolucion,
+            ram_gb_min=atributos.ram_gb_min,
+            gpu_dedicada=True if DetectorGpuDedicada.requiere_gpu(texto) else None,
         )
 
     @staticmethod
@@ -69,10 +75,25 @@ class ExtractorPerfilMensaje:
         match = RX_MARCAS.search(texto)
         return match.group(1).strip().lower() if match else None
 
-    @staticmethod
-    def _uso(texto: str) -> str | None:
+    _CANONICO_USO: dict[str, str] = {
+        "para el play": "gaming", "play station": "gaming",
+        "ps4": "gaming", "ps5": "gaming", "xbox": "gaming",
+        "juego": "gaming", "juegos": "gaming", "los juegos": "gaming",
+        "para jugar": "gaming",
+        "docker": "programacion", "desarrollo": "programacion", "programar": "programacion",
+        "chambear": "oficina", "chambeo": "oficina", "teletrabajo": "oficina",
+        "trabajo pesado": "oficina", "trabajo": "oficina",
+        "estudiar": "estudio",
+        "edicion": "diseno", "edicion de video": "diseno",
+    }
+
+    @classmethod
+    def _uso(cls, texto: str) -> str | None:
         match = RX_USO.search(texto)
-        return match.group(1).lower() if match else None
+        if not match:
+            return None
+        raw = match.group(1).lower()
+        return cls._CANONICO_USO.get(raw, raw)
 
     def _resolver_entidad(
         self, texto: str

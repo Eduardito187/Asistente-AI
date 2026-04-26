@@ -21,6 +21,8 @@ class ActualizarPerfilSesionCommand:
     pulgadas: Optional[float] = None
     tipo_panel: Optional[str] = None
     resolucion: Optional[str] = None
+    ram_gb_min: Optional[int] = None
+    gpu_dedicada: Optional[bool] = None
 
     def tiene_datos(self) -> bool:
         return any(
@@ -28,6 +30,6 @@ class ActualizarPerfilSesionCommand:
                 self.presupuesto_max, self.marca_preferida, self.categoria_foco,
                 self.subcategoria_foco, self.sku_foco, self.genero_declarado,
                 self.desired_tier, self.uso_declarado, self.pulgadas,
-                self.tipo_panel, self.resolucion,
+                self.tipo_panel, self.resolucion, self.ram_gb_min, self.gpu_dedicada,
             ]
         )

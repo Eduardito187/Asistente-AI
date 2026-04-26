@@ -63,6 +63,8 @@ class ManejadorProductoAusente:
         precio_min: float | None = None,
         nombre_excluye: tuple[str, ...] | None = None,
         tipo_producto_excluye: tuple[str, ...] | None = None,
+        marca_excluye: tuple[str, ...] | None = None,
+        pulgadas: float | None = None,
     ) -> RespuestaProductoAusente:
         cercana = self._resolvedor.resolver(texto_cliente)
         validacion = None
@@ -79,6 +81,7 @@ class ManejadorProductoAusente:
         alternativas = self._buscar_alternativas(
             filtros, precio_max=precio_max, precio_min=precio_min,
             nombre_excluye=nombre_excluye, tipo_producto_excluye=tipo_producto_excluye,
+            marca_excluye=marca_excluye, pulgadas=pulgadas,
         )
         alternativas = self._aplicar_refinamiento(alternativas, refinamiento)
 
@@ -148,6 +151,8 @@ class ManejadorProductoAusente:
         precio_min: float | None = None,
         nombre_excluye: tuple[str, ...] | None = None,
         tipo_producto_excluye: tuple[str, ...] | None = None,
+        marca_excluye: tuple[str, ...] | None = None,
+        pulgadas: float | None = None,
     ):
         categoria, subcategoria, marca, nombre = filtros
         return self._sugeridor.sugerir(
@@ -159,6 +164,8 @@ class ManejadorProductoAusente:
             precio_min=precio_min,
             nombre_excluye=nombre_excluye,
             tipo_producto_excluye=tipo_producto_excluye,
+            marca_excluye=marca_excluye,
+            pulgadas=pulgadas,
         )
 
     @staticmethod

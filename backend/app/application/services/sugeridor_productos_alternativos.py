@@ -24,10 +24,13 @@ class SugeridorProductosAlternativos:
         precio_min: float | None = None,
         nombre_excluye: tuple[str, ...] | None = None,
         tipo_producto_excluye: tuple[str, ...] | None = None,
+        marca_excluye: tuple[str, ...] | None = None,
+        pulgadas: float | None = None,
     ) -> list[Producto]:
         intentos = self._armar_intentos(
             categoria, subcategoria, marca, nombre_canonico,
-            precio_max, precio_min, nombre_excluye, tipo_producto_excluye,
+            precio_max, precio_min, nombre_excluye, tipo_producto_excluye, marca_excluye,
+            pulgadas,
         )
         for q in intentos:
             productos = self._buscar.ejecutar(q)
@@ -56,6 +59,8 @@ class SugeridorProductosAlternativos:
         precio_min: float | None = None,
         nombre_excluye: tuple[str, ...] | None = None,
         tipo_producto_excluye: tuple[str, ...] | None = None,
+        marca_excluye: tuple[str, ...] | None = None,
+        pulgadas: float | None = None,
     ) -> list[BuscarProductosQuery]:
         valores = {
             "query": (nombre_canonico or "").strip() or None,
@@ -69,7 +74,9 @@ class SugeridorProductosAlternativos:
         vistos: set[tuple] = set()
         for combo in combos:
             query = self._intento_para(
-                combo, valores, vistos, precio_max, precio_min, nombre_excluye, tipo_producto_excluye
+                combo, valores, vistos,
+                precio_max, precio_min, nombre_excluye, tipo_producto_excluye,
+                marca_excluye, pulgadas,
             )
             if query is not None:
                 intentos.append(query)
@@ -85,6 +92,8 @@ class SugeridorProductosAlternativos:
         precio_min: float | None = None,
         nombre_excluye: tuple[str, ...] | None = None,
         tipo_producto_excluye: tuple[str, ...] | None = None,
+        marca_excluye: tuple[str, ...] | None = None,
+        pulgadas: float | None = None,
     ) -> BuscarProductosQuery | None:
         kwargs = {k: valores[k] for k in combo if valores[k]}
         if len(kwargs) != len(combo):
@@ -101,6 +110,10 @@ class SugeridorProductosAlternativos:
             kwargs["nombre_excluye"] = nombre_excluye
         if tipo_producto_excluye:
             kwargs["tipo_producto_excluye"] = tipo_producto_excluye
+        if marca_excluye:
+            kwargs["marca_excluye"] = marca_excluye
+        if pulgadas is not None:
+            kwargs["pulgadas"] = pulgadas
         # Accesorios (portahuevos, fundas, cables) nunca son alternativas
         # validas de un producto principal ausente en catalogo.
         kwargs["excluir_accesorios"] = True

@@ -52,7 +52,9 @@ from .sugeridor_accesorios_relacionados import SugeridorAccesoriosRelacionados
 from .umbrales_tier import UmbralesTier
 from .verificador_claims_producto import VerificadorClaimsProducto
 from .detector_consulta_relativa import DetectorConsultaRelativa, TipoConsultaRelativa
+from .detector_tier_deseado import DetectorTierDeseado
 from .detector_consulta_disponibilidad import DetectorConsultaDisponibilidad
+from .detector_consulta_oferta import DetectorConsultaOferta
 from .detector_exclusiones_mensaje import DetectorExclusionesMensaje
 from .clasificador_etapa_conversacional import ClasificadorEtapaConversacional
 from .recortador_cierres_comerciales import RecortadorCierresComerciales
@@ -75,6 +77,12 @@ from .resolvedor_categoria_cercana import ResolvedorCategoriaCercana
 from .detector_marca_mensaje import DetectorMarcaMensaje
 from .detector_solicitud_similares import DetectorSolicitudSimilares
 from .excluidor_juguetes_default import ExcluidorJuguetesDefault
+from .detector_contradiccion_presupuesto import DetectorContradiccionPresupuesto
+from .detector_intencion_vaga import DetectorIntentionVaga
+from .detector_marca_excluida import DetectorMarcaExcluida
+from .detector_gpu_dedicada import DetectorGpuDedicada
+from .detector_preferencia_blanda import DetectorPreferenciaBlanda
+from .reranker_por_perfil import ReRankerPorPerfil
 from .responder_comparacion_explicita import ResponderComparacionExplicita
 from .responder_consulta_disponibilidad import ResponderConsultaDisponibilidad
 from .responder_productos_similares import ResponderProductosSimilares
@@ -219,9 +227,15 @@ class ProcesarChatService:
         if politica is not None:
             return self._responder_follow_up(sesion_id, inp.mensaje, politica, t0)
 
+        if DetectorConsultaOferta.es_consulta_oferta(inp.mensaje):
+            return self._responder_consulta_oferta(sesion_id, inp, t0)
+
         follow_up = self._gestor_follow_ups.intentar(inp.mensaje, sesion_id)
         if follow_up is not None:
             return self._responder_follow_up(sesion_id, inp.mensaje, follow_up, t0)
+
+        if DetectorIntentionVaga.es_vaga(inp.mensaje):
+            return self._responder_intencion_vaga(sesion_id, inp, t0)
 
         historial = [
             {"role": m.rol.value, "content": m.contenido}
@@ -632,6 +646,59 @@ class ProcesarChatService:
             pasos=[{"tool": p.tool, "args": p.args, "result": p.result} for p in trace],
         )
 
+    def _responder_consulta_oferta(
+        self,
+        sesion_id: UUID,
+        inp: ChatInput,
+        t0: float,
+    ) -> ChatOutput:
+        """Short-circuit para consultas de ofertas/descuentos: busca productos
+        con precio_anterior_bob > precio_bob y responde sin pasar por el LLM."""
+        from dataclasses import replace as dc_replace
+        query, _, perfil_of = self._construir_query_forzado(inp.mensaje, sesion_id, None)
+        cat_of = perfil_of.categoria_efectiva() or None
+        query = dc_replace(
+            query,
+            solo_en_oferta=True,
+            categoria=cat_of,
+            query=None,
+            limite=12,
+        )
+        productos = self._buscar.ejecutar(query)
+        if not productos:
+            texto = "Ahora mismo no encontré productos con descuento activo. Volvé a consultar pronto."
+        else:
+            items = "\n".join(
+                f"- {p.nombre} — Bs {p.precio.monto:,.0f} (antes Bs {p.precio_anterior.monto:,.0f}) [{p.sku}]"
+                for p in productos[:6]
+                if p.precio_anterior
+            )
+            texto = f"Estos productos están en oferta ahora:\n{items}"
+        productos_citados = [ProductoSerializer.detalle(p) for p in productos[:6]]
+        trace = [PasoAgente(tool="buscar_productos", args={"solo_en_oferta": True},
+                            result={"total": len(productos)}, fallback=True)]
+        self._registrar_respuesta(sesion_id, texto, trace)
+        self._persistir_turno_mostrado(sesion_id, productos_citados)
+        self._registrar_metrica.ejecutar(
+            RegistrarMetricaTurnoCommand(
+                sesion_id=sesion_id,
+                mensaje_usuario_len=len(inp.mensaje),
+                respuesta_len=len(texto),
+                tool_calls=1,
+                mentiras_detectadas=0,
+                productos_citados=len(productos_citados),
+                ruta="oferta",
+                tiempo_ms=int((time.monotonic() - t0) * 1000),
+            )
+        )
+        return ChatOutput(
+            sesion_id=sesion_id,
+            respuesta=texto,
+            productos_citados=productos_citados,
+            productos_sugeridos=self._sugeridos_para_cards(productos_citados),
+            pasos=[{"tool": p.tool, "args": p.args, "result": p.result} for p in trace],
+        )
+
     async def _short_circuit_resolver(
         self,
         inp: ChatInput,
@@ -767,9 +834,38 @@ class ProcesarChatService:
             self._bloque_consulta_relativa(mensaje),
             self._bloque_intencion_compra(mensaje),
             self._bloque_sku(mensaje, sesion_id),
+            self._bloque_exclusiones(mensaje),
+            self._bloque_preferencia_blanda(mensaje),
         ]
         bloques_validos = [b for b in bloques if b]
         return "\n\n".join(bloques_validos) if bloques_validos else None
+
+    @staticmethod
+    def _bloque_preferencia_blanda(mensaje: str) -> str | None:
+        """Cuando el cliente dice 'prefiero X pero acepto Y', inyecta instrucción
+        al LLM para mostrar ambas marcas sin aplicar filtro duro."""
+        pref = DetectorPreferenciaBlanda.detectar(mensaje)
+        if pref is None:
+            return None
+        alt_txt = f" y opciones de {pref.marca_alternativa.upper()}" if pref.marca_alternativa else " y la mejor alternativa disponible"
+        return (
+            f"PREFERENCIA BLANDA DE MARCA: el cliente prefiere {pref.marca_preferida.upper()}"
+            f"{alt_txt}. "
+            f"NO uses marca como filtro duro en buscar_productos — busca sin restricción de marca "
+            f"y presenta primero opciones de {pref.marca_preferida.upper()}, luego las mejores "
+            f"alternativas. El cliente ya aceptó ver otras marcas."
+        )
+
+    @staticmethod
+    def _bloque_exclusiones(mensaje: str) -> str | None:
+        marcas = DetectorMarcaExcluida.detectar(mensaje)
+        if not marcas:
+            return None
+        return (
+            f"EXCLUSIONES DEL CLIENTE — marcas a NO mostrar: {', '.join(m.upper() for m in marcas)}. "
+            f"Al llamar buscar_productos NO incluyas nada de estas marcas en los resultados. "
+            f"Si solo hay esas marcas, decilo honesto."
+        )
 
     @staticmethod
     def _bloque_intencion_compra(mensaje: str) -> str | None:
@@ -913,6 +1009,10 @@ class ProcesarChatService:
             )
         if perfil.uso_declarado:
             partes.append(f"- Uso declarado: {perfil.uso_declarado}")
+        if perfil.ram_gb_min:
+            partes.append(f"- RAM mínima requerida: {perfil.ram_gb_min} GB")
+        if perfil.gpu_dedicada:
+            partes.append("- GPU dedicada requerida: SÍ (solo mostrar laptops con GPU confirmada en ficha)")
         if perfil.pulgadas:
             partes.append(f"- Pulgadas: {perfil.pulgadas:g}\"")
         if perfil.tipo_panel:
@@ -1080,6 +1180,32 @@ class ProcesarChatService:
             pasos=[{"tool": follow_up.ruta, "args": {}, "result": {"skus": follow_up.skus}}],
         )
 
+    def _responder_intencion_vaga(
+        self,
+        sesion_id: UUID,
+        inp: ChatInput,
+        t0: float,
+    ) -> ChatOutput:
+        texto = DetectorIntentionVaga.RESPUESTA
+        self._registrar.ejecutar(
+            RegistrarMensajeCommand(
+                sesion_id=sesion_id, rol=RolMensaje.ASSISTANT, contenido=texto
+            )
+        )
+        self._registrar_metrica.ejecutar(
+            RegistrarMetricaTurnoCommand(
+                sesion_id=sesion_id,
+                mensaje_usuario_len=len(inp.mensaje),
+                respuesta_len=len(texto),
+                tool_calls=0,
+                mentiras_detectadas=0,
+                productos_citados=0,
+                ruta="intencion_vaga",
+                tiempo_ms=int((time.monotonic() - t0) * 1000),
+            )
+        )
+        return ChatOutput(sesion_id=sesion_id, respuesta=texto)
+
     def _responder_feedback(
         self,
         sesion_id: UUID,
@@ -1203,6 +1329,7 @@ class ProcesarChatService:
             )
         nombre_excluye = tuple(DetectorExclusionesMensaje.detectar(mensaje)) or None
         tipo_producto_excluye = tuple(DetectorExclusionesMensaje.tipos_a_excluir(mensaje)) or None
+        marca_excluye = tuple(DetectorMarcaExcluida.detectar(mensaje)) or None
         res = await self._manejador_ausente.manejar(
             mensaje,
             contexto,
@@ -1214,6 +1341,8 @@ class ProcesarChatService:
             precio_min=piso_tier,
             nombre_excluye=nombre_excluye,
             tipo_producto_excluye=tipo_producto_excluye,
+            marca_excluye=marca_excluye,
+            pulgadas=perfil.pulgadas or None,
         )
         if res.categoria_ofrecida:
             self._registrar_alternativa.ejecutar(
@@ -1261,7 +1390,20 @@ class ProcesarChatService:
                 trace,
                 [],
             )
+        tier_msg = DetectorTierDeseado.detectar(mensaje)
+        tier_ef = perfil.desired_tier or tier_msg
+        contradiccion = DetectorContradiccionPresupuesto.detectar(
+            tier=tier_ef,
+            presupuesto_max=perfil.presupuesto_max,
+            subcategoria=perfil.subcategoria_efectiva() or None,
+        )
         productos, genero_sin_resultados = self._ejecutar_query_con_fallbacks(query)
+        # Solo rerankeamos cuando no hay tier explícito: si el cliente pidió
+        # "tope de gama" o "lo más barato", el orden por precio del SQL ya es
+        # correcto y el reranker no debe alterar esa intención.
+        if not tier_ef:
+            marca_indif = DetectorIntencionAsesoria.marca_es_indiferente(mensaje)
+            productos = ReRankerPorPerfil().reordenar(productos, perfil, marca_indiferente=marca_indif)
         productos = self._prepend_sku_foco(productos, perfil.sku_foco)
         productos = self._filtrar_por_gama(productos, mensaje, perfil.sku_foco)
         skus_mostrados = {s for s in (perfil.ultimos_skus_mostrados or "").split(",") if s}
@@ -1278,6 +1420,8 @@ class ProcesarChatService:
         texto = self._texto_resultados_forzados(
             productos_efectivos, genero_sin_resultados, query
         )
+        if contradiccion:
+            texto = f"{contradiccion.mensaje}\n\n{texto}"
         return (texto, trace, [str(p.sku) for p in productos_efectivos[:3]])
 
     def _construir_query_forzado(
@@ -1287,7 +1431,6 @@ class ProcesarChatService:
         excluir_skus: tuple[str, ...] | None,
     ):
         """Construye el BuscarProductosQuery para _forzar_busqueda."""
-        from dataclasses import replace as dc_replace  # noqa: F401 — importado donde se usa
         perfil = self._obtener_perfil.ejecutar(ObtenerPerfilSesionQuery(sesion_id=sesion_id))
         mensaje_limpio = SanitizadorQueryBusqueda.sanitizar(mensaje)
         mensaje_norm = NormalizadorTexto.normalizar(mensaje_limpio or "")
@@ -1297,35 +1440,60 @@ class ProcesarChatService:
         es_accesorio = DetectorConsultaAccesorio.es_consulta_accesorio(
             mensaje_limpio if tiene_terminos else None, cat_ef, subcat_ef
         )
-        precio_min, precio_max_final = self._rango_precio_tier(perfil, subcat_ef)
-        ram_gb_min = self._extraer_ram_gb_mensaje(mensaje)
-        tipos_excluir = list(DetectorExclusionesMensaje.tipos_a_excluir(mensaje))
-        if ExcluidorJuguetesDefault.debe_excluir(
-            mensaje_limpio if tiene_terminos else None,
-            cat_ef, subcat_ef, mensaje
-        ) and "juguete" not in tipos_excluir:
-            tipos_excluir.append("juguete")
-        tier_pide_caros = perfil.desired_tier in ("flagship", "alto")
+        precio_min, precio_max_final = self._precio_sin_contradiccion(perfil, subcat_ef)
+        tier_ef = perfil.desired_tier or DetectorTierDeseado.detectar(mensaje)
+        pref_blanda = DetectorPreferenciaBlanda.detectar(mensaje)
+        marca_query = (
+            None if pref_blanda else
+            (perfil.marca_preferida or DetectorMarcaMensaje.extraer(mensaje) or None)
+        )
         query = BuscarProductosQuery(
             query=mensaje_limpio if tiene_terminos else None,
             categoria=cat_ef,
             subcategoria=subcat_ef,
-            marca=perfil.marca_preferida or None,
+            marca=marca_query,
             precio_min=precio_min,
             precio_max=precio_max_final,
             pulgadas=perfil.pulgadas,
             tipo_panel=perfil.tipo_panel,
             resolucion=perfil.resolucion,
-            ram_gb_min=ram_gb_min,
+            ram_gb_min=self._extraer_ram_gb_mensaje(mensaje) or perfil.ram_gb_min,
+            gpu_dedicada=self._gpu_ef(mensaje, perfil.gpu_dedicada),
             limite=12,
             excluir_accesorios=not es_accesorio,
             genero=perfil.genero_declarado or None,
             excluir_skus=excluir_skus,
             nombre_excluye=tuple(DetectorExclusionesMensaje.detectar(mensaje)) or None,
-            tipo_producto_excluye=tuple(tipos_excluir) or None,
-            orden_precio="desc" if tier_pide_caros else "asc",
+            tipo_producto_excluye=self._tipos_excluir(mensaje, mensaje_limpio if tiene_terminos else None, cat_ef, subcat_ef),
+            marca_excluye=tuple(DetectorMarcaExcluida.detectar(mensaje)) or None,
+            orden_precio="desc" if tier_ef in ("flagship", "alto") else "asc",
         )
         return query, es_accesorio, perfil
+
+    def _precio_sin_contradiccion(self, perfil, subcat_ef: str | None) -> tuple:
+        """Rango precio con tier; si piso > presupuesto, anula el piso."""
+        precio_min, precio_max = self._rango_precio_tier(perfil, subcat_ef)
+        if precio_min and precio_max and precio_min > precio_max:
+            precio_min = None
+        return precio_min, precio_max
+
+    @staticmethod
+    def _tipos_excluir(
+        mensaje: str,
+        mensaje_limpio: str | None,
+        cat_ef: str | None,
+        subcat_ef: str | None,
+    ) -> tuple | None:
+        tipos = list(DetectorExclusionesMensaje.tipos_a_excluir(mensaje))
+        if ExcluidorJuguetesDefault.debe_excluir(mensaje_limpio, cat_ef, subcat_ef, mensaje):
+            if "juguete" not in tipos:
+                tipos.append("juguete")
+        return tuple(tipos) or None
+
+    @staticmethod
+    def _gpu_ef(mensaje: str, gpu_perfil: bool | None) -> bool | None:
+        """True si el mensaje o el perfil persistido requiere GPU dedicada."""
+        return True if DetectorGpuDedicada.requiere_gpu(mensaje) else gpu_perfil
 
     @staticmethod
     def _extraer_ram_gb_mensaje(mensaje: str) -> int | None:
