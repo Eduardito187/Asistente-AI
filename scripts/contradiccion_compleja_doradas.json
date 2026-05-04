@@ -1,0 +1,78 @@
+[
+  {
+    "nombre": "CC01_gamer_rtx_presupuesto_bajo",
+    "descripcion": "RTX + 16GB + SSD 1TB con 3500 Bs: el agente debe explicar la contradiccion y dar alternativa realista.",
+    "turnos": [
+      {
+        "mensaje": "Quiero una laptop gamer premium con RTX, 16GB RAM y SSD 1TB, pero mi presupuesto maximo es 3500 Bs. No quiero que me digas simplemente que no; explicame que parte no cuadra y dame la mejor alternativa realista.",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener_cualquiera": [
+          "no alcanza",
+          "no cuadra",
+          "contradiccion",
+          "ese presupuesto",
+          "gama",
+          "alternativa",
+          "3500"
+        ],
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "CC02_tv_oled_75_ps5_4000bs",
+    "descripcion": "TV OLED 75 PS5 con 4000 Bs: si no existe, decir que requisito flexibilizar primero.",
+    "turnos": [
+      {
+        "mensaje": "Busco una TV OLED de 75 pulgadas para PS5, 120Hz, HDMI 2.1 y maximo 4000 Bs. Si no existe, dime que requisito deberia flexibilizar primero.",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener_cualquiera": [
+          "flexibilizar",
+          "no alcanza",
+          "ese presupuesto",
+          "4000",
+          "alternativa",
+          "relajar"
+        ],
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "CC03_flagship_512gb_2500bs",
+    "descripcion": "Celular flagship 512GB con 2500 Bs: dar 3 alternativas: realista, cercana, ideal.",
+    "turnos": [
+      {
+        "mensaje": "Quiero un celular flagship nuevo, 512GB, excelente camara y maximo 2500 Bs. Si ese presupuesto no alcanza, dame alternativas: una realista, una cercana y una ideal.",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener_cualquiera": [
+          "realista",
+          "cercana",
+          "ideal",
+          "alternativa",
+          "no alcanza",
+          "2500"
+        ],
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "CC04_contradiccion_ordenar_requisitos",
+    "descripcion": "Refri grande+nofrost+inverter+premium+barata: agente debe ordenar por importancia y decir que sacrifica.",
+    "turnos": [
+      {
+        "mensaje": "Necesito una refrigeradora grande, no frost, inverter, premium y barata. Ordena los requisitos de mas importante a menos importante y dime que sacrificarias.",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener_cualquiera": [
+          "prioridad",
+          "sacrificar",
+          "orden",
+          "primero",
+          "lo mas importante"
+        ],
+        "no_debe_contener": ["error"]
+      }
+    ]
+  }
+]

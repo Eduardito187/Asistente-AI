@@ -5,6 +5,7 @@ from uuid import UUID
 
 from ..ports.llm_port import LLMPort
 from ..services.inyector_fewshot import InyectorFewShot
+from ..services.sintetizador_respuesta_trace import SintetizadorRespuestaTrace
 from .helpers import SkuExtractor, ValueParser
 from .paso_agente import PasoAgente
 from .respuesta_agente import RespuestaAgente
@@ -52,8 +53,10 @@ class AgenteService:
             "",
         )
 
-        for _ in range(self._max_iter):
-            msg = await self._llm.chat(mensajes, TOOLS_SPEC)
+        for i in range(self._max_iter):
+            ultima_iter = i == self._max_iter - 1
+            tools = [] if ultima_iter else TOOLS_SPEC
+            msg = await self._llm.chat(mensajes, tools)
             mensajes.append(msg.to_dict())
 
             if not msg.tool_calls:
@@ -81,8 +84,19 @@ class AgenteService:
                     {"role": "tool", "content": json.dumps(resultado, ensure_ascii=False, default=str)}
                 )
 
+        # Si el LLM consumio todas las iteraciones sin responder, hacemos una
+        # llamada final SIN tools para forzar texto. Si igual no devuelve nada,
+        # sintetizamos desde el trace (productos encontrados) en vez del canned.
+        msg_final = await self._llm.chat(mensajes, [])
+        texto = (msg_final.content or "").strip()
+        if texto:
+            return RespuestaAgente(texto=texto, trace=trace, skus_tocados=SkuExtractor.dedupe(skus))
+        texto_fallback = SintetizadorRespuestaTrace.sintetizar(trace) or (
+            "Encontré opciones en el catálogo. Contame qué te importa más "
+            "(presupuesto, marca o uso) para ajustar la recomendación."
+        )
         return RespuestaAgente(
-            texto="Disculpa, se me complico resolver tu consulta. Contame de otra forma que necesitas.",
+            texto=texto_fallback,
             trace=trace,
             skus_tocados=SkuExtractor.dedupe(skus),
         )

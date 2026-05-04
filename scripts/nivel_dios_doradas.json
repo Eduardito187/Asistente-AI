@@ -1,0 +1,182 @@
+[
+  {
+    "nombre": "ND01_laptop_ingenieria_civil_tabla_3_opciones",
+    "descripcion": "Caso nivel dios: laptop ingenieria civil, AutoCAD+Civil3D, GPU confirmada obligatoria, tabla 3 opciones, penalizar N/D.",
+    "turnos": [
+      {
+        "mensaje": "Necesito una laptop para ingenieria civil. Uso AutoCAD, Civil 3D, Excel pesado y algo de render. Quiero 16GB RAM minimo, SSD 512GB minimo y GPU dedicada confirmada. Mi presupuesto ideal es 8500 Bs, pero puedo subir a 11000 Bs si la diferencia es real. Dame una tabla con maximo 3 opciones: economica, recomendada y premium. Penaliza datos faltantes. Si no hay GPU dedicada confirmada, no declares ganador definitivo.",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener_cualquiera": [
+          "economica",
+          "recomendada",
+          "premium",
+          "GPU",
+          "N/D",
+          "no puedo confirmar",
+          "16GB",
+          "512"
+        ],
+        "no_debe_contener": [
+          "error",
+          "Celeron",
+          "Pentium"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "ND02_tv_ps5_peliculas_futbol_ganador_por_uso",
+    "descripcion": "TV PS5+peliculas+futbol: si falta 120Hz/HDMI 2.1 decir frase exacta. Ganador por imagen, gaming, precio.",
+    "turnos": [
+      {
+        "mensaje": "Quiero una TV para PS5, peliculas y futbol. Busco 65 pulgadas, 4K, buena imagen, 120Hz y HDMI 2.1. Si 120Hz o HDMI 2.1 no estan en ficha, responde exactamente 'No tengo ese dato en la ficha tecnica' y no la llames ideal para gaming. Dame ganador por imagen, gaming, precio y compra inteligente.",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener_cualquiera": [
+          "No tengo ese dato en la ficha tecnica",
+          "no tengo ese dato",
+          "ganador",
+          "imagen",
+          "gaming",
+          "precio"
+        ],
+        "no_debe_contener": [
+          "ideal para gaming",
+          "error"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "ND03_celular_premium_25000bs_max_3",
+    "descripcion": "25000 Bs celular premium: no gama media ni basica, max 3 opciones, trade-off por cada una, elegir una.",
+    "turnos": [
+      {
+        "mensaje": "Tengo 25000 Bs para un celular premium. Quiero buena camara, minimo 256GB, buen rendimiento y vida util de varios anos. No me muestres gama de entrada ni gama media. Prefiero Samsung, pero acepto iPhone o Xiaomi premium. Dame maximo 3 opciones, explica el trade-off de cada una y elige una.",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener_cualquiera": [
+          "trade-off",
+          "ventaja",
+          "desventaja",
+          "elegire",
+          "elijo",
+          "recomiendo"
+        ],
+        "no_debe_contener": [
+          "gama media",
+          "gama de entrada",
+          "error"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "ND04_auditor_completo",
+    "descripcion": "Modo auditor: para cada producto cumple, no cumple, dato faltante, riesgo, puede ser principal.",
+    "turnos": [
+      {
+        "mensaje": "Quiero que evalues laptops como si fueras auditor de recomendaciones. Para cada producto dime: cumple, no cumple, dato faltante, riesgo y si puede ser recomendacion principal. No vendas productos que no cumplen requisitos obligatorios.",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener_cualquiera": [
+          "cumple",
+          "no cumple",
+          "dato faltante",
+          "riesgo",
+          "recomendacion principal"
+        ],
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "ND05_i7_sin_gpu_vs_gamer_i5_render",
+    "descripcion": "i7 integrado vs i5 gamer para render: no asumir GPU si no esta en ficha. Dato faltante que cambiaria decision.",
+    "turnos": [
+      {
+        "mensaje": "Estoy entre una laptop i7 sin GPU dedicada confirmada y una laptop gamer i5 con 16GB RAM. Para ingenieria y render, cual conviene mas? No asumas GPU si no esta en ficha. Explica que dato faltante cambiaria tu decision.",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener_cualquiera": [
+          "GPU",
+          "dato faltante",
+          "cambiaria",
+          "no puedo confirmar",
+          "integrada"
+        ],
+        "no_debe_contener": [
+          "GPU dedicada confirmada",
+          "tiene GPU dedicada",
+          "error"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "ND06_tres_tvs_nanocell_qled_qned_sin_hz",
+    "descripcion": "Asesor experto: 3 TVs 65, datos confirmados vs inferencias vs faltantes. Elegir una con separacion clara.",
+    "turnos": [
+      {
+        "mensaje": "Actua como asesor experto y honesto. Estoy entre 3 TVs de 65 pulgadas con precios parecidos: una Nanocell, una QLED y una QNED. No tengo claro cual tiene 120Hz. Quiero peliculas, futbol y PS5. Dime cual elegiras, pero separa claramente datos confirmados, inferencias y datos faltantes.",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener_cualquiera": [
+          "confirmado",
+          "inferencia",
+          "dato faltante",
+          "N/D",
+          "no tengo ese dato",
+          "elegire",
+          "elijo"
+        ],
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "ND07_multiturn_laptop_ingenieria_8_turnos",
+    "descripcion": "Multi-turno 8 pasos: laptop ingenieria civil, contexto acumulado, no inventar GPU.",
+    "turnos": [
+      {
+        "mensaje": "Busco una laptop."
+      },
+      {
+        "mensaje": "Es para ingenieria civil."
+      },
+      {
+        "mensaje": "Voy a usar AutoCAD, Civil 3D, Excel pesado y algo de render."
+      },
+      {
+        "mensaje": "Necesito minimo 16GB RAM."
+      },
+      {
+        "mensaje": "Preferiria grafica dedicada, pero si no hay, explicame el riesgo."
+      },
+      {
+        "mensaje": "Tengo 8500 Bs, pero puedo subir a 11000 si vale la pena.",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "Dame una recomendacion principal, una alternativa economica y una premium.",
+        "debe_contener_cualquiera": [
+          "principal",
+          "economica",
+          "premium",
+          "alternativa"
+        ]
+      },
+      {
+        "mensaje": "No inventes GPU si no esta en ficha.",
+        "no_debe_contener": [
+          "GPU dedicada confirmada",
+          "tiene GPU dedicada",
+          "error"
+        ],
+        "debe_contener_cualquiera": [
+          "no puedo confirmar",
+          "no tengo ese dato",
+          "integrada",
+          "N/D",
+          "de acuerdo",
+          "correcto"
+        ]
+      }
+    ]
+  }
+]

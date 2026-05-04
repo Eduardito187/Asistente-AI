@@ -36,4 +36,7 @@ class ObtenerPerfilSesionHandler:
             desired_tier=perfil.desired_tier,
             ram_gb_min=perfil.ram_gb_min,
             gpu_dedicada=perfil.gpu_dedicada,
+            ssd_gb_min=perfil.ssd_gb_min,
+            nombre_excluye_acum=perfil.nombre_excluye_acum,
+            presupuesto_ideal=perfil.presupuesto_ideal,
         )

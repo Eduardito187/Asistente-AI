@@ -9,11 +9,15 @@ from ..queries.resolver_categoria_sinonimo import (
     ResolverCategoriaSinonimoHandler,
     ResolverCategoriaSinonimoQuery,
 )
+from .detector_exclusiones_mensaje import DetectorExclusionesMensaje
 from .detector_genero_mencion import DetectorGeneroMencion
 from .detector_gpu_dedicada import DetectorGpuDedicada
+from .detector_requisitos_obligatorios import DetectorRequisitosObligatorios
 from .detector_tier_deseado import DetectorTierDeseado
+from .detector_uso_tecnico import DetectorUsoTecnico
 from .extractor_atributos_mensaje import ExtractorAtributosMensaje
 from .parser_presupuesto import ParserPresupuesto
+from .sanitizador_query_busqueda import SanitizadorQueryBusqueda
 
 RX_MARCAS = re.compile(
     r"\b(acer|asus|hp|lenovo|dell|apple|samsung|lg|sony|xiaomi|huawei|"
@@ -28,19 +32,18 @@ RX_USO = re.compile(
     r"programaci[o\xf3]n|programar|docker|desarrollo|"
     r"oficina|estudio|estudiar|trabajo\s+pesado|trabajo|teletrabajo|chambear|chambeo|"
     r"streaming|cocina|hogar|para\s+la\s+casa|familia|regalo|"
-    r"viaje|universidad|colegio|renderizado|fotograf[i\xed]a|m[u\xfa]sica)\b",
+    r"viaje|universidad|colegio|renderizado|fotograf[i\xed]a|m[u\xfa]sica|"
+    r"ingenier[i\xed]a|autocad|civil\s*3d|solidworks|revit|render)\b",
     re.IGNORECASE,
 )
 
 
 class ExtractorPerfilMensaje:
-    """SRP: extraer preferencias (presupuesto, marca, categoria, uso) desde el
-    mensaje del cliente y armar el ActualizarPerfilSesionCommand.
+    """SRP: extraer preferencias (presupuesto, marca, categoria, uso, specs)
+    desde el mensaje del cliente y armar el ActualizarPerfilSesionCommand.
 
-    La categoria/subcategoria se resuelve contra la tabla `categorias_sinonimos`
-    via ResolverCategoriaSinonimoHandler — asi el vocabulario es data-driven y
-    cubre todo el catalogo (Smartwatch, Relojeria, Cocina Menor, etc.) sin
-    tocar codigo."""
+    Usa DetectorUsoTecnico para inferir specs mínimas desde usos profesionales
+    (ej. 'AutoCAD' → ram_min=16, ssd_min=512). Acumula exclusiones detectadas."""
 
     def __init__(self, resolver: ResolverCategoriaSinonimoHandler) -> None:
         self._resolver = resolver
@@ -49,9 +52,28 @@ class ExtractorPerfilMensaje:
         texto = (mensaje or "").strip()
         atributos = ExtractorAtributosMensaje.extraer(texto)
         categoria, subcategoria, sku_foco = self._resolver_entidad(texto)
+
+        # Inferir specs mínimas desde uso técnico declarado
+        uso_specs = DetectorUsoTecnico.detectar(texto)
+        ram_min = atributos.ram_gb_min or (uso_specs.ram_gb_min if uso_specs else None)
+        ssd_min = atributos.ssd_gb_min or (uso_specs.ssd_gb_min if uso_specs else None)
+
+        # GPU: explícita en el mensaje o requerida por uso técnico
+        gpu = True if DetectorGpuDedicada.requiere_gpu(texto) else None
+        if gpu is None and uso_specs and uso_specs.gpu_requerida:
+            gpu = True
+
+        # Exclusiones del turno actual (explícitas + implícitas por uso)
+        excluye_turno: list[str] = [*DetectorExclusionesMensaje.detectar(texto)]
+        if uso_specs and uso_specs.excluir_nombres:
+            excluye_turno = [*{*excluye_turno, *uso_specs.excluir_nombres}]
+        nombre_excluye_nuevas = ",".join(excluye_turno) if excluye_turno else None
+
+        ideal, techo = self._presupuesto_rango(texto)
         return ActualizarPerfilSesionCommand(
             sesion_id=sesion_id,
-            presupuesto_max=self._presupuesto(texto),
+            presupuesto_max=techo,
+            presupuesto_ideal=ideal,
             marca_preferida=self._marca(texto),
             categoria_foco=categoria,
             subcategoria_foco=subcategoria,
@@ -62,13 +84,23 @@ class ExtractorPerfilMensaje:
             pulgadas=atributos.pulgadas,
             tipo_panel=atributos.tipo_panel,
             resolucion=atributos.resolucion,
-            ram_gb_min=atributos.ram_gb_min,
-            gpu_dedicada=True if DetectorGpuDedicada.requiere_gpu(texto) else None,
+            ram_gb_min=ram_min,
+            gpu_dedicada=gpu,
+            ssd_gb_min=ssd_min,
+            nombre_excluye_nuevas=nombre_excluye_nuevas,
         )
 
     @staticmethod
     def _presupuesto(texto: str) -> float | None:
+        if DetectorRequisitosObligatorios.precio_es_preferible(texto):
+            return None
         return ParserPresupuesto.extraer(texto)
+
+    @staticmethod
+    def _presupuesto_rango(texto: str) -> tuple[float | None, float | None]:
+        if DetectorRequisitosObligatorios.precio_es_preferible(texto):
+            return None, None
+        return ParserPresupuesto.extraer_rango(texto)
 
     @staticmethod
     def _marca(texto: str) -> str | None:
@@ -85,6 +117,9 @@ class ExtractorPerfilMensaje:
         "trabajo pesado": "oficina", "trabajo": "oficina",
         "estudiar": "estudio",
         "edicion": "diseno", "edicion de video": "diseno",
+        "ingenieria": "ingenieria", "autocad": "ingenieria", "civil 3d": "ingenieria",
+        "solidworks": "ingenieria", "revit": "ingenieria",
+        "renderizado": "diseno", "render": "diseno",
     }
 
     @classmethod
@@ -98,11 +133,9 @@ class ExtractorPerfilMensaje:
     def _resolver_entidad(
         self, texto: str
     ) -> tuple[Optional[str], Optional[str], Optional[str]]:
-        """Resuelve el texto del cliente contra categorias_sinonimos y devuelve
-        (categoria, subcategoria, sku_especifico). Si el alias identifica un
-        producto concreto (ej. 's26 ultra'), sku_especifico != None; si apunta
-        solo a una categoria (ej. 'celular'), sku es None."""
         if not texto:
+            return None, None, None
+        if SanitizadorQueryBusqueda.sanitizar(texto) is None:
             return None, None, None
         resultado = self._resolver.ejecutar(
             ResolverCategoriaSinonimoQuery(texto=texto, limite_relaciones=0)

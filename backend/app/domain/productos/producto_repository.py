@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Optional
 
-from .filtros_atributos import FiltrosAtributos
+from .filtros_atributos import FiltrosAtributos, OpcionesBusqueda
 from .producto import Producto
 from .sku import SKU
 
@@ -30,14 +30,8 @@ class ProductoRepository(ABC):
         precio_min: Optional[float],
         precio_max: Optional[float],
         atributos: FiltrosAtributos,
-        solo_con_stock: bool,
+        opciones: OpcionesBusqueda,
         limite: int,
-        excluir_accesorios: bool = False,
-        solo_accesorios: bool = False,
-        excluir_skus: Optional[list[str]] = None,
-        genero: Optional[str] = None,
-        nombre_excluye: Optional[list[str]] = None,
-        orden_precio: str = "asc",
     ) -> list[Producto]: ...
 
     @abstractmethod

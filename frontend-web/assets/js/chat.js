@@ -1,3 +1,26 @@
+/* ── Dark mode ─────────────────────────────────────────────────────────── */
+(() => {
+  const THEME_KEY = "dismi_theme";
+  const html = document.documentElement;
+  const toggle = document.getElementById("theme-toggle");
+
+  const apply = (dark) => {
+    html.dataset.theme = dark ? "dark" : "light";
+    if (toggle) toggle.checked = dark;
+  };
+
+  apply(localStorage.getItem(THEME_KEY) === "dark");
+
+  if (toggle) {
+    toggle.addEventListener("change", () => {
+      const dark = toggle.checked;
+      localStorage.setItem(THEME_KEY, dark ? "dark" : "light");
+      apply(dark);
+    });
+  }
+})();
+
+/* ── Chat widget ─────────────────────────────────────────────────────────── */
 (() => {
   const API_BASE = "/api";
   // Bump la versión cuando cambie el formato de la historia persistida (ej.
@@ -69,12 +92,12 @@
     if (!tieneProductos || !texto) return texto;
     const lineas = texto.split(/\n/);
     const limpio = lineas.filter(l => !/^\s*(\d+[.)]|\*|-|\*\*?\d+[.)])\s?.*\[[A-Za-z0-9][\w\-./#()]+\]/.test(l));
-    const resultado = limpio.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+    const resultado = limpio.join("\n").replaceAll(/\n{3,}/g, "\n\n").trim();
     return resultado || texto;
   }
 
   function escapeHtml(s) {
-    return String(s).replace(/[&<>"']/g, c => ({
+    return String(s).replaceAll(/[&<>"']/g, c => ({
       "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
     }[c]));
   }
@@ -97,7 +120,7 @@
   }
 
   function imagenProducto(p) {
-    if (p.imagen_url && p.imagen_url.startsWith("http") && !p.imagen_url.includes("example")) {
+    if (p.imagen_url?.startsWith("http") && !p.imagen_url.includes("example")) {
       return `<img src="${escapeHtml(p.imagen_url)}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"/><span style="display:none">${emojiPorCategoria(p.subcategoria || p.categoria)}</span>`;
     }
     return `<span>${emojiPorCategoria(p.subcategoria || p.categoria)}</span>`;
@@ -179,31 +202,67 @@
     return "ese producto";
   }
 
-  // Renderiza markdown minimo (bold con **, bullets con -) preservando el
-  // escapado HTML previo. Entrada: texto ya escapado con escapeHtml.
-  function renderMarkdown(textoEscapado) {
-    const html = textoEscapado.replaceAll(
-      /\*\*([^*\n]+)\*\*/g,
-      "<strong>$1</strong>"
-    );
-    const lineas = html.split("\n");
-    const out = [];
-    let enLista = false;
-    for (const linea of lineas) {
-      const m = linea.match(/^\s*[-*•]\s+(.*)$/);
-      if (m) {
-        if (!enLista) { out.push("<ul class=\"chat-bullets\">"); enLista = true; }
-        out.push(`<li>${m[1]}</li>`);
-      } else {
-        if (enLista) { out.push("</ul>"); enLista = false; }
-        out.push(linea);
-      }
+  // Convierte un grupo de líneas con pipe en tabla HTML.
+  // Retorna null si no es una tabla válida (< 2 filas o sin separador).
+  function renderTabla(lineas) {
+    const parseFila = l => l.trim().replaceAll(/^\||\|$/g, '').split('|').map(c => c.trim());
+    const esSep    = l => /^\|[\s|:-]+\|/.test(l.trim());
+    const sepIdx   = lineas.findIndex(esSep);
+    if (sepIdx < 1) return null;
+    const cabeceras = parseFila(lineas[0]);
+    const filas = lineas.slice(sepIdx + 1)
+      .map(parseFila)
+      .filter(f => f.some(Boolean));
+    if (!filas.length) return null;
+    const ths = cabeceras.map(h => `<th>${h}</th>`).join('');
+    const trs = filas.map(f => {
+      const tds = f.map((c, i) => `<td${i === 0 ? ' class="row-header"' : ''}>${c || '—'}</td>`).join('');
+      return `<tr>${tds}</tr>`;
+    }).join('');
+    return `<div class="chat-table-wrap"><table class="chat-table"><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table></div>`;
+  }
+
+  // Procesa una línea de bullet o texto plano; devuelve el nuevo estado enLista.
+  function _mdBullet(linea, enLista, out) {
+    const m = linea.match(/^\s*[-*•]\s+(.*)$/);
+    if (m) {
+      if (!enLista) out.push('<ul class="chat-bullets">');
+      out.push(`<li>${m[1]}</li>`);
+      return true;
     }
-    if (enLista) out.push("</ul>");
-    return out.join("\n")
-      .replaceAll("\n", "<br>")
-      .replaceAll(/<br>(<\/?ul>)/g, "$1")
-      .replaceAll(/(<\/?ul>)<br>/g, "$1");
+    if (enLista) out.push('</ul>');
+    out.push(linea);
+    return false;
+  }
+
+  // Renderiza markdown: bold (**), bullets (-) y tablas (|).
+  // Entrada: texto ya escapado con escapeHtml.
+  function renderMarkdown(textoEscapado) {
+    const html      = textoEscapado.replaceAll(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
+    const lineas    = html.split('\n');
+    const out       = [];
+    let enLista     = false;
+    let grupoTabla  = [];
+
+    for (const linea of lineas) {
+      if (linea.trim().startsWith('|')) {
+        if (enLista) { out.push('</ul>'); enLista = false; }
+        grupoTabla.push(linea);
+        continue;
+      }
+      if (grupoTabla.length) {
+        out.push(renderTabla(grupoTabla) ?? grupoTabla.join('\n'));
+        grupoTabla = [];
+      }
+      enLista = _mdBullet(linea, enLista, out);
+    }
+    if (grupoTabla.length) out.push(renderTabla(grupoTabla) ?? grupoTabla.join('\n'));
+    if (enLista) out.push('</ul>');
+
+    return out.join('\n')
+      .replaceAll('\n', '<br>')
+      .replaceAll(/<br>(<\/?[ut][ldr]>|<div)/g, '$1')
+      .replaceAll(/(<\/div>|<\/?[ut][ldr]>)<br>/g, '$1');
   }
 
   function renderCardsBloque(items, titulo) {
@@ -318,8 +377,8 @@
         signal: controller.signal,
       });
       if (!r.ok || !r.body) {
-        const body = await r.text().catch(() => "");
-        throw new Error(`HTTP ${r.status} ${body.slice(0, 120)}`);
+        await r.text().catch(() => "");
+        throw new Error("error de red");
       }
 
       const manejarEvento = ({ evento, data }) => {
@@ -374,20 +433,20 @@
   }
 
   const abrirChat = () => {
+    widget.show();
     widget.classList.add("open");
-    widget.setAttribute("aria-hidden", "false");
     badge.classList.add("hidden");
     input.focus();
   };
 
   const cerrarChat = () => {
     widget.classList.remove("open");
-    widget.setAttribute("aria-hidden", "true");
+    widget.close();
   };
 
   // ========== Init ==========
   const estadoPrevio = cargarEstado();
-  if (estadoPrevio && estadoPrevio.historia && estadoPrevio.historia.length) {
+  if (estadoPrevio?.historia?.length) {
     sesionId = estadoPrevio.sesionId || null;
     historia = estadoPrevio.historia;
     restaurarHistoria(historia);

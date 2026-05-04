@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import asdict
+from dataclasses import asdict, fields
 from typing import Callable, Optional
 
-from ....domain.productos import FiltrosAtributos, Producto
+from ....domain.productos import FiltrosAtributos, OpcionesBusqueda, Producto
 from ....domain.shared.normalizacion import NormalizadorTexto
 from ...ports import Cache, UnitOfWork
 from .query import BuscarProductosQuery
@@ -38,27 +38,8 @@ class BuscarProductosHandler:
         if cached_skus is not None:
             return self._hidratar_por_sku(cached_skus)
 
-        atributos = FiltrosAtributos(
-            pulgadas=q.pulgadas,
-            pulgadas_min=q.pulgadas_min,
-            pulgadas_max=q.pulgadas_max,
-            capacidad_gb_min=q.capacidad_gb_min,
-            ram_gb_min=q.ram_gb_min,
-            capacidad_litros_min=q.capacidad_litros_min,
-            capacidad_kg_min=q.capacidad_kg_min,
-            potencia_w_min=q.potencia_w_min,
-            potencia_w_max=q.potencia_w_max,
-            procesador=q.procesador,
-            tipo_panel=q.tipo_panel,
-            resolucion=q.resolucion,
-            color=q.color,
-            es_electrico=q.es_electrico,
-            tipo_producto=q.tipo_producto,
-            es_vestible=q.es_vestible,
-            tipo_producto_excluye=q.tipo_producto_excluye,
-            marca_excluye=q.marca_excluye,
-            gpu_dedicada=q.gpu_dedicada,
-        )
+        atributos = self._construir_filtros_atributos(q)
+        opciones = self._construir_opciones(q)
         with self._uow_factory() as uow:
             productos = uow.productos.buscar(
                 query_normalizada=query_norm,
@@ -68,18 +49,37 @@ class BuscarProductosHandler:
                 precio_min=q.precio_min,
                 precio_max=q.precio_max,
                 atributos=atributos,
-                solo_con_stock=q.solo_con_stock,
+                opciones=opciones,
                 limite=max(1, min(q.limite, 20)),
-                excluir_accesorios=q.excluir_accesorios,
-                solo_accesorios=q.solo_accesorios,
-                excluir_skus=list(q.excluir_skus) if q.excluir_skus else None,
-                genero=q.genero,
-                nombre_excluye=list(q.nombre_excluye) if q.nombre_excluye else None,
-                orden_precio=q.orden_precio,
-                solo_en_oferta=q.solo_en_oferta,
             )
         self._cache_set(cache_key, [str(p.sku) for p in productos])
         return productos
+
+    @staticmethod
+    def _construir_opciones(q: BuscarProductosQuery) -> OpcionesBusqueda:
+        return OpcionesBusqueda(
+            solo_con_stock=q.solo_con_stock,
+            solo_en_oferta=q.solo_en_oferta,
+            excluir_accesorios=q.excluir_accesorios,
+            solo_accesorios=q.solo_accesorios,
+            orden_precio=q.orden_precio,
+            excluir_skus=list(q.excluir_skus) if q.excluir_skus else None,
+            genero=q.genero,
+            nombre_excluye=list(q.nombre_excluye) if q.nombre_excluye else None,
+        )
+
+    @staticmethod
+    def _construir_filtros_atributos(q: BuscarProductosQuery) -> FiltrosAtributos:
+        """Construye el VO copiando todos los campos compartidos entre Query y
+        FiltrosAtributos. Evita listar 60+ asignaciones a mano: cualquier campo
+        que exista en ambos dataclasses se mapea automáticamente."""
+        campos_atributos = {f.name for f in fields(FiltrosAtributos)}
+        kwargs = {
+            f.name: getattr(q, f.name)
+            for f in fields(q)
+            if f.name in campos_atributos
+        }
+        return FiltrosAtributos(**kwargs)
 
     def _hidratar_por_sku(self, skus: list[str]) -> list[Producto]:
         """Reconstruye los Producto desde los SKUs cacheados — evita

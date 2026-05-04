@@ -5,18 +5,55 @@ import re
 
 class SanitizadorQueryBusqueda:
     """SRP: anular el argumento `query` de buscar_productos cuando contiene
-    frases conversacionales (pedido de asesoria, declaracion de presupuesto,
-    manifestaciones de preferencia) en vez de un termino de producto.
+    frases conversacionales o señales de uso (no nombres de productos).
 
     El LLM a veces copia la frase entera del cliente como `query`, lo que
-    genera MATCH() sin sentido contra el catalogo (ej. '+30000*' a partir
-    de "tengo presupuesto de 30000bs") y degrada al manejador de producto
-    ausente con alternativas random. Aqui cortamos esa via: si detectamos
-    una frase conversacional, devolvemos None y dejamos que los filtros
-    estructurados del PerfilSesion (categoria, pulgadas, precio_max, marca)
-    rijan la busqueda.
+    genera MATCH() sin sentido contra el catálogo. Aquí cortamos esa vía:
+    si detectamos una frase conversacional, devolvemos None y dejamos que
+    los filtros estructurados del PerfilSesion rijan la búsqueda."""
 
-    Es puramente deterministico — regex sobre el texto crudo, sin LLM."""
+    _RX_SPECS_PURAS = re.compile(
+        r"^[\s\w]*\b(?:"
+        r"\d+\s*hz\b"
+        r"|hdmi\s*[\d.]*"
+        r"|para\s+(?:ps[345]?|xbox|gaming|peliculas|futbol|netflix)"
+        r")\b",
+        re.IGNORECASE,
+    )
+
+    # Frases de uso/contexto que no son nombres de productos
+    _RX_USO_DECLARADO = re.compile(
+        r"(?:"
+        r"\bvoy\s+a\s+usar\b"
+        r"|\blo\s+(?:voy\s+a\s+)?usar\s+para\b"
+        r"|\bes\s+para\b"
+        r"|\bla\s+(?:voy\s+a\s+)?usar\s+para\b"
+        r"|\bestudio\s+\w"
+        r"|\bpara\s+(?:la\s+)?universidad\b"
+        r"|\bpara\s+(?:el\s+)?trabajo\b"
+        r"|\bpara\s+ingeniería\b"
+        r"|\bnecesito\s+para\b"
+        r"|\bla\s+necesito\s+para\b"
+        r"|\bpara\s+(?:dise[ñn]o|programaci[oó]n|arquitectura|ingenier[ií]a)\b"
+        r"|\bvarias?\s+pesta[ñn]as?\b"
+        r"|\bde\s+vez\s+en\s+cuando\b"
+        r"|\btrabajo\s+(?:pesado|intenso|profesional)\b"
+        r")",
+        re.IGNORECASE,
+    )
+
+    # Software profesional como query directo (sin nombre de producto)
+    _RX_SOFTWARE_PURO = re.compile(
+        r"^(?:[\s,]*(?:"
+        r"autocad|civil[\s_]?3d|solidworks|revit|archicad|catia|ansys|"
+        r"blender|cinema[\s_]?4d|3ds[\s_]?max|maya|unreal|unity|lumion|"
+        r"photoshop|illustrator|premiere|davinci|after[\s_]?effects|indesign|"
+        r"sketchup|rhino|rhinoceros|enscape|twinmotion|"
+        r"docker|kubernetes|virtualbox|vmware|excel[\s_]?pesado|"
+        r"render(?:izado)?|autocad"
+        r")[\s,]*)+$",
+        re.IGNORECASE,
+    )
 
     _RX_FRASE_CONVERSACIONAL = re.compile(
         r"(?:"
@@ -52,5 +89,11 @@ class SanitizadorQueryBusqueda:
         if not texto:
             return None
         if cls._RX_FRASE_CONVERSACIONAL.search(texto):
+            return None
+        if cls._RX_SPECS_PURAS.search(texto):
+            return None
+        if cls._RX_USO_DECLARADO.search(texto):
+            return None
+        if cls._RX_SOFTWARE_PURO.search(texto):
             return None
         return texto

@@ -1,0 +1,96 @@
+[
+  {
+    "nombre": "FI01_rtx_fallback_gpu_sin_rtx",
+    "descripcion": "Si no hay RTX buscar GPU dedicada; si tampoco hay, mostrar 16GB con aviso.",
+    "turnos": [
+      {
+        "mensaje": "Busco laptop con RTX y 16GB RAM. Si no hay RTX, busca GPU dedicada confirmada. Si tampoco hay, muestra laptops de 16GB RAM pero aclara que no cumplen GPU dedicada.",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener_cualquiera": [
+          "no hay RTX",
+          "sin RTX",
+          "no cumple GPU",
+          "no tengo GPU dedicada confirmada",
+          "alternativa",
+          "N/D"
+        ],
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "FI02_samsung_fallback_otras_marcas",
+    "descripcion": "Si no hay Samsung premium, mostrar iPhone/Xiaomi claramente separado como 'alternativas fuera de marca'.",
+    "turnos": [
+      {
+        "mensaje": "Busco celular Samsung premium de 256GB. Si no hay Samsung, muestra iPhone o Xiaomi premium, pero separa claramente 'alternativas fuera de marca'.",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener_cualquiera": [
+          "alternativas fuera de marca",
+          "no hay Samsung",
+          "fuera de marca",
+          "otras marcas"
+        ],
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "FI03_freezer_no_es_refrigeradora",
+    "descripcion": "Si busca freezer y no hay, NO mostrar refrigeradoras sin aclararlo.",
+    "turnos": [
+      {
+        "mensaje": "Busco freezer grande. Si no hay freezer, no me muestres refrigeradoras sin aclararlo.",
+        "must_use_tool": ["buscar_productos"],
+        "debe_contener_cualquiera": [
+          "no tengo freezer",
+          "no hay freezer",
+          "refrigeradora como alternativa",
+          "no es un freezer",
+          "aclarando que"
+        ],
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "FI04_anc_fallback_bluetooth_no_equivalente",
+    "descripcion": "ANC fallback: bluetooth normal es alternativa secundaria, no equivalente.",
+    "turnos": [
+      {
+        "mensaje": "Quiero audifonos con ANC. Si no hay ANC confirmado, muestra bluetooth normales como alternativa secundaria, no como equivalentes.",
+        "no_debe_contener": [
+          "equivalente",
+          "igual que ANC",
+          "misma funcion"
+        ],
+        "debe_contener_cualquiera": [
+          "alternativa secundaria",
+          "no tiene ANC",
+          "sin ANC confirmado",
+          "alternativa"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "FI05_tv_65_fallback_sin_gaming",
+    "descripcion": "TV 65 sin 120Hz/HDMI 2.1 puede mostrarse como fallback pero NO llamarla gaming premium.",
+    "turnos": [
+      {
+        "mensaje": "Quiero TV 65 pulgadas, 120Hz y HDMI 2.1. Si no hay todo, dame 65 pulgadas 4K como alternativa, pero no las llames gaming premium.",
+        "tools_requeridas": ["buscar_productos"],
+        "no_debe_contener": [
+          "gaming premium",
+          "ideal para gaming"
+        ],
+        "debe_contener_cualquiera": [
+          "no tengo ese dato",
+          "N/D",
+          "alternativa",
+          "no confirmado"
+        ]
+      }
+    ]
+  }
+]

@@ -313,6 +313,15 @@ img { max-width: 100%; display: block; }
   opacity: 0;
   transform: translateY(20px);
   transition: opacity .25s, transform .25s;
+  /* reset <dialog> UA defaults */
+  border: none;
+  padding: 0;
+  max-width: unset;
+  max-height: unset;
+  color: inherit;
+  left: auto;
+  top: auto;
+  margin: 0;
 }
 .chat-widget.open {
   display: flex;
@@ -693,7 +702,171 @@ img { max-width: 100%; display: block; }
 }
 .chat-confirm-btn-cancel:hover { background: #e5e7eb; }
 
-/* RESPONSIVE */
+/* ===== THEME SWITCH ===== */
+.theme-switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  margin-left: 4px;
+}
+.theme-switch input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.theme-slider {
+  width: 52px;
+  height: 28px;
+  background: #e5e7eb;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  padding: 2px;
+  transition: background .3s;
+  position: relative;
+}
+.theme-slider::before {
+  content: '';
+  width: 22px;
+  height: 22px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 2px 6px rgba(0,0,0,.18);
+  transition: transform .3s cubic-bezier(.4,0,.2,1);
+  position: absolute;
+  left: 3px;
+  z-index: 1;
+}
+.theme-switch input:checked + .theme-slider {
+  background: #334155;
+}
+.theme-switch input:checked + .theme-slider::before {
+  transform: translateX(24px);
+}
+.theme-icon {
+  position: absolute;
+  font-size: 13px;
+  line-height: 1;
+  z-index: 0;
+  transition: opacity .2s;
+}
+.theme-icon-sun  { left: 5px;  opacity: 1; }
+.theme-icon-moon { right: 5px; opacity: 0.5; }
+.theme-switch input:checked + .theme-slider .theme-icon-sun  { opacity: 0.5; }
+.theme-switch input:checked + .theme-slider .theme-icon-moon { opacity: 1; }
+
+/* ===== DARK MODE ===== */
+[data-theme="dark"] {
+  --ink:    #f1f5f9;
+  --ink-2:  #cbd5e1;
+  --muted:  #94a3b8;
+  --bg:     #0f172a;
+  --card:   #1e293b;
+  --line:   #334155;
+  --shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+  --brand-soft: #4c0519;
+}
+
+[data-theme="dark"] body {
+  background: var(--bg);
+  color: var(--ink);
+}
+
+/* Navbar */
+[data-theme="dark"] .navbar { background: #1e293b; border-color: var(--line); }
+[data-theme="dark"] .icon-btn:hover { background: #334155; }
+[data-theme="dark"] .theme-slider { background: #334155; }
+
+/* Hero — gradient queda bien, solo ajustamos overlay */
+[data-theme="dark"] .hero { box-shadow: 0 8px 32px rgba(0,0,0,.4); }
+
+/* Benefits / banner / cards */
+[data-theme="dark"] .benefit { background: var(--card); border-color: var(--line); }
+[data-theme="dark"] .product-card-landing { background: var(--card); border-color: var(--line); }
+[data-theme="dark"] .thumb { background: #0f172a; }
+[data-theme="dark"] .banner-ayuda { background: var(--card); border-color: var(--line); }
+[data-theme="dark"] .banner-ayuda p { color: var(--muted); }
+
+/* Footer already dark — minor tweaks */
+[data-theme="dark"] .footer { background: #020617; }
+[data-theme="dark"] .footer-bottom { border-color: #1e293b; }
+
+/* Chat widget */
+[data-theme="dark"] .chat-widget { background: #1e293b; }
+[data-theme="dark"] .chat-messages { background: #0f172a; }
+[data-theme="dark"] .msg.bot {
+  background: #1e293b;
+  color: var(--ink);
+  border-color: var(--line);
+}
+[data-theme="dark"] .msg.bot strong { color: var(--ink); }
+[data-theme="dark"] .msg.typing { background: #1e293b; color: var(--muted); }
+[data-theme="dark"] .msg.typing span { background: var(--muted); }
+[data-theme="dark"] .chat-card { background: #1e293b; border-color: var(--line); }
+[data-theme="dark"] .chat-card:hover { border-color: var(--brand); }
+[data-theme="dark"] .chat-card .chat-card-thumb { background: #0f172a; }
+[data-theme="dark"] .chat-card-action { background: #0f172a; color: var(--ink-2); }
+[data-theme="dark"] .chat-card-action:hover { background: var(--brand-soft); color: #fda4af; }
+[data-theme="dark"] .chat-card-actions { border-color: var(--line); }
+[data-theme="dark"] .chat-form { background: #1e293b; border-color: var(--line); }
+[data-theme="dark"] .chat-form input {
+  background: #0f172a;
+  border-color: var(--line);
+  color: var(--ink);
+}
+[data-theme="dark"] .chat-form input::placeholder { color: var(--muted); }
+[data-theme="dark"] .chat-form input:focus { border-color: var(--brand); }
+[data-theme="dark"] .chat-footer { background: #1e293b; border-color: var(--line); }
+[data-theme="dark"] .chat-confirm-box { background: #1e293b; }
+[data-theme="dark"] .chat-confirm-box p { color: var(--ink-2); }
+[data-theme="dark"] .chat-confirm-btn-cancel { background: #334155; color: var(--ink-2); }
+[data-theme="dark"] .chat-confirm-btn-cancel:hover { background: #475569; }
+
+/* ── Chat comparison table ─────────────────────────────────────────────── */
+.chat-table-wrap {
+  overflow-x: auto;
+  margin: 8px 0;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+}
+.chat-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  line-height: 1.4;
+}
+.chat-table thead tr {
+  background: var(--brand);
+  color: #fff;
+}
+.chat-table th {
+  padding: 8px 12px;
+  text-align: left;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.chat-table td {
+  padding: 7px 12px;
+  border-top: 1px solid var(--line);
+  vertical-align: top;
+}
+.chat-table td.row-header {
+  font-weight: 600;
+  white-space: nowrap;
+  background: var(--bg);
+}
+.chat-table tbody tr:nth-child(even) { background: var(--brand-soft); }
+.chat-table tbody tr:hover { background: var(--brand-soft); }
+
+[data-theme="dark"] .chat-table-wrap { border-color: var(--line); }
+[data-theme="dark"] .chat-table td { border-color: var(--line); }
+[data-theme="dark"] .chat-table td.row-header { background: #0f172a; }
+[data-theme="dark"] .chat-table tbody tr:nth-child(even) { background: #1e293b; }
+[data-theme="dark"] .chat-table tbody tr:hover { background: #334155; }
+
+/* ===== RESPONSIVE ===== */
 @media (max-width: 900px) {
   .hero { grid-template-columns: 1fr; padding: 32px 20px; }
   .hero h1 { font-size: 32px; }
@@ -707,6 +880,7 @@ img { max-width: 100%; display: block; }
     width: calc(100vw - 24px);
     height: calc(100vh - 120px);
     right: 12px;
+    left: auto;
     bottom: 90px;
   }
   .product-grid { grid-template-columns: 1fr; }

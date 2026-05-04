@@ -1,0 +1,71 @@
+[
+  {
+    "nombre": "CP01_laptop_por_perfil",
+    "descripcion": "Dar una laptop por perfil: estudiante basico, ingenieria, diseno grafico, premium.",
+    "turnos": [
+      {
+        "mensaje": "Dame una laptop para cada perfil: estudiante basico, ingenieria, diseno grafico y usuario premium.",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener_cualquiera": [
+          "estudiante",
+          "ingenieria",
+          "diseno",
+          "premium"
+        ],
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "CP02_tv_por_uso",
+    "descripcion": "TV para cada uso: peliculas, futbol, gaming, presupuesto bajo.",
+    "turnos": [
+      {
+        "mensaje": "Dame una TV para cada perfil: peliculas, futbol, gaming y presupuesto bajo.",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener_cualquiera": [
+          "peliculas",
+          "futbol",
+          "gaming",
+          "presupuesto"
+        ],
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "CP03_clasificar_laptops_basica_intermedia_potente",
+    "descripcion": "Clasificar laptops en: basica, intermedia, potente, no recomendada.",
+    "turnos": [
+      {
+        "mensaje": "Clasifica estas laptops en: basica, intermedia, potente y no recomendada.",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener_cualquiera": [
+          "basica",
+          "intermedia",
+          "potente",
+          "no recomendada"
+        ],
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "CP04_celular_cinco_perfiles",
+    "descripcion": "Celular para: fotos, bateria, almacenamiento, gama alta, ahorro.",
+    "turnos": [
+      {
+        "mensaje": "Dame un celular para cada perfil: fotos, bateria, almacenamiento, gama alta y ahorro.",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener_cualquiera": [
+          "fotos",
+          "bateria",
+          "almacenamiento",
+          "gama alta",
+          "ahorro"
+        ],
+        "no_debe_contener": ["error"]
+      }
+    ]
+  }
+]

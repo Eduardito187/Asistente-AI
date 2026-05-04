@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Dismac — Tecnología y Hogar</title>
   <link rel="icon" href="/assets/img/logo-dismi.png" />
-  <link rel="stylesheet" href="/assets/css/styles.css?v=4" />
+  <link rel="stylesheet" href="/assets/css/styles.css?v=5" />
 </head>
 <body>
   <header class="navbar">
@@ -25,6 +25,13 @@
         <button class="icon-btn" aria-label="Buscar">🔍</button>
         <button class="icon-btn" aria-label="Carrito">🛒</button>
         <button class="icon-btn" aria-label="Cuenta">👤</button>
+        <label class="theme-switch" aria-label="Modo oscuro" title="Modo oscuro">
+          <input type="checkbox" id="theme-toggle" />
+          <span class="theme-slider">
+            <span class="theme-icon theme-icon-sun">☀️</span>
+            <span class="theme-icon theme-icon-moon">🌙</span>
+          </span>
+        </label>
       </div>
     </div>
   </header>
@@ -170,7 +177,7 @@
     <span class="chat-badge" id="chat-badge">1</span>
   </button>
 
-  <div id="chat-widget" class="chat-widget" role="dialog" aria-hidden="true">
+  <dialog id="chat-widget" class="chat-widget" aria-label="Chat Dismi">
     <header class="chat-header">
       <img src="/assets/img/logo-dismi.png" alt="Dismac" class="chat-logo" />
       <div class="chat-title">
@@ -203,8 +210,8 @@
         </div>
       </div>
     </div>
-  </div>
+  </dialog>
 
-  <script src="/assets/js/chat.js?v=4"></script>
+  <script src="/assets/js/chat.js?v=5"></script>
 </body>
 </html>

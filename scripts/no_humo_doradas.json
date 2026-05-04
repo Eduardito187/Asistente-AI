@@ -1,0 +1,111 @@
+[
+  {
+    "nombre": "NH01_laptop_i7_sin_gpu",
+    "descripcion": "No me vendas humo: i7 con grafica integrada NO es GPU dedicada, debe decirlo sin eufemismos.",
+    "turnos": [
+      {
+        "mensaje": "No me vendas humo: dime cual laptop realmente sirve para ingenieria y cual solo parece buena por tener i7.",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener_cualquiera": [
+          "integrada",
+          "no tiene GPU dedicada",
+          "grafica integrada",
+          "no es GPU dedicada",
+          "solo parece"
+        ],
+        "no_debe_contener": [
+          "ideal",
+          "perfecta",
+          "error"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "NH02_tv_4k_normal_vs_ps5",
+    "descripcion": "No me vendas humo: TV 4K sin Hz ni HDMI 2.1 confirmados no es ideal para PS5.",
+    "turnos": [
+      {
+        "mensaje": "No me vendas humo: dime si esta TV realmente sirve para PS5 o solo es una 4K normal.",
+        "tools_requeridas": ["buscar_productos"],
+        "no_debe_contener": [
+          "ideal para PS5",
+          "perfecta para gaming"
+        ],
+        "debe_contener_cualquiera": [
+          "no tengo ese dato",
+          "N/D",
+          "120Hz",
+          "HDMI 2.1",
+          "no puedo confirmar",
+          "4K normal"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "NH03_celular_premium_solo_memoria",
+    "descripcion": "No me vendas humo: mucha memoria no hace premium a un celular.",
+    "turnos": [
+      {
+        "mensaje": "No me vendas humo: dime si este celular es premium real o solo tiene mucha memoria.",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener_cualquiera": [
+          "no es suficiente",
+          "la memoria no define",
+          "gama",
+          "procesador",
+          "no solo memoria"
+        ],
+        "no_debe_contener": [
+          "premium confirmado",
+          "error"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "NH04_respuesta_no_vendedor",
+    "descripcion": "El cliente pide respuesta de asesor honesto, no de vendedor.",
+    "turnos": [
+      {
+        "mensaje": "No quiero una respuesta de vendedor, quiero una recomendacion honesta en laptops.",
+        "tools_requeridas": ["buscar_productos"],
+        "no_debe_contener": [
+          "excelente opcion",
+          "perfecta para",
+          "no te vas a arrepentir",
+          "error"
+        ],
+        "debe_contener_cualquiera": [
+          "pero",
+          "aunque",
+          "N/D",
+          "no tengo",
+          "desventaja",
+          "limitacion"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "NH05_dato_faltante_preocupante",
+    "descripcion": "El agente identifica cual dato faltante le preocupa mas para hacer la recomendacion.",
+    "turnos": [
+      {
+        "mensaje": "Dime que dato faltante te preocupa mas en las laptops disponibles.",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener_cualquiera": [
+          "GPU",
+          "Hz",
+          "N/D",
+          "no tengo",
+          "dato faltante",
+          "preocupa",
+          "falta"
+        ],
+        "no_debe_contener": ["error"]
+      }
+    ]
+  }
+]

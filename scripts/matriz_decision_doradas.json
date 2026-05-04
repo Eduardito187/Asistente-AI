@@ -1,0 +1,75 @@
+[
+  {
+    "nombre": "MD01_matriz_laptops_ingenieria",
+    "descripcion": "Comparacion con pesos: GPU 35%, RAM 20%, CPU 20%, storage 10%, precio 15%. Penalizar N/D.",
+    "turnos": [
+      {
+        "mensaje": "Compara las mejores laptops para ingenieria usando esta matriz: GPU dedicada 35%, RAM 20%, procesador 20%, almacenamiento 10%, precio 15%. Penaliza datos N/D. Dame puntaje, ganador y riesgo de compra.",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener_cualquiera": [
+          "N/D",
+          "penalizado",
+          "puntaje",
+          "ganador",
+          "riesgo",
+          "%"
+        ],
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "MD02_matriz_tv_gaming",
+    "descripcion": "Comparacion TV: imagen 30%, gaming 30%, precio 20%, datos confirmados 20%. Sin Hz/HDMI 2.1 no gana gaming.",
+    "turnos": [
+      {
+        "mensaje": "Compara 3 TVs de 65 pulgadas usando: imagen 30%, gaming 30%, precio 20%, datos confirmados 20%. Si no hay Hz o HDMI 2.1, no puede ganar en gaming.",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener_cualquiera": [
+          "N/D",
+          "no tengo ese dato",
+          "gaming",
+          "imagen",
+          "precio"
+        ],
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "MD03_matriz_celulares_premium",
+    "descripcion": "Comparacion celulares: camara 35%, storage 20%, rendimiento 20%, bateria 15%, precio 10%.",
+    "turnos": [
+      {
+        "mensaje": "Compara celulares premium usando: camara 35%, almacenamiento 20%, rendimiento 20%, bateria 15%, precio 10%. Si la camara no esta especificada, no le des puntaje completo.",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener_cualquiera": [
+          "N/D",
+          "penalizado",
+          "camara",
+          "no tengo ese dato",
+          "puntaje"
+        ],
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "MD04_ganador_y_opcion_segura",
+    "descripcion": "La matriz debe producir ganador, opcion mas segura y uno que evitaria.",
+    "turnos": [
+      {
+        "mensaje": "Compara laptops con puntaje: rendimiento 35%, datos confirmados 25%, precio 20%, marca 10%, riesgo de compra 10%. Si un dato clave falta, penaliza. Dame ganador general, opcion mas segura y opcion que evitarias.",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener_cualquiera": [
+          "ganador",
+          "opcion mas segura",
+          "segura",
+          "evitar",
+          "evitaria"
+        ],
+        "no_debe_contener": ["error"]
+      }
+    ]
+  }
+]

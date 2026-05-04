@@ -13,90 +13,1057 @@ def _tool(name: str, description: str, properties: dict, required: list[str] | N
     }
 
 
+# Atributos boolean derivados de la ficha técnica (atributos_texto JSON / caracteristicas).
+# Cada filtro acepta True/False; None = sin restriccion.
+# El backend genera el filtro LIKE correspondiente sobre atributos_texto y nombre.
+#
+# Descripciones humanas para los 170+ booleanos. Si un campo del catálogo
+# (ValidadorFiltrosDuros._ATRIBUTOS_BOOLEANOS) no está aquí, se le inyecta
+# una descripción genérica derivada de su nombre.
+_DESC_BOOLEANOS: dict[str, str] = {
+    # Línea blanca / electro
+    "inverter":             "Tecnologia inverter (refrigeradoras, lavadoras, AC)",
+    "no_frost":             "Sistema No Frost (refrigeradoras)",
+    "auto_limpieza":        "Auto limpieza / self cleaning",
+    "auto_descongelado":    "Descongelado automatico (frost free)",
+    "diagnostico_inteligente": "Smart Diagnosis del fabricante",
+    "notif_movil":          "Notificaciones al telefono cuando termina ciclo",
+    "modo_nocturno":        "Modo nocturno silencioso",
+    "modo_vacaciones":      "Modo vacaciones (refrigeradoras, ACs)",
+    "alarma_puerta":        "Alarma de puerta abierta",
+    "congelacion_rapida":   "Fast freeze / congelacion rapida",
+    "enfriamiento_rapido":  "Fast cooling / enfriamiento rapido",
+    "vapor":                "Funcion vapor (lavadoras, hornos)",
+    "lavado_frio":          "Programa lavado en frio",
+    "secado_calor":         "Secado por calor",
+    "secado_aire":          "Secado por aire",
+    "iones_negativos":      "Generador de iones negativos",
+    "ozono":                "Esterilizacion por ozono",
+    "refrigerante_eco":     "Refrigerante ecologico R600a / R32",
+    # Audio
+    "anc":                  "Active Noise Cancelling (audifonos)",
+    "aptx":                 "Codec aptX",
+    "aptx_hd":              "Codec aptX HD",
+    "ldac":                 "Codec LDAC (alta resolucion)",
+    "spatial_audio":        "Spatial audio / audio espacial",
+    "bass_boost":           "Bass boost / extra bass",
+    "ecualizador":          "Ecualizador configurable",
+    "multipoint":           "Conexion simultanea a 2 dispositivos",
+    "transparency_mode":    "Modo transparencia / ambient sound",
+    "hi_res_audio":         "Hi-Res Audio certificado",
+    "dolby_atmos":          "Dolby Atmos",
+    "dolby_vision":         "Dolby Vision HDR",
+    "hdr":                  "HDR (cualquier formato)",
+    "hdr10":                "HDR10",
+    # Conectividad
+    "bluetooth_incluido":   "Bluetooth incluido",
+    "wifi_incluido":        "WiFi incluido",
+    "usb_c":                "Puerto USB-C / Type-C",
+    "thunderbolt":          "Puerto Thunderbolt 3/4/5",
+    "displayport":          "Puerto DisplayPort",
+    "mini_jack":            "Mini-jack 3.5mm para audifonos cableados",
+    "nfc":                  "NFC para pagos contactless",
+    "hdmi_2_1":             "HDMI 2.1 (gaming 4K@120Hz)",
+    "hdmi_arc":             "HDMI ARC / eARC",
+    "hdmi_puerto":          "Tiene puerto HDMI",
+    "ethernet":             "Puerto Ethernet RJ-45",
+    # Smartphone / wearable
+    "tactil":               "Pantalla tactil / touch",
+    "lector_huella":        "Lector de huella",
+    "dual_sim":             "Dual SIM",
+    "inalambrico":          "Wireless / sin cables",
+    "carga_inalambrica":    "Carga inalambrica Qi",
+    "modo_avion":           "Modo avion",
+    "gps":                  "GPS integrado",
+    "acelerometro":         "Acelerometro",
+    "monitor_cardiaco":     "Monitor de ritmo cardiaco",
+    "oximetro":             "Oximetro / SpO2",
+    "podometro":            "Podometro / step counter",
+    # Cámaras / video
+    "triple_camara":        "Triple camara trasera",
+    "cuadruple_camara":     "Cuadruple camara trasera",
+    "camara_macro":         "Lente macro",
+    "camara_telefoto":      "Lente telefoto",
+    "camara_ultrawide":     "Lente ultra gran angular",
+    "vision_nocturna":      "Vision nocturna / modo nocturno camara",
+    "ois":                  "OIS / estabilizacion optica de imagen",
+    "video_4k":             "Grabacion video 4K",
+    "video_8k":             "Grabacion video 8K",
+    "slow_motion":          "Slow motion / camara lenta",
+    # Ingreso / dispositivos
+    "smart_tv":             "Smart TV con SO (Android/Google/webOS/Tizen)",
+    "airfryer":             "Funcion freidora de aire",
+    "control_remoto":       "Incluye control remoto",
+    "control_voz":          "Control por voz / Alexa / Google Assistant",
+    "retroiluminado":       "Retroiluminacion / backlit",
+    "plegable":             "Plegable (foldable phone)",
+    "convertible":          "Convertible 2-en-1 (laptops)",
+    "touchpad":             "Touchpad incluido",
+    "teclado_numerico":     "Teclado numerico / numpad",
+    "camara_web":           "Webcam integrada",
+    "microfono":            "Microfono integrado",
+    "ranura_sd":            "Lector SD / microSD",
+    "solar":                "Carga solar / panel solar",
+    "recargable":           "Bateria recargable",
+    "portatil":             "Portatil / portable",
+    "estabilizador":        "Estabilizador (camaras, voltaje)",
+    "antiderrame":          "Anti-derrame (cocinas, licuadoras)",
+    "auto_apagado":         "Apagado automatico",
+    "temporizador":         "Timer / temporizador",
+    "display_digital":      "Pantalla digital",
+    "antiadherente":        "Antiadherente (sartenes)",
+    "multifuncion":         "Multifuncion",
+    "turbo":                "Modo turbo",
+    "eco":                  "Modo eco / ahorro",
+    "silencioso":           "Modo silencioso",
+    "oled_keyboard":        "Teclado OLED",
+    # IP rating
+    "ip67":                 "IP67 (polvo + agua hasta 1m)",
+    "ip68":                 "IP68 (mas resistente que IP67)",
+    "ipx4":                 "IPX4 (salpicaduras)",
+    "resistente_agua":      "Resistencia al agua confirmada (cualquier IP)",
+    # Smart home
+    "alexa_compatible":     "Compatible con Amazon Alexa",
+    "google_home_compatible": "Compatible con Google Home / Assistant",
+    "homekit_compatible":   "Compatible con Apple HomeKit",
+    "matter_compatible":    "Soporta protocolo Matter",
+    "zigbee":               "Protocolo Zigbee",
+    "z_wave":               "Protocolo Z-Wave",
+    "ifttt":                "Compatible IFTTT",
+    "app_movil":            "Controlable desde app del fabricante",
+    "smart_home":           "Producto domotica / smart home",
+    "control_app":          "Control desde app movil",
+    "notif_push":           "Soporta notificaciones push",
+    # Salud / cuidado personal
+    "bpa_free":             "Libre de BPA",
+    "hipoalergenico":       "Hipoalergenico",
+    "antibacterial":        "Antibacterial / antimicrobiano",
+    "antiacaros":           "Anti-acaros",
+    "ionizador":            "Ionizador",
+    "filtro_hepa":          "Filtro HEPA",
+    "filtro_carbon":        "Filtro de carbon activado",
+    "filtro_uv":            "Esterilizacion UV-C",
+    "aromaterapia":         "Aromaterapia / aceites esenciales",
+    "cromoterapia":         "Cromoterapia / luces de colores",
+    "monitor_presion":      "Tensiometro / presion arterial",
+    "monitor_glucosa":      "Glucometro",
+    "monitor_temperatura":  "Termometro",
+    "masajeador":           "Funcion masajeador",
+    # Seguridad cocina/hogar
+    "cierre_infantil":      "Cierre infantil / child lock",
+    "doble_vidrio":         "Doble vidrio (hornos)",
+    "vidrio_templado":      "Vidrio templado",
+    "asa_fria":             "Asa fria / cool touch",
+    "antichoque":           "Anti-impacto / shockproof",
+    "resistente_calor":     "Resistente al calor / heat resistant",
+    "apto_lavavajillas":    "Apto lavavajillas",
+    "apto_microondas":      "Apto microondas",
+    "apto_horno":           "Apto horno",
+    "apto_induccion":       "Compatible con induccion",
+    "apto_congelador":      "Apto congelador",
+    "detector_humo":        "Detector de humo",
+    "sensor_movimiento":    "Sensor de movimiento",
+    "alarma":               "Sirena / alarma",
+    # Materiales
+    "acero_inoxidable":     "Acero inoxidable",
+    "madera_solida":        "Madera solida / maciza",
+    "bambu":                "Bambu",
+    "ceramica_material":    "Ceramica como material principal",
+    "silicona_material":    "Silicona como material principal",
+    "cuero_real":           "Cuero genuino",
+    "algodon_organico":     "Algodon organico",
+    "aluminio_material":    "Aluminio como material principal",
+    "titanio":              "Titanio",
+    "fibra_carbono":        "Fibra de carbono",
+    "microfibra":           "Microfibra",
+    # Pequeños electro
+    "antical":              "Antical / descalcificador",
+    "antigoteo":            "Anti-drip / antigoteo",
+    "cable_recogible":      "Cable retraible / recogible",
+    "giratorio_360":        "Giro 360 grados",
+    "mango_ergonomico":     "Mango ergonomico",
+    "desmontable":          "Partes desmontables / removibles",
+    "recipiente_extraible": "Recipiente extraible",
+    "jarra_vidrio":         "Jarra de vidrio",
+    "jarra_inoxidable":     "Jarra de acero inoxidable",
+    # Adecuación de uso
+    "para_gaming":          "Apto / optimizado para gaming",
+    "para_oficina":         "Apto para uso de oficina",
+    "para_diseno":          "Apto para diseño grafico / video",
+    "para_streaming":       "Apto para streaming",
+    "para_outdoor":         "Apto para uso exterior / outdoor",
+    "para_viaje":           "Compacto para viaje",
+    "para_bebe":            "Apto para bebes / infantil",
+    "para_adulto_mayor":    "Diseñado para adultos mayores / accesibilidad",
+    # Estética
+    "bordes_redondeados":   "Bordes redondeados",
+    "sin_marco":            "Sin marco / borderless / infinity display",
+    "transparente_diseno":  "Diseño transparente",
+    "diseno_ergonomico":    "Diseño ergonomico",
+    "premium_diseno":       "Acabado premium / lujo",
+    # Bicis / movilidad
+    "abs_motos":            "Frenos ABS (motos)",
+    "electrico_bici":       "E-bike / bicicleta electrica",
+    "frenos_disco":         "Frenos de disco",
+    "suspension_doble":     "Doble suspension / full suspension",
+    "suspension_delantera": "Suspension delantera",
+    "cambios_shimano":      "Cambios Shimano",
+    # Monitores gaming
+    "gsync":                "NVIDIA G-Sync",
+    "freesync":             "AMD FreeSync",
+    "monitor_curvo":        "Pantalla curva",
+    "pivot_monitor":        "Soporta rotacion vertical (pivot)",
+    "altura_ajustable":     "Altura ajustable",
+    "hub_usb_c":            "USB-C hub / docking integrado",
+    # Drones / cámaras pro
+    "evita_obstaculos":     "Evita obstaculos automaticamente",
+    "retorno_automatico":   "Return to home automatico",
+    "seguimiento_inteligente": "Active track / follow me",
+    # Bebés / niños
+    "educativo":            "Producto educativo",
+    "stem":                 "STEM / robotica educativa",
+    # Sustentabilidad
+    "energy_star":          "Certificacion Energy Star",
+    "reciclable":           "Reciclable",
+    "eco_friendly":         "Eco-friendly",
+    # Comerciales
+    "envio_rapido":         "Envio rapido / 24h",
+    "garantia_extendida":   "Garantia extendida disponible",
+    "manual_incluido":      "Manual de usuario incluido",
+
+    # ===== Ronda 3 — comprador real con sinonimos =====
+    # Atributos blandos
+    "ultra_silencioso":     "Ultra silencioso (<30 dB), 'que no haga ruido'",
+    "bajo_consumo":         "Bajo consumo electrico, ahorra luz, eficiente",
+    "liviano":              "Ligero, ultra ligero, poco peso",
+    "compacto":             "Compacto, ahorra espacio, diseño reducido",
+    "durable":              "Larga vida util, durable",
+    "resistente_caidas":    "Resistente a caidas / golpes ('que aguante caidas')",
+    "resistente_rayones":   "Resistente a rayones, no se raya",
+    "anti_oxido":           "Anti oxido / anti corrosion ('que no se oxide')",
+    "resistente_uv":        "Resistente UV, proteccion solar para outdoor",
+    "antimanchas":          "Anti-manchas ('que no se manche')",
+    "facil_limpieza":       "Facil de limpiar / lavable",
+    "lavable":              "Lavable a maquina o mano",
+    "preensamblado":        "Ya viene armado, no requiere armar",
+    "sin_herramientas":     "Sin herramientas para armar",
+    "plug_and_play":        "Plug & Play, listo para usar sin instalacion",
+    "gorilla_glass":        "Gorilla Glass (resistencia pantalla)",
+    "antireflejo":          "Pantalla antireflejo / anti glare",
+    "brillo_alto":          "Alto brillo (1000+ nits), visible bajo el sol",
+    # Smart Home avanzado
+    "cerradura_smart":      "Cerradura inteligente / smart lock",
+    "videoportero":         "Videoportero / doorbell con video",
+    "camara_seguridad":     "Camara de seguridad / vigilancia",
+    "luz_smart":            "Luz / bombilla inteligente",
+    "termostato_smart":     "Termostato inteligente",
+    "enchufe_smart":        "Enchufe / tomacorriente inteligente",
+    "alarma_smart":         "Alarma inteligente / sistema seguridad",
+    "aspersor_smart":       "Aspersor / riego inteligente",
+    "sensor_puerta":        "Sensor de puerta abierta",
+    "sensor_fuga_agua":     "Detector de fugas de agua",
+    "hub_smart_home":       "Hub central de smart home / domotica",
+    # Mascotas
+    "comedero_automatico":  "Comedero automatico para mascotas",
+    "fuente_agua_mascota":  "Fuente / bebedero automatico para mascotas",
+    "rascador":             "Rascador para gatos",
+    "transportadora_mascota": "Transportadora / carrier para mascotas",
+    "collar_gps":           "Collar con GPS / pet tracker",
+    "camara_mascota":       "Camara de monitoreo para mascotas",
+    "juguete_interactivo":  "Juguete interactivo para mascotas",
+    "tipo_perro":           "Producto destinado a perros",
+    "tipo_gato":            "Producto destinado a gatos",
+    # Bebés
+    "cuna":                 "Cuna / moises",
+    "cuna_convertible":     "Cuna convertible (crece con el bebe)",
+    "cochecito":            "Cochecito / carriola",
+    "silla_auto":           "Silla de auto / car seat",
+    "andadera":             "Andadera / walker",
+    "corral":               "Corral / playpen",
+    "biberon":              "Biberon / bottle baby",
+    "esterilizador":        "Esterilizador (biberones, accesorios)",
+    "calentador_biberon":   "Calentador de biberon",
+    "extractor_leche":      "Extractor de leche / breast pump",
+    "monitor_bebe":         "Monitor de bebe / video monitor",
+    "cambiador":            "Cambiador / changing table",
+    "humidificador_bebe":   "Humidificador para cuarto de bebe",
+    "termometro_bebe":      "Termometro digital para bebe",
+    "ajustable_etapas":     "Ajustable en varias etapas (crece con el bebe)",
+    # Camping / outdoor
+    "carpa":                "Carpa / tienda de campaña",
+    "mosquitero":           "Mosquitero anti-mosquitos",
+    "saco_dormir":          "Saco de dormir / sleeping bag",
+    "colchon_inflable":     "Colchon inflable / air mattress",
+    "termo":                "Termo / thermos para liquidos calientes",
+    "hielera_portatil":     "Hielera / cooler portatil",
+    "linterna_recargable":  "Linterna recargable / led",
+    "fogon_portatil":       "Fogon / anafe portatil",
+    "repelente_uv":         "Proteccion UV outdoor",
+    "kit_supervivencia":    "Kit de supervivencia",
+    "bolsa_dormir_temp":    "Saco con temperatura comfort especificada",
+    # Gym / deportes
+    "cinta_correr":         "Cinta de correr / treadmill",
+    "bici_estatica":        "Bicicleta estatica / spinning",
+    "eliptica":             "Eliptica / elliptical",
+    "set_pesas":            "Set de pesas / mancuernas",
+    "mat_yoga":             "Mat / esterilla de yoga",
+    "balon_pilates":        "Balon de pilates / fitball",
+    "bandas_resistencia":   "Bandas elasticas de resistencia",
+    "guantes_boxeo":        "Guantes de boxeo",
+    "saco_boxeo":           "Saco / costal de boxeo",
+    "balon_futbol":         "Balon de futbol",
+    "balon_basquet":        "Balon de basquet",
+    "para_natacion":        "Para natacion / piscina",
+    "para_correr":          "Para correr / running",
+    "para_ciclismo":        "Para ciclismo / bici road",
+    "monitor_calorias":     "Monitor de calorias / fitness tracker",
+    # Foto / video pro
+    "camara_dslr":          "Camara DSLR / reflex",
+    "camara_mirrorless":    "Camara mirrorless / sin espejo",
+    "camara_compacta":      "Camara compacta / point and shoot",
+    "camara_accion":        "Action cam (GoPro, etc.)",
+    "sensor_full_frame":    "Sensor full frame",
+    "sensor_aps_c":         "Sensor APS-C",
+    "lente_prime":          "Lente fijo / prime",
+    "lente_zoom":           "Lente zoom",
+    "gimbal":               "Estabilizador gimbal",
+    "tripode":              "Tripode",
+    "monopode":             "Monopode / selfie stick",
+    "flash_externo":        "Flash externo / speedlite",
+    "microfono_externo":    "Microfono externo / shotgun",
+    "ring_light":           "Ring light / aro de luz",
+    "luz_softbox":          "Softbox de iluminacion",
+    "vlog_friendly":        "Optimo para vlog / creadores",
+    # Cleaning robots / aspiradoras
+    "robot_aspiradora":     "Robot aspirador (Roomba style)",
+    "mapeo_casa":           "Mapeo laser / LiDAR de la casa",
+    "trapeado":             "Funcion mopa / trapeo",
+    "estacion_autovaciado": "Estacion de auto vaciado",
+    "succion_alta":         "Succion alta (alfombras, mascotas)",
+    "filtro_pm25":          "Filtro PM 2.5 (particulas finas)",
+    # Climate / Air
+    "aire_acondicionado":   "Aire acondicionado / split",
+    "calefactor":           "Calefactor / estufa electrica",
+    "ventilador":           "Ventilador",
+    "ventilador_pie":       "Ventilador de pie / parante",
+    "ventilador_techo":     "Ventilador de techo",
+    "ventilador_torre":     "Ventilador torre",
+    "ventilador_mesa":      "Ventilador de mesa",
+    "calefactor_ceramico":  "Calefactor ceramico",
+    "estufa_aceite":        "Estufa de aceite / radiador",
+    "purificador_aire":     "Purificador de aire",
+    "humidificador":        "Humidificador",
+    "deshumidificador":     "Deshumidificador",
+    "ac_inverter":          "AC con tecnologia inverter",
+    # Iluminación
+    "dimmer":               "Regulable / atenuador (dimmer)",
+    "luz_blanca":           "Luz blanca / fria",
+    "luz_calida":           "Luz calida / amarilla",
+    "luz_rgb":              "Luz RGB / multicolor",
+    "solar_outdoor":        "Lampara solar exterior",
+    "led":                  "Tecnologia LED",
+    "led_strip":            "Tira / strip LED",
+    # Office / impresoras
+    "impresora_laser":      "Impresora laser",
+    "impresora_tinta":      "Impresora de tinta / inkjet",
+    "tinta_continua":       "Tinta continua / EcoTank",
+    "duplex":               "Impresion duplex / doble cara",
+    "escaner":              "Escaner integrado",
+    "fax":                  "Fax",
+    "copiadora":            "Funcion fotocopia",
+    "a3":                   "Soporta papel A3",
+    "oficio":               "Soporta papel oficio / legal",
+    "color_impresion":      "Imprime a color",
+    "bn_impresion":         "Imprime solo blanco y negro",
+    # Beauty pro
+    "alisadora":            "Plancha alisadora de pelo",
+    "rizadora":             "Rizadora / curling iron",
+    "secador_pelo":         "Secador de pelo",
+    "depiladora":           "Depiladora",
+    "ipl":                  "Depilacion IPL / luz pulsada",
+    "afeitadora":           "Afeitadora electrica",
+    "recortadora_barba":    "Recortadora / trimmer de barba",
+    "cortadora_pelo":       "Cortadora / clipper de pelo",
+    "wet_dry":              "Wet & dry (uso humedo y seco)",
+    "tecnologia_iones":     "Iones negativos / anti-frizz",
+    "ceramica_pelo":        "Placas ceramicas",
+    "turmalina":            "Tecnologia turmalina",
+    "titanio_pelo":         "Placas de titanio",
+    # Hogar emocional / regalos
+    "para_regalo":          "Ideal para regalo / obsequio",
+    "empaque_regalo":       "Viene con empaque de regalo",
+    "regalo_aniversario":   "Regalo de aniversario",
+    "regalo_navidad":       "Regalo navideño",
+    "regalo_dia_madre":     "Regalo dia de la madre",
+    "regalo_dia_padre":     "Regalo dia del padre",
+    "regalo_cumple":        "Regalo cumpleaños",
+    "premium":              "Producto premium / alta gama / lujo",
+    "edicion_limitada":     "Edicion limitada / exclusiva",
+    "mas_vendido":          "Best seller / mas vendido",
+    "nuevo_lanzamiento":    "Nuevo lanzamiento / recien llegado",
+    # Restricciones dietéticas
+    "sin_azucar":           "Sin azucar (alimentos)",
+    "sin_gluten":           "Sin gluten / celiaco apto",
+    "vegano":               "Vegano / 100% vegetal",
+    "vegetariano":          "Vegetariano",
+    "organico":             "Organico / ecologico",
+    "natural":              "100% natural",
+    "sin_parabenos":        "Sin parabenos (cuidado personal)",
+    "sin_sulfatos":         "Sin sulfatos (cuidado personal)",
+    "cruelty_free":         "Cruelty free / no testeado en animales",
+    # Texturas / acabados
+    "acabado_mate":         "Acabado mate",
+    "acabado_brillante":    "Acabado brillante / glossy",
+    "acabado_satinado":     "Acabado satinado",
+    "acabado_espejado":     "Acabado espejado / efecto espejo",
+    "texturizado":          "Acabado texturizado",
+    # Modos profesionales
+    "modo_pro":             "Modo profesional / manual",
+    "modo_juego":           "Game mode / modo juego",
+    "modo_pelicula":        "Movie / Cinema mode",
+    "modo_deporte":         "Modo deporte / futbol",
+    # Compatibilidad consolas
+    "ps5_compatible":       "Compatible con PS5",
+    "ps4_compatible":       "Compatible con PS4",
+    "xbox_compatible":      "Compatible con Xbox",
+    "switch_compatible":    "Compatible con Nintendo Switch",
+    # Soporte / postventa
+    "servicio_24_7":        "Soporte tecnico 24/7",
+    "repuestos_disponibles": "Repuestos disponibles",
+    "instalacion_incluida": "Instalacion incluida",
+    "entrega_a_domicilio":  "Entrega a domicilio / delivery",
+    "retiro_tienda":        "Retiro en tienda / pickup",
+    # Modos especiales electro
+    "modo_invitado":        "Modo invitado",
+    "memoria_programa":     "Memoria de programa favorito",
+    "modo_lluvia":          "Modo lluvia / anti-humedad",
+    "modo_invierno":        "Modo invierno",
+    "modo_verano":          "Modo verano",
+    # Hogar muebles
+    "con_ruedas":           "Tiene ruedas",
+    "con_cajones":          "Tiene cajones",
+    "con_espejo":           "Espejo incluido",
+    "reclinable":           "Reclinable",
+    "giratorio":            "Giratorio (silla, etc.)",
+    "memory_foam_material": "Memory foam / espuma viscoelastica",
+    "soporte_lumbar":       "Soporte lumbar",
+    "apoya_brazos":         "Apoyabrazos",
+    "ergonomico_oficina":   "Ergonomic / silla horas oficina",
+    # Herramientas
+    "taladro":              "Taladro",
+    "taladro_percutor":     "Taladro percutor / rotomartillo",
+    "taladro_inalambrico":  "Taladro inalambrico / a bateria",
+    "soldadora":            "Soldadora",
+    "amoladora":            "Amoladora / esmeril",
+    "sierra_circular":      "Sierra circular",
+    "sierra_caladora":      "Sierra caladora / jigsaw",
+    "lijadora":             "Lijadora",
+    "compresor_aire":       "Compresor de aire",
+    "hidrolavadora":        "Hidrolavadora alta presion",
+    "juego_destornilladores": "Juego de destornilladores",
+    "multimetro":           "Multimetro / tester",
+    "pistola_calor":        "Pistola de calor / heat gun",
+    # Auto / vehiculos
+    "para_auto":            "Para auto / automotriz",
+    "scooter_electrico":    "Scooter electrico / e-scooter",
+    "hoverboard":           "Hoverboard / patineta electrica",
+    "cargador_auto":        "Cargador para auto (12V)",
+    "aspiradora_auto":      "Aspiradora portatil para auto",
+    "dash_cam":             "Camara para auto / dashcam",
+    "gps_auto":             "GPS / navegador para vehiculo",
+    # Termoelectronica
+    "control_temperatura":  "Control de temperatura",
+    "temperatura_ajustable": "Temperatura ajustable",
+    "alta_temperatura":     "Alta temperatura disponible",
+    "conservacion_calor":   "Conservacion de calor / keep warm",
+    # Smartwatch funciones
+    "notificaciones_smartwatch": "Notificaciones del telefono al reloj",
+    "control_musica_reloj": "Control de musica desde el reloj",
+    "contestar_llamadas":   "Contesta llamadas desde el reloj",
+    "modos_deporte_multi":  "Multiples modos deportivos (50+)",
+    "monitor_estres":       "Monitor de estres / stress tracker",
+    "monitor_sueno":        "Monitor de sueno",
+    "alarma_inteligente":   "Alarma inteligente con vibracion",
+    # Standards
+    "usb_30":               "Puerto USB 3.0 (SuperSpeed)",
+    "usb_32":               "Puerto USB 3.2",
+    "usb_4":                "Puerto USB 4.0",
+    "pcie_4":               "PCIe 4.0",
+    "pcie_5":               "PCIe 5.0",
+    "ddr4":                 "Memoria DDR4",
+    "ddr5":                 "Memoria DDR5",
+    # Audio extra
+    "subwoofer":            "Subwoofer incluido",
+    "home_theater":         "Home theater 5.1 / 7.1",
+    "calidad_estudio":      "Calidad de estudio / monitoring",
+    "microfono_estudio":    "Microfono de estudio / condenser",
+    # Productividad office
+    "auriculares_oficina":  "Auriculares para oficina / teletrabajo",
+    "escritorio_de_pie":    "Escritorio de pie / standing desk",
+    "monitor_oficina":      "Monitor optimizado para oficina",
+    # Familias específicas
+    "familia_grande":       "Para familia grande (5+ personas)",
+    "uso_individual":       "Uso individual / solo persona",
+    "uso_compartido":       "Uso compartido / multi-usuario",
+    # Accesibilidad
+    "alta_visibilidad":     "Alta visibilidad / baja vision",
+    "teclado_grande":       "Teclas grandes / accesible",
+    "audio_alto_volumen":   "Volumen alto / amplificado (sordera leve)",
+
+    # ===== Ronda 4 — sinonimos enriquecidos + categorias creativas =====
+    # País de origen
+    "made_in_usa":          "Fabricado en EE.UU.",
+    "made_in_china":        "Fabricado en China",
+    "made_in_korea":        "Fabricado en Corea",
+    "made_in_japan":        "Fabricado en Japon",
+    "made_in_germany":      "Fabricado en Alemania",
+    "made_in_italy":        "Fabricado en Italia",
+    "made_in_brazil":       "Fabricado en Brasil",
+    "made_in_bolivia":      "Fabricado en Bolivia / produccion nacional",
+    "ensamblado_bolivia":   "Ensamblado / armado en Bolivia",
+    "calidad_alemana":      "Calidad / ingenieria alemana",
+    "calidad_japonesa":     "Calidad japonesa",
+    "calidad_coreana":      "Calidad coreana",
+    # Frecuencia de uso
+    "uso_diario":           "Uso diario / todos los dias",
+    "uso_eventual":         "Uso ocasional / fin de semana",
+    "uso_intensivo":        "Uso intensivo / heavy duty",
+    "uso_profesional":      "Uso profesional",
+    "uso_comercial":        "Uso comercial / para negocio",
+    "uso_industrial":       "Uso industrial",
+    "uso_domestico":        "Uso domestico / hogar",
+    "uso_emergencia":       "Para emergencias",
+    "grado_militar":        "Grado militar / mil-spec",
+    "grado_medico":         "Grado medico / hospitalario",
+    "grado_gastronomico":   "Grado gastronomico / food grade",
+    # Lugar / contexto
+    "para_playa":           "Para la playa",
+    "para_montaña":         "Para la montaña / trekking",
+    "para_nieve":           "Para nieve / esqui",
+    "para_terraza":         "Para terraza / rooftop",
+    "para_jardin":          "Para jardin / patio",
+    "para_piscina":         "Para piscina / alberca",
+    "para_fiesta":          "Para fiesta / reunion",
+    "para_camping":         "Para camping",
+    "para_oficina_uso":     "Para oficina / escritorio",
+    "para_taller":          "Para taller / garaje",
+    "para_baño":            "Para baño / ducha",
+    "para_cocina":          "Para cocina",
+    "para_dormitorio":      "Para dormitorio",
+    "para_sala":            "Para sala / living",
+    "para_comedor":         "Para comedor",
+    "para_balcon":          "Para balcon",
+    "para_garaje":          "Para garaje",
+    "para_outdoor_general": "Para exterior / outdoor / intemperie",
+    "para_indoor_general":  "Para interior / indoor",
+    # Eventos / regalos especificos
+    "regalo_boda":          "Regalo de boda / lista de bodas",
+    "regalo_baby_shower":   "Regalo baby shower",
+    "regalo_quince":        "Para quinceañera / 15 años",
+    "regalo_graduacion":    "Regalo de graduacion",
+    "regalo_amigo_invisible": "Amigo invisible / secret santa",
+    "regalo_san_valentin":  "Regalo San Valentin / dia del amor",
+    "para_pareja":          "Para pareja / novio / novia / esposo",
+    "para_amigo":           "Para amigo / amiga",
+    "para_hermano":         "Para hermano / hermana",
+    "para_jefe":            "Para jefe / boss",
+    "para_profesor":        "Para profesor / maestro",
+    "para_abuelo":          "Para abuelos",
+    "para_hijo":            "Para hijo / hija",
+    "para_compadre":        "Para compadre / comadre",
+    # Estilos de decoracion
+    "estilo_moderno":       "Estilo moderno / contemporaneo",
+    "estilo_clasico":       "Estilo clasico",
+    "estilo_vintage":       "Estilo vintage / retro",
+    "estilo_minimalista":   "Estilo minimalista",
+    "estilo_escandinavo":   "Estilo escandinavo / nordic",
+    "estilo_industrial":    "Estilo industrial",
+    "estilo_rustico":       "Estilo rustico",
+    "estilo_boho":          "Estilo boho / bohemio",
+    "estilo_art_deco":      "Estilo art deco",
+    "estilo_colonial":      "Estilo colonial",
+    "estilo_japones":       "Estilo japones / japandi / zen",
+    "estilo_glam":          "Estilo glam / lujo",
+    "decorativo":           "Producto decorativo",
+    "estetico":             "Estetico / bonito / atractivo",
+    "combinable":           "Combinable / que combine con decoracion",
+    # Niveles de habilidad
+    "nivel_principiante":   "Para principiantes",
+    "nivel_intermedio":     "Nivel intermedio",
+    "nivel_avanzado":       "Nivel avanzado",
+    "nivel_experto":        "Nivel experto / pro",
+    "user_friendly":        "User friendly / facil de usar",
+    # Genero / quien lo usa
+    "para_hombre":          "Para hombre / varon",
+    "para_mujer":           "Para mujer / dama",
+    "unisex_uso":           "Unisex / ambos generos",
+    "para_niño":            "Para niño / chico",
+    "para_niña":            "Para niña / chica",
+    # Edades
+    "edad_recien_nacido":   "Edad 0-6 meses (recien nacido)",
+    "edad_lactante":        "Edad 6-12 meses (lactante)",
+    "edad_caminando":       "Edad 1-3 años (que ya camina)",
+    "edad_preescolar":      "Edad 3-6 años (preescolar)",
+    "edad_escolar":         "Edad 6-12 años (escolar)",
+    "edad_adolescente":     "Adolescente / teen",
+    "edad_adulto":          "Adulto / +18",
+    # Climas / Estaciones
+    "para_invierno":        "Para invierno / frio",
+    "para_verano":          "Para verano / calor",
+    "para_lluvia":          "Para epoca de lluvias",
+    "clima_calido":         "Para clima calido / tropical",
+    "clima_frio":           "Para clima frio / altiplano",
+    "clima_humedo":         "Para clima humedo",
+    "clima_seco":           "Para clima seco",
+    # Sensoriales
+    "fragancia_natural":    "Fragancia natural / aromatico",
+    "sin_olor":             "Sin olor / odorless",
+    "tacto_suave":          "Suave al tacto / soft touch",
+    "con_vibracion":        "Con vibracion",
+    "con_sonido":           "Con sonido / sonoro",
+    "led_iluminado":        "Iluminado / con luz LED",
+    # Wellness
+    "relajante":            "Relajante",
+    "anti_ansiedad":        "Anti ansiedad / calma",
+    "para_meditacion":      "Para meditar / yoga",
+    "mejora_postura":       "Mejora postura / corrige postura",
+    "antifatiga":           "Anti-fatiga / anti cansancio",
+    "anti_dolor":           "Alivia dolor / pain relief",
+    "anti_estres":          "Anti estres / stress relief",
+    "aromaterapia_uso":     "Para aromaterapia / aceites esenciales",
+    # Cocina especializada
+    "panificadora":         "Panificadora / para hacer pan",
+    "maquina_pasta":        "Maquina de pasta / para fideos",
+    "maquina_helado":       "Maquina de helado",
+    "maquina_yogurt":       "Yogurtera / para hacer yogurt",
+    "maquina_cafe":         "Cafetera / coffee maker",
+    "cafetera_capsula":     "Cafetera de capsulas (Nespresso, Dolce Gusto)",
+    "cafetera_espresso":    "Cafetera espresso",
+    "molino_cafe":          "Molino de cafe",
+    "vacuum_sealer":        "Envasadora al vacio / sellado al vacio",
+    "deshidratador":        "Deshidratador de alimentos",
+    "conveccion":           "Horno con conveccion",
+    "microondas_grill":     "Microondas con grill",
+    "olla_presion":         "Olla a presion",
+    "olla_electrica":       "Olla electrica multifuncion",
+    "wok":                  "Wok / para wok",
+    "freidora_honda":       "Freidora honda / deep fryer",
+    "parrilla_incorporada": "Parrilla / asador / barbacoa",
+    "plancha_grill":        "Plancha / griddle",
+    "vaporera":             "Vaporera / cocina al vapor",
+    "licuadora_inmersion":  "Licuadora de inmersion / minipimer",
+    "procesador_alimentos": "Procesador de alimentos",
+    "batidora_mano":        "Batidora de mano",
+    "batidora_pedestal":    "Batidora de pedestal (KitchenAid)",
+    "exprimidor":           "Exprimidor / juicer",
+    # Comidas / restricciones
+    "apto_diabetico":       "Apto para diabeticos",
+    "apto_celiaco":         "Apto celiaco / sin gluten",
+    "apto_lactosa":         "Sin lactosa / lactose free",
+    "apto_keto":            "Apto dieta keto / cetogenica",
+    "apto_paleo":           "Apto dieta paleo",
+    "low_carb":             "Bajo en carbohidratos / low carb",
+    # Sostenibilidad extra
+    "biodegradable":        "Biodegradable",
+    "compostable":          "Compostable",
+    "cien_pct_reciclado":   "100% reciclado",
+    "fair_trade":           "Comercio justo / fair trade",
+    "sin_plastico":         "Sin plastico / plastic free",
+    "carbono_neutral":      "Carbono neutral / huella cero",
+    "plant_based":          "Plant based / 100% vegetal",
+    # Voltaje / electricidad
+    "voltaje_110":          "Voltaje 110V (americano)",
+    "voltaje_220":          "Voltaje 220V (europeo / boliviano)",
+    "doble_voltaje":        "Doble voltaje 110/220",
+    # Iluminación
+    "lampara_escritorio":   "Lampara de escritorio",
+    "lampara_mesa":         "Lampara de mesa",
+    "lampara_pie":          "Lampara de pie / floor lamp",
+    "lampara_pared":        "Lampara / aplique de pared",
+    "plafon":               "Plafon / lampara de techo",
+    "araña_luz":            "Araña / candelabro / chandelier",
+    "luz_decorativa":       "Luz decorativa",
+    # Profesiones
+    "para_electricista":    "Para electricista",
+    "para_plomero":         "Para plomero / fontanero",
+    "para_carpintero":      "Para carpintero",
+    "para_mecanico":        "Para mecanico",
+    "para_soldador":        "Para soldador profesional",
+    "para_panadero":        "Para panaderia",
+    "para_pastelero":       "Para pasteleria",
+    "para_chef":            "Para chef profesional",
+    "para_barista":         "Para barista profesional",
+    "para_barbero":         "Para barberia profesional",
+    "para_estilista":       "Para estilista / esteticista / salon",
+    "para_doctor":          "Para uso medico / doctor",
+    # Hobbies
+    "para_tejido":          "Para tejer / knitting",
+    "para_pintura":         "Para pintar / painting",
+    "para_dibujo":          "Para dibujar / ilustracion",
+    "para_modelismo":       "Modelismo / miniaturas",
+    "para_rompecabezas":    "Rompecabezas / puzzles",
+    "para_lego":            "Para legos / bloques",
+    "para_coleccion":       "Producto coleccionable",
+    "para_jardineria":      "Para jardineria / plantas",
+    "para_costura":         "Para costura / sewing",
+    "para_manualidades":    "Para manualidades / DIY crafts",
+    "para_cerveza_casera":  "Para cerveza casera / homebrew",
+    "para_kombucha":        "Para kombucha / fermentacion",
+    "para_fermentacion":    "Para fermentacion en general",
+    # Fiestas / Holidays
+    "para_navidad":         "Decoracion navideña",
+    "para_halloween":       "Para Halloween",
+    "para_dia_muertos":     "Dia de los Muertos / Todos Santos",
+    "para_carnaval":        "Para carnaval / anata",
+    "para_fiestas_patrias": "Fiestas patrias / 6 de agosto",
+    "para_pascua":          "Para Pascua / Easter",
+    "para_san_juan":        "Para San Juan / fogata",
+    # Música / Instrumentos
+    "para_guitarra":        "Para guitarra",
+    "para_piano":           "Para piano / teclado musical",
+    "para_bateria_musical": "Bateria musical / drums",
+    "para_violin":          "Para violin",
+    "para_flauta":          "Para flauta",
+    "para_canto":           "Para canto / vocal",
+    "karaoke":              "Para karaoke",
+    "amplificador_musical": "Amplificador musical",
+    # Casa eventos
+    "para_mudanza":         "Para mudanza / casa nueva",
+    "para_alquiler":        "Para alquiler / rental",
+    "para_airbnb":          "Para Airbnb / alquiler temporario",
+    "para_hotel":           "Para hotel / hotel grade",
+    "para_oficina_uso2":    "Para oficina corporativa",
+    "para_restaurante":     "Para restaurante / uso gastronomico",
+    "para_evento_grande":   "Para eventos grandes / catering",
+    # Telas / Materiales textiles
+    "cien_pct_algodon":     "100% algodon",
+    "lino_textil":          "Tela de lino",
+    "seda_textil":          "Tela de seda",
+    "lana_textil":          "Tela de lana",
+    "polar_textil":         "Polar / fleece",
+    "denim_textil":         "Denim / mezclilla",
+    "spandex_lycra":        "Spandex / lycra / elastico",
+    "sintetico_textil":     "Tela sintetica / poliester",
+    "nylon_textil":         "Tela de nylon",
+    # Tallas
+    "talla_xs":             "Talla XS / extra pequeña",
+    "talla_s":              "Talla S / pequeña",
+    "talla_m":              "Talla M / mediana",
+    "talla_l":              "Talla L / grande",
+    "talla_xl":             "Talla XL / extra grande",
+    "talla_xxl":            "Talla XXL / doble extra grande",
+    "talla_plus":           "Tallas plus / grandes",
+    "talla_unica":          "Talla unica / one size",
+    "talla_ajustable":      "Talla ajustable",
+    # Texturas tela
+    "acolchado":            "Acolchado / padded",
+    "impermeable_tela":     "Tela impermeable",
+    "transpirable":         "Transpirable / breathable",
+    "anti_arrugas":         "Anti-arrugas / no se arruga",
+    # Limpieza profunda
+    "autolavado_funcion":   "Funcion auto-lavado",
+    "antimicrobiano":       "Antimicrobiano / anti germenes",
+    "desinfectante":        "Desinfectante / sanitizante",
+    # Cocina / Bebidas
+    "dispensador_agua":     "Dispensador de agua",
+    "dispensador_hielo":    "Dispensador de hielo",
+    "maquina_hielo":        "Maquina de hielo / ice maker",
+    # Salud específica
+    "monitor_oxigeno":      "Oximetro de pulso",
+    "balanza_inteligente":  "Balanza inteligente / smart scale",
+    "nebulizador":          "Nebulizador",
+    "inhalador":            "Inhalador",
+    "almohadilla_termica":  "Almohadilla termica / heating pad",
+    "ortopedico":           "Ortopedico",
+    # Tipos de productos
+    "kit_completo":         "Kit completo / viene con todo",
+    "todo_en_uno":          "Todo en uno / all-in-one",
+    "con_accesorios":       "Incluye accesorios",
+    "baterias_incluidas":   "Baterias incluidas",
+    "sin_baterias":         "NO incluye baterias",
+    "cargador_incluido":    "Cargador incluido",
+    "estuche_incluido":     "Estuche incluido",
+    "cable_incluido":       "Cable incluido",
+    # Carácter
+    "antiguo":              "Producto antiguo",
+    "rebajado":             "Rebajado / saldo",
+    "liquidacion":          "En liquidacion / clearance",
+    "oferta_relampago":     "Oferta relampago / del dia",
+    "recomendado":          "Recomendado por la tienda",
+    "editores_pick":        "Editors pick / elegido por editores",
+    "tendencia":            "Tendencia / lo mas pedido",
+    # Bebés extras
+    "para_gemelos":         "Para gemelos / mellizos",
+    "moises_portatil":      "Moises portatil",
+    "monitor_sueno_bebe":   "Monitor de sueño bebe",
+    "cubre_lluvia_bebe":    "Cubre lluvia para coche bebe",
+    "sombrilla_bebe":       "Sombrilla para coche bebe",
+    "organizador_bebe":     "Organizador articulos bebe",
+    # Office
+    "alfombrilla_mouse":    "Alfombrilla mouse / mousepad",
+    "apoya_muñeca":         "Apoya-muñeca",
+    "organizador_cables":   "Organizador de cables",
+    "regleta":              "Regleta / power strip",
+    "ups":                  "UPS / respaldo de energia",
+    "estabilizador_voltaje": "Estabilizador de voltaje",
+    # Cocina utensilios
+    "set_cuchillos":        "Set / juego de cuchillos",
+    "juego_ollas":          "Juego de ollas / cookware",
+    "vajilla_completa":     "Vajilla completa",
+    "set_cubiertos":        "Set de cubiertos",
+    "organizador_cocina":   "Organizador de cocina",
+    "tabla_picar":          "Tabla de picar",
+    # Hogar limpieza
+    "escoba_electrica":     "Escoba electrica / stick vacuum",
+    "aspiradora_mano":      "Aspiradora de mano / portatil",
+    "aspiradora_central":   "Aspiradora central de casa",
+    "limpiavidrios":        "Robot limpiavidrios",
+    "trapeador_giratorio":  "Trapeador giratorio / spin mop",
+    # Mascotas extras
+    "ropa_mascota":         "Ropa para mascota",
+    "juguete_mascota":      "Juguete para mascota",
+    "areneros_gatos":       "Arenero / litter box gato",
+    "cama_mascota":         "Cama para mascota",
+    "plato_mascota":        "Plato / comedero mascota",
+    "rascador_techo":       "Rascador / cat tree",
+    # Muebles / Almacenaje
+    "estante":              "Estante / repisa / shelf",
+    "organizador_armario":  "Organizador de armario",
+    "zapatero":             "Zapatero / shoe rack",
+    "perchero":             "Perchero / coat rack",
+    "escritorio":           "Escritorio / desk",
+    "silla_escritorio":     "Silla de escritorio / oficina",
+    "silla_gaming":         "Silla gaming",
+    "silla_comedor":        "Silla comedor",
+    "mesa_centro":          "Mesa de centro / sala",
+    "mesa_comedor":         "Mesa de comedor",
+    "mesa_consola":         "Mesa consola",
+    "sofa":                 "Sofa / sillon / couch",
+    "sofa_cama":            "Sofa cama / sleeper sofa",
+    "colchon":              "Colchon",
+    "cama_individual":      "Cama individual / 1 plaza",
+    "cama_matrimonial":     "Cama matrimonial / 2 plazas",
+    "cama_king":            "Cama king size",
+    "cabecera_cama":        "Cabecera de cama / headboard",
+    # Iluminación ambiental
+    "velas_aromaticas":     "Velas aromaticas",
+    "difusor_aroma":        "Difusor de aroma",
+    # Belleza extras
+    "manicura_pedicura":    "Manicura / pedicura",
+    "set_uñas":             "Set / kit de uñas",
+    "limpiador_facial":     "Limpiador facial",
+    "masajeador_facial":    "Masajeador / rodillo facial",
+    # Aire libre extras
+    "piscina_inflable":     "Piscina inflable",
+    "trampolin":            "Trampolin",
+    "hamaca":               "Hamaca",
+    "parasol":              "Parasol / sombrilla jardin",
+    "set_jardin":           "Set / juego de jardin",
+    "muebles_jardin":       "Muebles de jardin / outdoor",
+    # Energía
+    "panel_solar":          "Panel solar",
+    "bateria_litio":        "Bateria de litio",
+    "powerbank":            "Power bank / cargador portatil",
+    # Certificaciones
+    "certificado_ce":       "Certificacion CE",
+    "certificado_fcc":      "Certificacion FCC",
+    "certificado_rohs":     "Certificacion RoHS",
+    "certificado_fda":      "Aprobado FDA",
+    "certificado_invima":   "Registrado INVIMA",
+}
+
+
+def _booleanos_ficha_completos() -> list[tuple[str, str]]:
+    """Genera la lista (campo, descripcion) para todos los booleans del catalogo,
+    usando la descripcion humana de _DESC_BOOLEANOS o una generica si falta."""
+    from .validador_filtros_duros import ValidadorFiltrosDuros
+    out: list[tuple[str, str]] = []
+    for nombre, _kws in ValidadorFiltrosDuros._ATRIBUTOS_BOOLEANOS:
+        desc = _DESC_BOOLEANOS.get(nombre)
+        if desc is None:
+            # Fallback: convierte snake_case → "Snake case"
+            desc = nombre.replace("_", " ").capitalize()
+        out.append((nombre, desc))
+    return out
+
+
+_BOOLEANOS_FICHA: list[tuple[str, str]] = _booleanos_ficha_completos()
+
+
+_PROPS_BUSCAR_PRODUCTOS: dict = {
+    "query": {
+        "type": "string",
+        "description": (
+            "SOLO el sustantivo o nombre del producto (ej. 'laptop', "
+            "'televisor', 'freidora', 'iphone 15 pro'). PROHIBIDO pasar "
+            "frases conversacionales del cliente: 'tengo presupuesto de "
+            "30000bs', 'cual me conviene', 'no me interesa la marca', "
+            "'asesorame'. Esas senales van como filtros estructurados "
+            "(precio_max, marca) o las infiere el sistema desde el perfil. "
+            "Si el cliente solo dio contexto/preferencias sin nombrar "
+            "producto, omite `query` y usa los otros filtros."
+        ),
+    },
+    "categoria": {"type": "string"},
+    "subcategoria": {"type": "string"},
+    "marca": {"type": "string"},
+    "modelo": {"type": "string", "description": "Filtra por nombre de modelo (ej. 'Galaxy S26', 'WH-1000XM5')."},
+    "precio_max": {"type": "number"},
+    "precio_min": {"type": "number"},
+    "pulgadas": {
+        "type": "number",
+        "description": "Pulgadas exactas (tolerancia +/-0.5). Ej: 55 para TV de 55\".",
+    },
+    "pulgadas_min": {"type": "number"},
+    "pulgadas_max": {"type": "number"},
+    "capacidad_gb_min": {
+        "type": "integer",
+        "description": "Almacenamiento minimo en GB (celulares, laptops, tablets).",
+    },
+    "ram_gb_min": {"type": "integer", "description": "RAM minima en GB."},
+    "capacidad_litros_min": {
+        "type": "number",
+        "description": "Capacidad minima en litros (heladeras, hornos, microondas).",
+    },
+    "capacidad_kg_min": {
+        "type": "number",
+        "description": "Capacidad minima en kg (lavadoras).",
+    },
+    "potencia_w_min": {
+        "type": "integer",
+        "description": "Potencia minima en W (licuadoras, secadores, aspiradoras).",
+    },
+    "potencia_w_max": {"type": "integer", "description": "Potencia maxima en W."},
+    "procesador": {
+        "type": "string",
+        "description": "Procesador canonico (laptops/mini-pc). Ej: i3, i5, i7, i9, ryzen 3, ryzen 5, ryzen 7, ryzen 9, m1, m2, m3, m4, celeron, pentium, xeon, snapdragon, mediatek.",
+    },
+    "tipo_panel": {"type": "string", "enum": ["OLED", "QLED", "MINILED", "DLED", "LED"]},
+    "resolucion": {"type": "string", "enum": ["8K", "4K", "2K", "FHD", "HD"]},
+    "color": {"type": "string"},
+    "refresh_hz_min": {
+        "type": "integer",
+        "description": (
+            "Frecuencia de refresco minima en Hz (TVs, monitores). "
+            "Ej: 120 para filtrar 120Hz+. SOLO usar si el cliente "
+            "requiere 120Hz o mas explicitamente. NO incluir '120Hz' "
+            "en el campo `query` — usar este parametro en su lugar."
+        ),
+    },
+    "gpu_dedicada": {
+        "type": "boolean",
+        "description": (
+            "True para filtrar laptops/PCs con GPU dedicada confirmada "
+            "(NVIDIA GeForce, AMD Radeon). Usar cuando el cliente pide "
+            "'GPU dedicada', 'gráfica dedicada', 'RTX', 'gaming serio', "
+            "'render' o 'ingeniería con gráficos'. NUNCA inferir GPU "
+            "dedicada solo porque el procesador sea i7 o Ryzen 7."
+        ),
+    },
+    "es_electrico": {
+        "type": "boolean",
+        "description": (
+            "True SOLO para vehiculos electricos (motos electricas, autos "
+            "electricos). NUNCA usar para refrigeradoras, lavadoras ni "
+            "electrodomesticos — esos no tienen este campo."
+        ),
+    },
+    "bateria_mah_min": {
+        "type": "integer",
+        "description": "Capacidad de bateria minima en mAh (smartphones, power banks).",
+    },
+    "camara_mp_min": {
+        "type": "integer",
+        "description": "Megapixeles minimos de camara trasera principal (smartphones).",
+    },
+    "camara_frontal_mp_min": {
+        "type": "integer",
+        "description": "Megapixeles minimos de camara frontal / selfie.",
+    },
+    "soporta_5g": {
+        "type": "boolean",
+        "description": "True si el cliente exige 5G. Productos sin 5G confirmado quedan fuera.",
+    },
+    "sistema_operativo": {
+        "type": "string",
+        "description": "Sistema operativo (Android, iOS, Windows, macOS, Linux, FreeDOS, ChromeOS).",
+    },
+    "meses_garantia_min": {
+        "type": "integer",
+        "description": "Meses minimos de garantia oficial Dismac.",
+    },
+    "tiene_descuento": {
+        "type": "boolean",
+        "description": "True para productos con precio anterior > precio actual (en oferta).",
+    },
+    "descuento_pct_min": {
+        "type": "number",
+        "description": "Porcentaje minimo de descuento (ej. 20 = al menos 20% off).",
+    },
+    "stock_min": {"type": "integer", "description": "Stock minimo disponible."},
+    "carga_rapida_w_min": {
+        "type": "integer",
+        "description": "Carga rapida minima en W (smartphones).",
+    },
+    "eficiencia_energetica": {
+        "type": "string",
+        "description": "Etiqueta energetica (A++, A+, A, B, C, D).",
+    },
+    "tipo_combustible": {
+        "type": "string",
+        "enum": ["gas", "electrico", "induccion", "mixto"],
+        "description": "Tipo de combustible para cocinas/hornos.",
+    },
+    "tipo_carga_lavadora": {
+        "type": "string",
+        "enum": ["frontal", "superior"],
+        "description": "Tipo de carga para lavadoras.",
+    },
+    "frecuencia_rpm_min": {
+        "type": "integer",
+        "description": "RPM minimas (lavadoras, motores).",
+    },
+    "ip_rating": {
+        "type": "string",
+        "description": "Certificacion IP requerida exacta (IP67, IP68, IPX4...).",
+    },
+    "bluetooth_version_min": {
+        "type": "number",
+        "description": "Version minima de Bluetooth (5.0, 5.3...).",
+    },
+    "hdmi_version_min": {
+        "type": "number",
+        "description": "Version minima de HDMI (2.0, 2.1).",
+    },
+    "wifi_version": {
+        "type": "string",
+        "description": "Version de Wi-Fi requerida (Wi-Fi 6, Wi-Fi 5...).",
+    },
+    "hdmi_puertos_min": {"type": "integer", "description": "Cantidad minima de puertos HDMI."},
+    "usb_puertos_min": {"type": "integer", "description": "Cantidad minima de puertos USB."},
+    "solo_en_oferta": {"type": "boolean", "description": "Solo productos con precio_anterior > actual."},
+    "solo_con_stock": {"type": "boolean", "default": True},
+}
+
+# Inyectar dinamicamente todos los booleanos de ficha
+for _filtro, _desc in _BOOLEANOS_FICHA:
+    _PROPS_BUSCAR_PRODUCTOS[_filtro] = {"type": "boolean", "description": _desc}
+
+
 TOOLS_SPEC: list[dict] = [
     _tool(
         "buscar_productos",
         (
             "Busca productos en el catalogo Dismac. Hasta 6 resultados. Combina filtros "
-            "(query de texto + categoria + subcategoria + marca + rango de precio en Bs). "
-            "Para filtrar por atributos estructurados prefiere los campos dedicados antes "
-            "que incrustarlos en `query`: pulgadas (TVs/monitores/laptops), capacidad_gb_min "
-            "(almacenamiento celulares/laptops), ram_gb_min (RAM), capacidad_litros_min "
-            "(heladeras/hornos), capacidad_kg_min (lavadoras), potencia_w_min/max "
-            "(licuadoras/secadores/aspiradoras), procesador (laptops: i3/i5/i7/i9, "
-            "ryzen 3/5/7/9, m1-m4), tipo_panel (OLED/QLED/LED), "
-            "resolucion (8K/4K/FHD/HD), color."
+            "estructurados sobre todo el catalogo (linea blanca, electronica, computacion, "
+            "audio, smartphones, tablets, smartwatches, electrodomesticos, cocina, deportes, "
+            "vehiculos). Para filtrar por atributos prefiere los campos dedicados antes "
+            "que incrustarlos en `query`. Soporta filtros boolean derivados de la ficha "
+            "(inverter, no_frost, anc, smart_tv, hdmi_2_1, dolby_atmos, ip67, ip68, "
+            "lector_huella, dual_sim, etc.) y filtros comerciales (tiene_descuento, "
+            "descuento_pct_min, stock_min)."
         ),
-        {
-            "query": {
-                "type": "string",
-                "description": (
-                    "SOLO el sustantivo o nombre del producto (ej. 'laptop', "
-                    "'televisor', 'freidora', 'iphone 15 pro'). PROHIBIDO pasar "
-                    "frases conversacionales del cliente: 'tengo presupuesto de "
-                    "30000bs', 'cual me conviene', 'no me interesa la marca', "
-                    "'asesorame'. Esas senales van como filtros estructurados "
-                    "(precio_max, marca) o las infiere el sistema desde el perfil. "
-                    "Si el cliente solo dio contexto/preferencias sin nombrar "
-                    "producto, omite `query` y usa los otros filtros."
-                ),
-            },
-            "categoria": {"type": "string"},
-            "subcategoria": {"type": "string"},
-            "marca": {"type": "string"},
-            "precio_max": {"type": "number"},
-            "precio_min": {"type": "number"},
-            "pulgadas": {
-                "type": "number",
-                "description": "Pulgadas exactas (tolerancia +/-0.5). Ej: 55 para TV de 55\".",
-            },
-            "pulgadas_min": {"type": "number"},
-            "pulgadas_max": {"type": "number"},
-            "capacidad_gb_min": {
-                "type": "integer",
-                "description": "Almacenamiento minimo en GB (celulares, laptops, tablets).",
-            },
-            "ram_gb_min": {"type": "integer", "description": "RAM minima en GB."},
-            "capacidad_litros_min": {
-                "type": "number",
-                "description": "Capacidad minima en litros (heladeras, hornos, microondas).",
-            },
-            "capacidad_kg_min": {
-                "type": "number",
-                "description": "Capacidad minima en kg (lavadoras).",
-            },
-            "potencia_w_min": {
-                "type": "integer",
-                "description": "Potencia minima en W (licuadoras, secadores, aspiradoras).",
-            },
-            "potencia_w_max": {
-                "type": "integer",
-                "description": "Potencia maxima en W.",
-            },
-            "procesador": {
-                "type": "string",
-                "description": "Procesador canonico (laptops/mini-pc). Ej: i3, i5, i7, i9, ryzen 3, ryzen 5, ryzen 7, ryzen 9, m1, m2, m3, m4, celeron, pentium, xeon, snapdragon, mediatek.",
-            },
-            "tipo_panel": {
-                "type": "string",
-                "enum": ["OLED", "QLED", "MINILED", "DLED", "LED"],
-            },
-            "resolucion": {
-                "type": "string",
-                "enum": ["8K", "4K", "2K", "FHD", "HD"],
-            },
-            "color": {"type": "string"},
-            "es_electrico": {
-                "type": "boolean",
-                "description": (
-                    "True para vehiculos/productos electricos (motocicletas "
-                    "electricas, autos electricos). False para combustion. "
-                    "Usar cuando el cliente pregunta 'electricas', 'a bateria', "
-                    "'sin gasolina'."
-                ),
-            },
-            "solo_con_stock": {"type": "boolean", "default": True},
-        },
+        _PROPS_BUSCAR_PRODUCTOS,
     ),
     _tool(
         "listar_categorias",

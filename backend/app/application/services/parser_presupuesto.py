@@ -47,7 +47,14 @@ class ParserPresupuesto:
         re.IGNORECASE,
     )
     _RX_MIL = re.compile(
-        r"\b(\d{1,3})\s*(?:mil|k)\b(?!\s*(?:mah|hz|ghz|mhz|rpm))",
+        r"\b(\d{1,3})\s*(?:mil|k)\b(?!\s*(?:mah|hz|ghz|mhz|rpm|uhd|p\b))",
+        re.IGNORECASE,
+    )
+    _RX_CONTEXTO_BUDGET = re.compile(
+        r"(?:pre[\s-]?supuesto|presu|tengo|gastar\w*|gasto|gastaria|"
+        r"max(?:imo)?|hasta|por\s+solo|solo\s+\d|rango|costar|cuesta\w*|"
+        r"valer|valga|vale|monto|llega|alcanza|pagar|pagaria|poner|"
+        r"invertir|destinar|disponer|bs\.?|bob|bolivianos?|\$)",
         re.IGNORECASE,
     )
     _RX_UNIDAD_NO_MONETARIA = re.compile(
@@ -69,9 +76,40 @@ class ParserPresupuesto:
                 return valor
         return None
 
+    _RX_IDEAL_VS_MAX = re.compile(
+        r"(?:ideal|prefer\w+|me\s+gustar[ia]a|si\s+puedo)[^\d]{0,30}([\d][\d\.,]{2,})"
+        r".*?"
+        r"(?:max\w*|hasta|podr[ia]a?\s+subir|tope|techo)[^\d]{0,20}([\d][\d\.,]{2,})",
+        re.IGNORECASE | re.DOTALL,
+    )
+
+    @classmethod
+    def extraer_rango(cls, texto: str) -> tuple[float | None, float | None]:
+        """Devuelve (presupuesto_ideal, presupuesto_max).
+
+        Si el cliente expresa rango ('ideal 8500, hasta 11000 si vale la pena'),
+        ambos valores se devuelven separados. Si solo hay un numero, se asume
+        como techo absoluto y el ideal queda None."""
+        if not texto:
+            return None, None
+        m = cls._RX_IDEAL_VS_MAX.search(texto)
+        if m:
+            v1 = cls._a_float(m.group(1))
+            v2 = cls._a_float(m.group(2))
+            if v1 and v2 and cls._MIN <= v1 <= cls._MAX and cls._MIN <= v2 <= cls._MAX:
+                ideal, techo = (v1, v2) if v1 <= v2 else (v2, v1)
+                return ideal, techo
+        unico = cls.extraer(texto)
+        return None, unico
+
     @classmethod
     def _extraer_mil(cls, texto: str) -> float | None:
         for match in cls._RX_MIL.finditer(texto):
+            inicio = max(0, match.start() - 35)
+            fin = min(len(texto), match.end() + 20)
+            contexto = texto[inicio:fin]
+            if not cls._RX_CONTEXTO_BUDGET.search(contexto):
+                continue
             try:
                 valor = float(match.group(1)) * 1000.0
             except ValueError:

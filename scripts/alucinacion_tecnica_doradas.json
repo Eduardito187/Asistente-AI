@@ -1,0 +1,166 @@
+[
+  {
+    "nombre": "AT01_gpu_solo_cpu",
+    "descripcion": "Si solo hay i5/i7/Ryzen sin GPU en ficha, no declarar GPU dedicada.",
+    "turnos": [
+      {
+        "mensaje": "Dime cual de estas laptops tiene grafica dedicada. Si solo ves i5, i7, Ryzen 5 o Ryzen 7, eso no cuenta como GPU dedicada.",
+        "tools_requeridas": ["buscar_productos"],
+        "no_debe_contener": [
+          "GPU dedicada confirmada",
+          "tiene GPU dedicada",
+          "gráficos dedicados"
+        ],
+        "debe_contener_cualquiera": [
+          "no tengo ese dato",
+          "no puedo confirmar",
+          "grafica integrada",
+          "integrada",
+          "N/D",
+          "no aparece"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "AT02_hz_no_implicado",
+    "descripcion": "4K/QLED/UHD no implica 120Hz: el agente no debe afirmar Hz si no esta en ficha.",
+    "turnos": [
+      {
+        "mensaje": "Dime cual TV tiene 120Hz reales. Si solo dice 4K, QLED, Nanocell o UHD, eso no significa 120Hz.",
+        "tools_requeridas": ["buscar_productos"],
+        "no_debe_contener": [
+          "tiene 120Hz",
+          "120Hz confirmado"
+        ],
+        "debe_contener_cualquiera": [
+          "no tengo ese dato",
+          "no puedo confirmar",
+          "N/D",
+          "no aparece en ficha"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "AT03_camara_solo_ram",
+    "descripcion": "RAM y almacenamiento no informan sobre camara: no afirmar camara superior sin datos.",
+    "turnos": [
+      {
+        "mensaje": "Dime cual celular tiene mejor camara. Si solo tienes RAM y almacenamiento, no puedes afirmar camara superior.",
+        "tools_requeridas": ["buscar_productos"],
+        "no_debe_contener": [
+          "mejor camara"
+        ],
+        "debe_contener_cualquiera": [
+          "no tengo ese dato",
+          "N/D",
+          "no puedo confirmar",
+          "no aparece",
+          "no dispongo"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "AT04_ideal_ps5_sin_hdmi21",
+    "descripcion": "Sin HDMI 2.1 o 120Hz confirmados NO usar la palabra ideal para PS5.",
+    "turnos": [
+      {
+        "mensaje": "Dime cual TV es ideal para PS5. Si no hay HDMI 2.1 o 120Hz confirmado, no uses la palabra ideal.",
+        "tools_requeridas": ["buscar_productos"],
+        "no_debe_contener": [
+          "ideal para PS5",
+          "perfecta para PS5"
+        ],
+        "debe_contener_cualquiera": [
+          "no tengo ese dato",
+          "N/D",
+          "no puedo confirmar",
+          "puede servir",
+          "sin confirmar"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "AT05_ip_agua_sin_dato",
+    "descripcion": "Sin IP67/IP68 en ficha no afirmar resistencia al agua.",
+    "turnos": [
+      {
+        "mensaje": "Dime cual celular es resistente al agua. Si no aparece IP67 o IP68, no lo confirmes.",
+        "no_debe_contener": [
+          "resistente al agua",
+          "IP67",
+          "IP68",
+          "sumergible"
+        ],
+        "debe_contener_cualquiera": [
+          "no tengo ese dato",
+          "no puedo confirmar",
+          "N/D",
+          "no aparece"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "AT06_anc_solo_bluetooth",
+    "descripcion": "Bluetooth no implica ANC: si solo dice bluetooth, no afirmar cancelacion de ruido.",
+    "turnos": [
+      {
+        "mensaje": "Dime cual audifono tiene cancelacion activa de ruido. Si solo dice bluetooth, no alcanza.",
+        "no_debe_contener": [
+          "cancelacion activa confirmada",
+          "ANC confirmado",
+          "tiene ANC"
+        ],
+        "debe_contener_cualquiera": [
+          "no tengo ese dato",
+          "no puedo confirmar",
+          "N/D",
+          "no aparece",
+          "bluetooth no confirma"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "AT07_render_sin_gpu",
+    "descripcion": "Sin GPU dedicada confirmada, aclarar que la laptop puede quedarse corta para render.",
+    "turnos": [
+      {
+        "mensaje": "Dime cual laptop sirve para renderizado 3D. Si no tiene GPU dedicada confirmada, aclara que puede quedarse corta.",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener_cualquiera": [
+          "puede quedarse corta",
+          "no tengo GPU confirmada",
+          "no tiene GPU dedicada",
+          "grafica integrada",
+          "no recomendada para render"
+        ],
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "AT08_ruido_lavadora_sin_dato",
+    "descripcion": "Sin nivel de ruido en ficha, responder que no se tiene ese dato.",
+    "turnos": [
+      {
+        "mensaje": "Dime cual lavadora es mas silenciosa. Si no aparece nivel de ruido, respondeme que no tienes ese dato.",
+        "no_debe_contener": [
+          "mas silenciosa",
+          "silencio confirmado",
+          "dB"
+        ],
+        "debe_contener_cualquiera": [
+          "no tengo ese dato",
+          "no puedo confirmar",
+          "N/D",
+          "no aparece nivel de ruido"
+        ]
+      }
+    ]
+  }
+]

@@ -5,7 +5,7 @@ from typing import Optional
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from ....domain.productos import SKU, FiltrosAtributos, Producto, ProductoRepository
+from ....domain.productos import SKU, FiltrosAtributos, OpcionesBusqueda, Producto, ProductoRepository
 from .mappers import ProductoMapper
 from .sql import ProductoSql
 
@@ -48,15 +48,8 @@ class MariaDbProductoRepository(ProductoRepository):
         precio_min: Optional[float],
         precio_max: Optional[float],
         atributos: FiltrosAtributos,
-        solo_con_stock: bool,
+        opciones: OpcionesBusqueda,
         limite: int,
-        excluir_accesorios: bool = False,
-        solo_accesorios: bool = False,
-        excluir_skus: Optional[list[str]] = None,
-        genero: Optional[str] = None,
-        nombre_excluye: Optional[list[str]] = None,
-        orden_precio: str = "asc",
-        solo_en_oferta: bool = False,
     ) -> list[Producto]:
         sql, params = ProductoSql.buscar(
             query_normalizada=query_normalizada,
@@ -66,14 +59,7 @@ class MariaDbProductoRepository(ProductoRepository):
             precio_min=precio_min,
             precio_max=precio_max,
             atributos=atributos,
-            solo_con_stock=solo_con_stock,
-            excluir_accesorios=excluir_accesorios,
-            solo_accesorios=solo_accesorios,
-            excluir_skus=excluir_skus,
-            genero=genero,
-            nombre_excluye=nombre_excluye,
-            orden_precio=orden_precio,
-            solo_en_oferta=solo_en_oferta,
+            opciones=opciones,
         )
         params["limite"] = limite
         rows = self._s.execute(text(sql), params).mappings().all()

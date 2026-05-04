@@ -36,6 +36,17 @@ class DetectorExclusionesMensaje:
         "consola", "monitor", "parlante", "accesorio", "accesorios",
         "tablet", "laptop", "televisor", "celular", "impresora",
         "secadora", "frigobar", "freezer",
+        # Procesadores/componentes low-end — excluibles cuando el cliente los pide explícitamente
+        "celeron", "pentium", "chromebook",
+    )
+
+    # Regex para detectar componentes técnicos no deseados citados explícitamente
+    # en un contexto de exclusión (lista tras "no me muestres", "no quiero", etc.)
+    _RX_TECH_NEGADA = re.compile(
+        r"\b(?:no\s+(?:me\s+)?(?:quiero|muestres?|incluyas?|pongas?)\s+[^.;]*?|"
+        r"(?:nada\s+de|sin|excluye)\s*[^.;]*?)\b"
+        r"(celeron|pentium|chromebook)\b",
+        re.IGNORECASE,
     )
     _DISTANCIA_MAX = 1
 
@@ -57,6 +68,12 @@ class DetectorExclusionesMensaje:
     _EXCLUSIONES_IMPLICITAS: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
         # keyword gatillo    → (exclusiones si no está el "anti-keyword"    ,  anti-keywords)
         "reloj":  (("pared", "mural", "cocina"),  ("pared", "mural", "cocina", "decorativo")),
+        # Uso profesional → excluir procesadores de entrada del nombre
+        "ingenieria": (("celeron", "pentium"), ("celeron", "pentium")),
+        "autocad":    (("celeron", "pentium"), ("celeron", "pentium")),
+        "solidworks": (("celeron", "pentium"), ("celeron", "pentium")),
+        "render":     (("celeron", "pentium"), ("celeron", "pentium")),
+        "renderizado": (("celeron", "pentium"), ("celeron", "pentium")),
     }
 
     # Cuando el campo tipo_producto de la BD está poblado, este mapa indica
@@ -81,7 +98,14 @@ class DetectorExclusionesMensaje:
         return sorted({
             *negadas,
             *cls._calcular_exclusiones_implicitas(norm, palabras_negadas=set(negadas)),
+            *cls._componentes_tech_negados(norm),
         })
+
+    @classmethod
+    def _componentes_tech_negados(cls, norm: str) -> list[str]:
+        """Captura procesadores/componentes low-end citados en lista tras señal de exclusión.
+        Cubre 'no me muestres Celeron, Pentium' donde _RX_NEGACION solo captura una palabra."""
+        return [m.group(1).lower() for m in cls._RX_TECH_NEGADA.finditer(norm)]
 
     @classmethod
     def tipos_a_excluir(cls, mensaje: str | None) -> list[str]:

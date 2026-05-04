@@ -25,6 +25,9 @@ class ResultadoObtenerPerfilSesion:
     desired_tier: Optional[str] = None
     ram_gb_min: Optional[int] = None
     gpu_dedicada: Optional[bool] = None
+    ssd_gb_min: Optional[int] = None
+    nombre_excluye_acum: Optional[str] = None  # comma-separated
+    presupuesto_ideal: Optional[float] = None  # techo blando preferido del cliente
 
     def esta_vacio(self) -> bool:
         return not any(
@@ -52,3 +55,11 @@ class ResultadoObtenerPerfilSesion:
         if self.alternativa_ofrecida and "/" in self.alternativa_ofrecida:
             return self.alternativa_ofrecida.split("/", 1)[1]
         return None
+
+    def exclusiones_acumuladas(self) -> list[str]:
+        """Retorna la lista deduplicada de exclusiones acumuladas."""
+        if not self.nombre_excluye_acum:
+            return []
+        return list(dict.fromkeys(
+            kw.strip() for kw in self.nombre_excluye_acum.split(",") if kw.strip()
+        ))

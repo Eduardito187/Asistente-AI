@@ -43,6 +43,9 @@ class MariaDbPerfilSesionRepository(PerfilSesionRepository):
                 "res": perfil.resolucion,
                 "ram": perfil.ram_gb_min,
                 "gpu": 1 if perfil.gpu_dedicada else None,
+                "ssd": perfil.ssd_gb_min,
+                "excluye": perfil.nombre_excluye_acum,
+                "pideal": perfil.presupuesto_ideal,
             },
         )
 

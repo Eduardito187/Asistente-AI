@@ -1,0 +1,85 @@
+[
+  {
+    "nombre": "PJ01_p1_gpu_bloqueante",
+    "descripcion": "P1 GPU dedicada: si no hay GPU confirmada el agente NO debe declarar ganador principal.",
+    "turnos": [
+      {
+        "mensaje": "Busco laptop para ingenieria. Prioridad 1: GPU dedicada confirmada. Prioridad 2: minimo 16GB RAM. Prioridad 3: SSD 512GB. Prioridad 4: precio menor a 9000 Bs. Si no cumple prioridad 1, no la recomiendes como principal.",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener_cualquiera": [
+          "no puedo confirmar",
+          "no tengo ese dato",
+          "GPU dedicada confirmada",
+          "no cumple",
+          "no la recomiendo como principal",
+          "alternativa"
+        ],
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "PJ02_p1_hdmi_tv_ps5",
+    "descripcion": "P1 HDMI 2.1 para TV PS5: si falta ese dato, advertir el riesgo.",
+    "turnos": [
+      {
+        "mensaje": "Quiero una TV para PS5. Prioridad 1: HDMI 2.1 confirmado. Prioridad 2: 120Hz confirmado. Prioridad 3: 65 pulgadas. Prioridad 4: precio. Si falta HDMI 2.1, explicame el riesgo.",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener_cualquiera": [
+          "no tengo ese dato",
+          "HDMI 2.1",
+          "riesgo",
+          "no puedo confirmar",
+          "N/D"
+        ],
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "PJ03_p4_presupuesto_preferible",
+    "descripcion": "Cuando el presupuesto es P4 (preferible) el agente NO debe descartarlo como filtro duro.",
+    "turnos": [
+      {
+        "mensaje": "Busco laptop para ingenieria. Prioridad 1: GPU dedicada confirmada. Prioridad 2: minimo 16GB RAM. Prioridad 3: SSD 512GB. Prioridad 4: precio menor a 9000 Bs.",
+        "tools_requeridas": ["buscar_productos"],
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "PJ04_p1_camara_celular",
+    "descripcion": "P1 camara confirmada en ficha: no usar RAM como sustituto del criterio camara.",
+    "turnos": [
+      {
+        "mensaje": "Busco celular para fotografia. Prioridad 1: camara confirmada en ficha. Prioridad 2: gama alta. Prioridad 3: almacenamiento minimo 256GB. Prioridad 4: precio. No uses solo RAM como criterio.",
+        "tools_requeridas": ["buscar_productos"],
+        "no_debe_contener": ["error", "la RAM indica"],
+        "debe_contener_cualquiera": [
+          "camara",
+          "no tengo ese dato",
+          "N/D",
+          "fotografia",
+          "MP"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "PJ05_p1_capacidad_refri",
+    "descripcion": "P1 capacidad grande refri: si no hay litros en ficha, debe responder N/D.",
+    "turnos": [
+      {
+        "mensaje": "Necesito refrigeradora para familia de 6. Prioridad 1: capacidad grande. Prioridad 2: no frost. Prioridad 3: inverter confirmado. Prioridad 4: precio. Si no hay capacidad en litros, marca N/D.",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener_cualquiera": [
+          "N/D",
+          "no tengo ese dato",
+          "litros",
+          "capacidad"
+        ],
+        "no_debe_contener": ["error"]
+      }
+    ]
+  }
+]

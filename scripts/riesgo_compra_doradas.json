@@ -1,0 +1,96 @@
+[
+  {
+    "nombre": "RC01_menor_riesgo_laptop_ingenieria",
+    "descripcion": "El agente debe evaluar riesgo de compra por datos confirmados + adecuacion al uso + precio.",
+    "turnos": [
+      {
+        "mensaje": "Dime cual laptop tiene menor riesgo de compra para ingenieria, considerando datos confirmados, rendimiento y precio.",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener_cualquiera": [
+          "riesgo",
+          "bajo",
+          "medio",
+          "alto",
+          "confirmado",
+          "dato faltante"
+        ],
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "RC02_riesgo_tv_ps5",
+    "descripcion": "TV para PS5: riesgo de decepcionar si no hay Hz o HDMI 2.1 confirmados.",
+    "turnos": [
+      {
+        "mensaje": "Cual TV tiene menor riesgo de decepcionar a alguien que la quiere para PS5?",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener_cualquiera": [
+          "riesgo",
+          "HDMI",
+          "Hz",
+          "no tengo ese dato",
+          "N/D",
+          "confirmar"
+        ],
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "RC03_producto_barato_riesgoso_por_falta_datos",
+    "descripcion": "El agente debe identificar que precio bajo con ficha pobre es riesgo, no necesariamente buen deal.",
+    "turnos": [
+      {
+        "mensaje": "Dime que producto parece bueno en precio pero riesgoso por falta de datos tecnicos.",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener_cualquiera": [
+          "riesgo",
+          "dato faltante",
+          "N/D",
+          "no tengo ese dato",
+          "ficha incompleta",
+          "falta informacion"
+        ],
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "RC04_recomendacion_conservadora_agresiva_economica",
+    "descripcion": "El agente entrega 3 perfiles de compra: conservadora, agresiva, economica.",
+    "turnos": [
+      {
+        "mensaje": "Dame una recomendacion conservadora, una agresiva y una economica en laptops.",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener_cualquiera": [
+          "conservadora",
+          "agresiva",
+          "economica",
+          "segura"
+        ],
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "RC05_desventaja_producto_recomendado",
+    "descripcion": "El agente debe mencionar la desventaja del producto que recomienda (honestidad obligatoria).",
+    "turnos": [
+      {
+        "mensaje": "Dime que desventaja tiene el producto que recomiendas en laptops para ingenieria.",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener_cualquiera": [
+          "desventaja",
+          "pero",
+          "aunque",
+          "sin embargo",
+          "no tiene",
+          "N/D",
+          "limitacion"
+        ],
+        "no_debe_contener": ["error"]
+      }
+    ]
+  }
+]

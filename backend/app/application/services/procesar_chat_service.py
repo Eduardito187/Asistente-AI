@@ -60,6 +60,7 @@ from .clasificador_etapa_conversacional import ClasificadorEtapaConversacional
 from .recortador_cierres_comerciales import RecortadorCierresComerciales
 from .renderizador_tabla_comparacion import RenderizadorTablaComparacion
 from .silenciador_preguntas_redundantes import SilenciadorPreguntasRedundantes
+from .normalizador_acentos_respuesta import NormalizadorAcentosRespuesta
 from .normalizador_formato_producto import NormalizadorFormatoProducto
 from .limpiador_lista_productos import LimpiadorListaProductos
 from .detector_intencion_asesoria import DetectorIntencionAsesoria
@@ -78,6 +79,7 @@ from .detector_marca_mensaje import DetectorMarcaMensaje
 from .detector_solicitud_similares import DetectorSolicitudSimilares
 from .excluidor_juguetes_default import ExcluidorJuguetesDefault
 from .detector_contradiccion_presupuesto import DetectorContradiccionPresupuesto
+from .detector_prioridades_jerarquicas import DetectorPrioridadesJerarquicas
 from .detector_intencion_vaga import DetectorIntentionVaga
 from .detector_marca_excluida import DetectorMarcaExcluida
 from .detector_gpu_dedicada import DetectorGpuDedicada
@@ -88,6 +90,7 @@ from .responder_consulta_disponibilidad import ResponderConsultaDisponibilidad
 from .responder_productos_similares import ResponderProductosSimilares
 from .responder_consulta_politica import ResponderConsultaPolitica
 from .respuesta_follow_up import RespuestaFollowUp
+from .detector_manipulacion import DetectorManipulacion
 from .sanitizador_query_busqueda import SanitizadorQueryBusqueda
 from .tools_mark import ToolsMark
 
@@ -207,6 +210,10 @@ class ProcesarChatService:
             )
             return ChatOutput(sesion_id=sesion_id, respuesta=directa.texto)
 
+        sc_manip = self._short_circuit_manipulacion(inp=inp, sesion_id=sesion_id, t0=t0)
+        if sc_manip is not None:
+            return sc_manip
+
         # Boton 'Similares' del card: atajo determinista antes de cualquier
         # otro detector (follow-ups, atajos) que pueda distraer el flujo.
         similares_sc = self._short_circuit_similares(
@@ -298,6 +305,7 @@ class ProcesarChatService:
                         productos = [ProductoSerializer.detalle(prods_sku[0])]
         respuesta = VerificadorClaimsProducto.corregir(respuesta, productos)
         respuesta = NormalizadorFormatoProducto.normalizar(respuesta)
+        respuesta = NormalizadorAcentosRespuesta.normalizar(respuesta)
         if productos:
             respuesta = LimpiadorListaProductos.limpiar(respuesta)
 
@@ -595,6 +603,32 @@ class ProcesarChatService:
             pasos=[{"tool": p.tool, "args": p.args, "result": p.result} for p in trace],
         )
 
+    def _short_circuit_manipulacion(
+        self,
+        inp: ChatInput,
+        sesion_id: UUID,
+        t0: float,
+    ) -> ChatOutput | None:
+        if not DetectorManipulacion.es_manipulacion(inp.mensaje):
+            return None
+        texto = DetectorManipulacion.respuesta_rechazo()
+        self._registrar.ejecutar(
+            RegistrarMensajeCommand(sesion_id=sesion_id, rol=RolMensaje.ASSISTANT, contenido=texto)
+        )
+        self._registrar_metrica.ejecutar(
+            RegistrarMetricaTurnoCommand(
+                sesion_id=sesion_id,
+                mensaje_usuario_len=len(inp.mensaje),
+                respuesta_len=len(texto),
+                tool_calls=0,
+                mentiras_detectadas=0,
+                productos_citados=0,
+                ruta="rechazo_manipulacion",
+                tiempo_ms=int((time.monotonic() - t0) * 1000),
+            )
+        )
+        return ChatOutput(sesion_id=sesion_id, respuesta=texto)
+
     def _short_circuit_similares(
         self,
         inp: ChatInput,
@@ -713,6 +747,8 @@ class ProcesarChatService:
         cercana = self._resolvedor_categoria.resolver(inp.mensaje)
         if cercana is None:
             return None
+        if self._cercana_contradice_perfil_bloqueado(cercana, sesion_id, inp.mensaje):
+            return None
         if cercana.fuente == "relacionada":
             respuesta, trace, productos = await self._delegar_a_manejador_ausente(
                 inp.mensaje, historial, [], sesion_id
@@ -739,6 +775,30 @@ class ProcesarChatService:
                 )
         return None
 
+    def _cercana_contradice_perfil_bloqueado(
+        self, cercana, sesion_id: UUID, mensaje: str
+    ) -> bool:
+        """Si el perfil ya tiene una categoria bloqueada (de turnos anteriores)
+        y la 'cercana' inferida del mensaje cae en otra categoria distinta, NO
+        cortocircuites: muy probablemente sea ruido de n-grama (ej. 'civil 3D'
+        matcheando 'Basculas' por la palabra 'civil'). Solo se permite el
+        cambio si el cliente lo pidio explicito."""
+        from .detector_cambio_categoria import DetectorCambioCategoria
+        perfil = self._obtener_perfil.ejecutar(
+            ObtenerPerfilSesionQuery(sesion_id=sesion_id)
+        )
+        cat_bloqueada = perfil.categoria_efectiva()
+        if not cat_bloqueada:
+            return False
+        cat_cercana = (cercana.categoria or "").lower()
+        cat_bloq = cat_bloqueada.lower()
+        prefix = min(len(cat_cercana), len(cat_bloq), 5)
+        if prefix >= 5 and cat_cercana[:prefix] == cat_bloq[:prefix]:
+            return False
+        if DetectorCambioCategoria.hay_cambio(mensaje):
+            return False
+        return True
+
     def _finalizar_turno_ausente(
         self,
         sesion_id: UUID,
@@ -753,6 +813,7 @@ class ProcesarChatService:
         mensaje, metricas y devuelve ChatOutput sin pasar por el LLM."""
         respuesta = NormalizadorMoneda.normalizar(respuesta)
         respuesta = NormalizadorFormatoProducto.normalizar(respuesta)
+        respuesta = NormalizadorAcentosRespuesta.normalizar(respuesta)
         respuesta = self._recortar_cierres(respuesta, inp.mensaje, sesion_id, trace)
         self._persistir_turno_mostrado(sesion_id, productos)
         self._registrar_respuesta(sesion_id, respuesta, trace)
@@ -829,6 +890,7 @@ class ProcesarChatService:
     def _contexto_del_turno(self, mensaje: str, sesion_id: UUID) -> str | None:
         bloques = [
             self._bloque_perfil(sesion_id),
+            self._bloque_categoria_bloqueada(sesion_id),
             self._bloque_shown_products(sesion_id),
             self._bloque_intencion(mensaje),
             self._bloque_consulta_relativa(mensaje),
@@ -836,9 +898,34 @@ class ProcesarChatService:
             self._bloque_sku(mensaje, sesion_id),
             self._bloque_exclusiones(mensaje),
             self._bloque_preferencia_blanda(mensaje),
+            self._bloque_prioridades(mensaje),
+            self._bloque_formato_tres_opciones(mensaje),
+            self._bloque_no_humo(mensaje),
         ]
         bloques_validos = [b for b in bloques if b]
         return "\n\n".join(bloques_validos) if bloques_validos else None
+
+    def _bloque_categoria_bloqueada(self, sesion_id: UUID) -> str | None:
+        """Intent/Category Lock: cuando el cliente ya estableció una categoría en
+        la sesión, le dice al LLM que la use en buscar_productos y no la cambie
+        salvo que el cliente lo pida explícitamente."""
+        perfil = self._obtener_perfil.ejecutar(ObtenerPerfilSesionQuery(sesion_id=sesion_id))
+        cat = perfil.categoria_efectiva()
+        if not cat:
+            return None
+        subcat = perfil.subcategoria_efectiva()
+        cat_str = f"{cat}/{subcat}" if subcat else cat
+        instruccion = (
+            f"CATEGORÍA ACTIVA: el cliente ya estableció que busca en «{cat_str}». "
+            f"Pasá siempre `categoria=\"{cat}\"` a buscar_productos en este turno"
+        )
+        if subcat:
+            instruccion += f" y `subcategoria=\"{subcat}\"`"
+        instruccion += (
+            ". NO cambies la categoría a menos que el cliente mencione explícitamente "
+            "otro tipo de producto."
+        )
+        return instruccion
 
     @staticmethod
     def _bloque_preferencia_blanda(mensaje: str) -> str | None:
@@ -865,6 +952,65 @@ class ProcesarChatService:
             f"EXCLUSIONES DEL CLIENTE — marcas a NO mostrar: {', '.join(m.upper() for m in marcas)}. "
             f"Al llamar buscar_productos NO incluyas nada de estas marcas en los resultados. "
             f"Si solo hay esas marcas, decilo honesto."
+        )
+
+    @staticmethod
+    def _bloque_prioridades(mensaje: str) -> str | None:
+        slots = DetectorPrioridadesJerarquicas.detectar(mensaje)
+        if not slots:
+            return None
+        return DetectorPrioridadesJerarquicas.formatear(slots)
+
+    _RX_TRES_OPCIONES_A = re.compile(
+        r"\b(?:opci[oó]n\s+)?(?:econ[oó]mica|barata)\b.{0,60}\bpremium\b",
+        re.IGNORECASE | re.DOTALL,
+    )
+    _RX_TRES_OPCIONES_B = re.compile(
+        r"\b(?:tres?|3)\s*(?:opciones?|modelos?|alternativas?)\b",
+        re.IGNORECASE,
+    )
+
+    @classmethod
+    def _bloque_formato_tres_opciones(cls, mensaje: str) -> str | None:
+        if not (cls._RX_TRES_OPCIONES_A.search(mensaje) or cls._RX_TRES_OPCIONES_B.search(mensaje)):
+            return None
+        pide_eleccion = bool(
+            re.search(r"\bcompr[aá]r[ií]as?\b|\bpara\s+tu\s+casa\b", mensaje, re.IGNORECASE)
+            or re.search(r"\btu\s+elecci[oó]n\b|\bsi\s+fuera\s+(?:para\s+)?tuyo?\b", mensaje, re.IGNORECASE)
+        )
+        bloque = (
+            "FORMATO ESTE TURNO: usar exactamente 3 secciones:\n"
+            "**Opción económica — Nombre — Bs precio [SKU]** | specs: valor/N/D | razón\n"
+            "**Opción equilibrada — Nombre — Bs precio [SKU]** | specs: valor/N/D | razón\n"
+            "**Opción premium — Nombre — Bs precio [SKU]** | specs: valor/N/D | razón\n"
+            "Atributos no confirmados en ficha = N/D obligatorio."
+        )
+        if pide_eleccion:
+            bloque += (
+                "\nAl final, responder en 1ª persona: "
+                "'Para mi casa elegiría la [opción] porque [razón concreta].'"
+            )
+        return bloque
+
+    _RX_NO_HUMO_A = re.compile(
+        r"\bno\s+me\s+vendas?\s+humo\b|\bquiero\s+honestidad\b|\bla\s+verdad\b",
+        re.IGNORECASE,
+    )
+    _RX_NO_HUMO_B = re.compile(
+        r"\brealmente\s+(?:sirve|vale|conviene|es\s+buena?)\b|\bde\s+verdad\s+(?:sirve|vale)\b",
+        re.IGNORECASE,
+    )
+
+    @classmethod
+    def _bloque_no_humo(cls, mensaje: str) -> str | None:
+        if not (cls._RX_NO_HUMO_A.search(mensaje) or cls._RX_NO_HUMO_B.search(mensaje)):
+            return None
+        return (
+            "MODO HONESTIDAD ACTIVADO: separar explícitamente para cada producto:\n"
+            "✓ Dato confirmado en ficha | ⚠ Inferido/probable | ✗ No disponible/N/D\n"
+            "Mencionar la desventaja real del producto recomendado.\n"
+            "No usar términos de catálogo sin datos: 'ideal', 'perfecto', 'potente'.\n"
+            "Si Hz/HDMI/GPU/inverter no están en ficha → decirlo, no suponerlo."
         )
 
     @staticmethod
@@ -1397,7 +1543,7 @@ class ProcesarChatService:
             presupuesto_max=perfil.presupuesto_max,
             subcategoria=perfil.subcategoria_efectiva() or None,
         )
-        productos, genero_sin_resultados = self._ejecutar_query_con_fallbacks(query)
+        productos, genero_sin_resultados, aviso_fallback = self._ejecutar_query_con_fallbacks(query)
         # Solo rerankeamos cuando no hay tier explícito: si el cliente pidió
         # "tope de gama" o "lo más barato", el orden por precio del SQL ya es
         # correcto y el reranker no debe alterar esa intención.
@@ -1418,7 +1564,7 @@ class ProcesarChatService:
             trace, query, productos_efectivos, sugeridos, perfil, genero_sin_resultados
         )
         texto = self._texto_resultados_forzados(
-            productos_efectivos, genero_sin_resultados, query
+            productos_efectivos, genero_sin_resultados, query, aviso_fallback
         )
         if contradiccion:
             texto = f"{contradiccion.mensaje}\n\n{texto}"
@@ -1526,23 +1672,60 @@ class ProcesarChatService:
 
     def _ejecutar_query_con_fallbacks(
         self, query: BuscarProductosQuery
-    ) -> tuple[list, bool]:
-        """Ejecuta query con dos fallbacks:
-        1) sin filtro de género cuando no hay resultados con género.
-        2) sin query textual cuando el FULLTEXT falla con frases largas."""
+    ) -> tuple[list, bool, str | None]:
+        """Ejecuta query con fallbacks en cascada. Devuelve (productos, genero_sin_resultados, aviso)."""
         from dataclasses import replace
         productos = self._buscar.ejecutar(query)
         genero_sin_resultados = bool(query.genero) and not productos
         if genero_sin_resultados:
             productos = self._buscar.ejecutar(replace(query, genero=None))
-        # Frase larga como query ("un reloj para ponerme en la mano") → FULLTEXT falla.
-        # Con categoria resuelta, reintentamos sin query.
+        aviso: str | None = None
+        if not productos and query.gpu_dedicada:
+            productos, aviso = self._fallback_gpu_dedicada(query)
+        if not productos and query.marca and not aviso:
+            productos, aviso = self._fallback_marca(query)
         if not productos and query.query and (query.categoria or query.subcategoria):
             productos = self._buscar.ejecutar(replace(query, query=None))
-        # Filtro de panel (ej. OLED) demasiado restrictivo junto a otros filtros → sin panel.
+        # Cuando el LLM metió términos de análisis (Hz, HDMI, PS5…) en el query
+        # y no pasó categoria, caemos aquí: usamos solo los filtros estructurados.
+        if not productos and query.query and self._tiene_filtros_estructurados(query):
+            productos = self._buscar.ejecutar(replace(query, query=None))
         if not productos and query.tipo_panel:
             productos = self._buscar.ejecutar(replace(query, tipo_panel=None))
-        return productos, genero_sin_resultados
+        if not productos and query.refresh_hz_min:
+            productos = self._buscar.ejecutar(replace(query, refresh_hz_min=None))
+        return productos, genero_sin_resultados, aviso
+
+    @staticmethod
+    def _tiene_filtros_estructurados(query: BuscarProductosQuery) -> bool:
+        return bool(
+            query.pulgadas or query.pulgadas_min or query.pulgadas_max
+            or query.resolucion or query.ram_gb_min or query.capacidad_gb_min
+            or query.capacidad_litros_min or query.capacidad_kg_min
+            or query.refresh_hz_min
+        )
+
+    def _fallback_gpu_dedicada(
+        self, query: BuscarProductosQuery
+    ) -> tuple[list, str | None]:
+        """Fallback GPU en orden de prioridad:
+        1) quitar precio_max pero mantener GPU → muestra laptops GPU sobre presupuesto
+        2) quitar gpu_dedicada → último recurso, laptops sin GPU dentro del precio"""
+        from dataclasses import replace
+        if query.precio_max:
+            con_gpu = self._buscar.ejecutar(replace(query, precio_max=None))
+            if con_gpu:
+                return con_gpu, f"gpu_sobre_presupuesto:{query.precio_max:.0f}"
+        sin_gpu = self._buscar.ejecutar(replace(query, gpu_dedicada=None))
+        return (sin_gpu, "gpu_dedicada_no_confirmada") if sin_gpu else ([], None)
+
+    def _fallback_marca(
+        self, query: BuscarProductosQuery
+    ) -> tuple[list, str | None]:
+        """Fallback marca: re-busca sin restricción de marca cuando no hay stock."""
+        from dataclasses import replace
+        sin_marca = self._buscar.ejecutar(replace(query, marca=None))
+        return (sin_marca, f"marca_no_encontrada:{query.marca}") if sin_marca else ([], None)
 
     def _registrar_paso_forzado(
         self,
@@ -1559,11 +1742,13 @@ class ProcesarChatService:
             "tipo_panel": query.tipo_panel, "resolucion": query.resolucion,
             "genero": query.genero,
         }.items() if v is not None}
+        from ..chat.tool_dispatcher import ToolDispatcher
         resultado = {
-            "productos": [ProductoSerializer.resumen(p) for p in productos_efectivos],
+            "productos": [ToolDispatcher._proyectar(p, perfil) for p in productos_efectivos],
             "total": len(productos_efectivos),
-            "sugeridos": [ProductoSerializer.resumen(p) for p in sugeridos],
+            "sugeridos": [ToolDispatcher._proyectar(p, perfil) for p in sugeridos],
         }
+        resultado.update(ToolDispatcher._inteligencia_turno(productos_efectivos, perfil))
         if perfil.sku_foco and productos_efectivos and str(productos_efectivos[0].sku) == perfil.sku_foco:
             resultado["producto_foco_sku"] = perfil.sku_foco
         if genero_sin_resultados:
@@ -1578,23 +1763,64 @@ class ProcesarChatService:
         productos_efectivos: list,
         genero_sin_resultados: bool,
         query: BuscarProductosQuery,
+        aviso_fallback: str | None = None,
     ) -> str:
         if not productos_efectivos:
             return (
                 "Ups, no encontre nada exacto con eso en el catalogo. "
                 "Me das mas pistas? Marca preferida, presupuesto o tamanio me ayudarian un monton."
             )
-        aviso = (
-            f"En esta categoria no diferenciamos por genero '{query.genero}', "
-            f"son modelos unisex. Igual te muestro los disponibles:\n"
-            if genero_sin_resultados else ""
-        )
+        aviso = ""
+        if genero_sin_resultados:
+            aviso = (
+                f"En esta categoria no diferenciamos por genero '{query.genero}', "
+                f"son modelos unisex. Igual te muestro los disponibles:\n"
+            )
+        elif aviso_fallback == "gpu_dedicada_no_confirmada":
+            aviso = (
+                "No encontre laptops con GPU dedicada confirmada en ficha. "
+                "Te muestro las opciones con mejores especificaciones disponibles "
+                "(sin GPU dedicada confirmada en catalogo):\n"
+            )
+        elif aviso_fallback and aviso_fallback.startswith("gpu_sobre_presupuesto:"):
+            presupuesto = aviso_fallback.split(":", 1)[1]
+            aviso = (
+                f"Las laptops con GPU dedicada superan tu presupuesto de Bs {presupuesto}. "
+                f"Estas son las opciones disponibles con GPU confirmada:\n"
+            )
+        elif aviso_fallback and aviso_fallback.startswith("marca_no_encontrada:"):
+            marca = aviso_fallback.split(":", 1)[1]
+            aviso = (
+                f"No encontre stock de {marca} en este momento. "
+                f"Te muestro alternativas similares disponibles:\n"
+            )
         lineas = [f"{aviso}Estas son las opciones que te puedo ofrecer:"]
         for p in productos_efectivos[:3]:
             extra = f" (antes Bs {p.precio_anterior.monto:.0f})" if p.precio_anterior else ""
             lineas.append(f"- {p.nombre} — Bs {p.precio.monto:.0f}{extra} [{p.sku}]")
-        lineas.append("Contame que te importa mas (presupuesto, marca, uso) y te ayudo a elegir.")
+        cierre = ProcesarChatService._cierre_contextual(aviso_fallback)
+        if cierre:
+            lineas.append(cierre)
         return "\n".join(lineas)
+
+    @staticmethod
+    def _cierre_contextual(aviso_fallback: str | None) -> str:
+        """Pregunta de cierre adaptada al contexto del fallback."""
+        if aviso_fallback == "gpu_dedicada_no_confirmada":
+            return (
+                "Estas opciones no tienen GPU dedicada confirmada — pueden servir para "
+                "oficina y estudio pero no para render o CAD serio. "
+                "Queres que busque algo especifico o ajustamos el presupuesto?"
+            )
+        if aviso_fallback and aviso_fallback.startswith("gpu_sobre_presupuesto:"):
+            presupuesto = aviso_fallback.split(":", 1)[1]
+            return (
+                f"Estan sobre tu presupuesto de Bs {presupuesto}, pero son las unicas "
+                f"con GPU confirmada en catalogo. Vale la pena la diferencia para render/CAD?"
+            )
+        if aviso_fallback and aviso_fallback.startswith("marca_no_encontrada:"):
+            return "Son alternativas de otras marcas — si queres ajustar la busqueda, avisame."
+        return "Contame que te importa mas (presupuesto, marca, uso) y te ayudo a elegir."
 
     def _ejecutar_fallback_acciones(
         self,

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Callable
 
 from ....domain.perfiles_sesion import PerfilSesion
@@ -29,13 +29,16 @@ class ActualizarPerfilSesionHandler:
             pulgadas=cmd.pulgadas,
             tipo_panel=cmd.tipo_panel,
             resolucion=cmd.resolucion,
-            updated_at=datetime.utcnow(),
+            updated_at=datetime.now(timezone.utc),
             subcategoria_foco=cmd.subcategoria_foco,
             genero_declarado=cmd.genero_declarado,
             sku_foco=cmd.sku_foco,
             desired_tier=cmd.desired_tier,
             ram_gb_min=cmd.ram_gb_min,
             gpu_dedicada=cmd.gpu_dedicada,
+            ssd_gb_min=cmd.ssd_gb_min,
+            nombre_excluye_acum=cmd.nombre_excluye_nuevas,
+            presupuesto_ideal=cmd.presupuesto_ideal,
         )
         try:
             with self._uow_factory() as uow:

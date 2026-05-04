@@ -330,6 +330,7 @@ def procesar_chat_service() -> ProcesarChatService:
         llm=llm_port(),
         dispatcher=dispatcher,
         inyector_fewshot=inyector_fewshot(),
+        max_iter=5,
     )
     atajo_sku = AtajoSkuDirecto(detector=DetectorSkuMensaje(), dispatcher=dispatcher)
     atajo_ordinal = AtajoOrdinalCarrito(

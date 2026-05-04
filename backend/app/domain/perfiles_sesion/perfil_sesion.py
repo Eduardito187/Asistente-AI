@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 from uuid import UUID
 
@@ -31,6 +31,9 @@ class PerfilSesion:
     desired_tier: Optional[str] = None
     ram_gb_min: Optional[int] = None
     gpu_dedicada: Optional[bool] = None
+    ssd_gb_min: Optional[int] = None
+    nombre_excluye_acum: Optional[str] = None  # comma-separated acumulado
+    presupuesto_ideal: Optional[float] = None  # techo blando: prefiere no exceder
 
     @staticmethod
     def vacio(sesion_id: UUID) -> "PerfilSesion":
@@ -43,17 +46,7 @@ class PerfilSesion:
             pulgadas=None,
             tipo_panel=None,
             resolucion=None,
-            updated_at=datetime.utcnow(),
-            ultimos_skus_mostrados=None,
-            precio_min_mostrado=None,
-            precio_max_mostrado=None,
-            alternativa_ofrecida=None,
-            subcategoria_foco=None,
-            genero_declarado=None,
-            sku_foco=None,
-            desired_tier=None,
-            ram_gb_min=None,
-            gpu_dedicada=None,
+            updated_at=datetime.now(timezone.utc),
         )
 
     def esta_vacio(self) -> bool:
@@ -74,7 +67,7 @@ class PerfilSesion:
         p = self._pick
         return PerfilSesion(
             sesion_id=self.sesion_id,
-            updated_at=datetime.utcnow(),
+            updated_at=datetime.now(timezone.utc),
             presupuesto_max=p(otro.presupuesto_max, self.presupuesto_max),
             marca_preferida=p(otro.marca_preferida, self.marca_preferida),
             categoria_foco=p(otro.categoria_foco, self.categoria_foco),
@@ -92,4 +85,7 @@ class PerfilSesion:
             desired_tier=p(otro.desired_tier, self.desired_tier),
             ram_gb_min=p(otro.ram_gb_min, self.ram_gb_min),
             gpu_dedicada=p(otro.gpu_dedicada, self.gpu_dedicada),
+            ssd_gb_min=p(otro.ssd_gb_min, self.ssd_gb_min),
+            nombre_excluye_acum=p(otro.nombre_excluye_acum, self.nombre_excluye_acum),
+            presupuesto_ideal=p(otro.presupuesto_ideal, self.presupuesto_ideal),
         )

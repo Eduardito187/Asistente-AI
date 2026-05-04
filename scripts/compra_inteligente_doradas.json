@@ -1,0 +1,100 @@
+[
+  {
+    "nombre": "CI01_laptop_4_anos",
+    "descripcion": "Compra inteligente laptop que dure 4 anos: priorizar RAM, generacion CPU, SSD NVMe.",
+    "turnos": [
+      {
+        "mensaje": "Cual es la compra mas inteligente en laptops si quiero que me dure 4 anos?",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener_cualquiera": [
+          "RAM",
+          "generacion",
+          "NVMe",
+          "durabilidad",
+          "4 anos",
+          "envejecer",
+          "futuro"
+        ],
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "CI02_9000bs_laptop_4anos",
+    "descripcion": "9000 Bs laptop para programacion y Docker que dure 4 anos: recomendacion principal + alternativa mas barata + advertencia.",
+    "turnos": [
+      {
+        "mensaje": "Quiero una compra inteligente, no una lista. Tengo 9000 Bs para una laptop que me dure 4 anos. Uso programacion, Docker, universidad y algo de edicion. Dame una recomendacion principal, una alternativa mas barata y una advertencia de que no deberia comprar.",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener_cualquiera": [
+          "recomendacion principal",
+          "alternativa",
+          "no deberia comprar",
+          "advertencia",
+          "evitar"
+        ],
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "CI03_tv_sin_consola_futura",
+    "descripcion": "TV que no arrepentirse cuando compre consola: considerar Hz real y HDMI 2.1.",
+    "turnos": [
+      {
+        "mensaje": "Cual es la compra mas inteligente en TVs si no quiero arrepentirme cuando compre una consola?",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener_cualquiera": [
+          "120Hz",
+          "HDMI 2.1",
+          "no tengo ese dato",
+          "N/D",
+          "consola",
+          "gaming"
+        ],
+        "no_debe_contener": ["error"]
+      }
+    ]
+  },
+  {
+    "nombre": "CI04_no_la_mas_barata_ni_la_mas_cara",
+    "descripcion": "Cliente pide la mas inteligente, no la mas barata ni la mas cara.",
+    "turnos": [
+      {
+        "mensaje": "No quiero la mas barata ni la mas cara. Quiero la compra mas inteligente en laptops.",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener_cualquiera": [
+          "relacion",
+          "calidad",
+          "precio",
+          "equilibrio",
+          "inteligente"
+        ],
+        "no_debe_contener": [
+          "la mas barata es",
+          "la mas cara es",
+          "error"
+        ]
+      }
+    ]
+  },
+  {
+    "nombre": "CI05_descuento_compensa_desventajas",
+    "descripcion": "El agente evalua si el descuento compensa las desventajas del producto.",
+    "turnos": [
+      {
+        "mensaje": "Dime si el descuento compensa las desventajas del producto con mayor rebaja en laptops.",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener_cualquiera": [
+          "desventaja",
+          "descuento",
+          "compensa",
+          "vale la pena",
+          "pero",
+          "aunque"
+        ],
+        "no_debe_contener": ["error"]
+      }
+    ]
+  }
+]
