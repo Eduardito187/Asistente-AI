@@ -25,6 +25,9 @@ class MariaDbMetricasTurnoRepository(MetricasTurnoRepository):
                 "prods": int(metrica.productos_citados),
                 "ruta": (metrica.ruta or "agente")[:40],
                 "ms": int(metrica.tiempo_ms),
+                "pversion": getattr(metrica, "prompt_version", None),
+                "qscore": getattr(metrica, "quality_score", None),
+                "reason": getattr(metrica, "reason_code", None),
             },
         )
         return int(res.lastrowid or 0)

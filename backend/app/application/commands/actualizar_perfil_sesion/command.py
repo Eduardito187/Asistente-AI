@@ -26,6 +26,9 @@ class ActualizarPerfilSesionCommand:
     ssd_gb_min: Optional[int] = None
     nombre_excluye_nuevas: Optional[str] = None  # comma-sep exclusiones de ESTE turno
     presupuesto_ideal: Optional[float] = None
+    # Delta a sumar al contador acumulado de frustración (1 por señal).
+    # NULL = sin cambio. El handler hace SUM(viejo, delta).
+    frustracion_delta: Optional[int] = None
 
     def tiene_datos(self) -> bool:
         return any(
@@ -35,5 +38,6 @@ class ActualizarPerfilSesionCommand:
                 self.desired_tier, self.uso_declarado, self.pulgadas,
                 self.tipo_panel, self.resolucion, self.ram_gb_min, self.gpu_dedicada,
                 self.ssd_gb_min, self.nombre_excluye_nuevas, self.presupuesto_ideal,
+                self.frustracion_delta,
             ]
         )

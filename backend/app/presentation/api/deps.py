@@ -23,7 +23,12 @@ from ...application.commands.registrar_feedback_orden import (
     RegistrarFeedbackOrdenHandler,
 )
 from ...application.commands.registrar_mensaje import RegistrarMensajeHandler
+from ...application.commands.auto_curar_conversacion import AutoCurarConversacionHandler
+from ...application.commands.guardar_perfil_historico import GuardarPerfilHistoricoHandler
+from ...application.commands.registrar_conversacion_fallida import RegistrarConversacionFallidaHandler
 from ...application.commands.registrar_metrica_turno import RegistrarMetricaTurnoHandler
+from ...application.commands.registrar_synonym_candidato import RegistrarSynonymCandidatoHandler
+from ...application.queries.obtener_perfil_historico import ObtenerPerfilHistoricoHandler
 from ...application.commands.registrar_sugerencia_catalogo import (
     RegistrarSugerenciaCatalogoHandler,
 )
@@ -295,6 +300,29 @@ def activar_conversacion_curada_handler() -> ActivarConversacionCuradaHandler:
     return ActivarConversacionCuradaHandler(uow_factory)
 
 
+def registrar_conversacion_fallida_handler() -> RegistrarConversacionFallidaHandler:
+    return RegistrarConversacionFallidaHandler(uow_factory)
+
+
+def auto_curar_conversacion_handler() -> AutoCurarConversacionHandler:
+    return AutoCurarConversacionHandler(
+        uow_factory,
+        registrar_fallida=registrar_conversacion_fallida_handler(),
+    )
+
+
+def registrar_synonym_candidato_handler() -> RegistrarSynonymCandidatoHandler:
+    return RegistrarSynonymCandidatoHandler(uow_factory)
+
+
+def guardar_perfil_historico_handler() -> GuardarPerfilHistoricoHandler:
+    return GuardarPerfilHistoricoHandler(uow_factory)
+
+
+def obtener_perfil_historico_handler() -> ObtenerPerfilHistoricoHandler:
+    return ObtenerPerfilHistoricoHandler(uow_factory)
+
+
 def curador_conversaciones() -> CuradorConversaciones:
     return CuradorConversaciones(
         evaluador=EvaluadorConversacion(),
@@ -303,7 +331,10 @@ def curador_conversaciones() -> CuradorConversaciones:
 
 
 def inyector_fewshot() -> InyectorFewShot:
-    return InyectorFewShot(ejemplos=obtener_ejemplos_fewshot_handler())
+    return InyectorFewShot(
+        ejemplos=obtener_ejemplos_fewshot_handler(),
+        uow_factory=uow_factory,
+    )
 
 
 def reindexador_embeddings() -> ReindexadorEmbeddings:
@@ -331,6 +362,7 @@ def procesar_chat_service() -> ProcesarChatService:
         dispatcher=dispatcher,
         inyector_fewshot=inyector_fewshot(),
         max_iter=5,
+        registrar_fallida=registrar_conversacion_fallida_handler(),
     )
     atajo_sku = AtajoSkuDirecto(detector=DetectorSkuMensaje(), dispatcher=dispatcher)
     atajo_ordinal = AtajoOrdinalCarrito(
@@ -405,4 +437,8 @@ def procesar_chat_service() -> ProcesarChatService:
             uow_factory=uow_factory,
             sugeridor=SugeridorProductosAlternativos(buscar=buscar_handler()),
         ),
+        auto_curar=auto_curar_conversacion_handler(),
+        registrar_synonym=registrar_synonym_candidato_handler(),
+        guardar_perfil_historico=guardar_perfil_historico_handler(),
+        obtener_perfil_historico=obtener_perfil_historico_handler(),
     )

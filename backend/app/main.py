@@ -9,6 +9,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from .presentation.api.deps import llm_port
 from .presentation.api.errors import registrar as registrar_errores
 from .presentation.api.routers import (
+    aprendizaje_admin,
     carrito,
     carritos_admin,
     chat,
@@ -51,3 +52,4 @@ app.include_router(carritos_admin.router)
 app.include_router(conversaciones_curadas_admin.router)
 app.include_router(metricas.router)
 app.include_router(embeddings_admin.router)
+app.include_router(aprendizaje_admin.router)

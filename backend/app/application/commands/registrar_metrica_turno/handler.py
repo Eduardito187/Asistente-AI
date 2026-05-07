@@ -30,6 +30,9 @@ class RegistrarMetricaTurnoHandler:
                 ruta=cmd.ruta,
                 tiempo_ms=cmd.tiempo_ms,
                 created_at=datetime.utcnow(),
+                prompt_version=cmd.prompt_version,
+                quality_score=cmd.quality_score,
+                reason_code=cmd.reason_code,
             )
             with self._uow_factory() as uow:
                 uow.metricas_turno.registrar(metrica)

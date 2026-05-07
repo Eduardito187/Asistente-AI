@@ -20,6 +20,22 @@ from ..commands.registrar_alternativa_ofrecida import (
     RegistrarAlternativaOfrecidaHandler,
 )
 from ..commands.registrar_mensaje import RegistrarMensajeCommand, RegistrarMensajeHandler
+from ..commands.auto_curar_conversacion import (
+    AutoCurarConversacionCommand,
+    AutoCurarConversacionHandler,
+)
+from ..commands.guardar_perfil_historico import (
+    GuardarPerfilHistoricoCommand,
+    GuardarPerfilHistoricoHandler,
+)
+from ..commands.registrar_synonym_candidato import (
+    RegistrarSynonymCandidatoCommand,
+    RegistrarSynonymCandidatoHandler,
+)
+from ..queries.obtener_perfil_historico import (
+    ObtenerPerfilHistoricoHandler,
+    ObtenerPerfilHistoricoQuery,
+)
 from ..commands.registrar_metrica_turno import (
     RegistrarMetricaTurnoCommand,
     RegistrarMetricaTurnoHandler,
@@ -90,7 +106,17 @@ from .responder_consulta_disponibilidad import ResponderConsultaDisponibilidad
 from .responder_productos_similares import ResponderProductosSimilares
 from .responder_consulta_politica import ResponderConsultaPolitica
 from .respuesta_follow_up import RespuestaFollowUp
+from .detector_despedida import DetectorDespedida
+from .detector_frustracion import DetectorFrustracion
+from .detector_indecision import DetectorIndecision
 from .detector_manipulacion import DetectorManipulacion
+from .detector_pregunta_repetida import DetectorPreguntaRepetida
+from .detector_saturacion_cognitiva import DetectorSaturacionCognitiva
+from .detector_urgencia import DetectorUrgencia
+from .evaluador_frustracion_acumulada import EvaluadorFrustracionAcumulada
+from .horario_atencion import HorarioAtencion
+from .responder_derivar_ventas import ResponderDerivarVentas
+from .verificador_avance_turno import VerificadorAvanceTurno
 from .sanitizador_query_busqueda import SanitizadorQueryBusqueda
 from .tools_mark import ToolsMark
 
@@ -138,6 +164,10 @@ class ProcesarChatService:
         responder_consulta_disponibilidad: ResponderConsultaDisponibilidad,
         responder_comparacion_explicita: ResponderComparacionExplicita,
         responder_similares: ResponderProductosSimilares,
+        auto_curar: "AutoCurarConversacionHandler | None" = None,
+        registrar_synonym: "RegistrarSynonymCandidatoHandler | None" = None,
+        guardar_perfil_historico: "GuardarPerfilHistoricoHandler | None" = None,
+        obtener_perfil_historico: "ObtenerPerfilHistoricoHandler | None" = None,
     ) -> None:
         self._uow_factory = uow_factory
         self._crear_sesion = crear_sesion
@@ -165,6 +195,10 @@ class ProcesarChatService:
         self._responder_consulta_disp = responder_consulta_disponibilidad
         self._responder_comparacion_explicita = responder_comparacion_explicita
         self._responder_similares = responder_similares
+        self._auto_curar = auto_curar
+        self._registrar_synonym = registrar_synonym
+        self._guardar_perfil_historico = guardar_perfil_historico
+        self._obtener_perfil_historico = obtener_perfil_historico
 
     async def procesar(self, inp: ChatInput) -> ChatOutput:
         t0 = time.monotonic()
@@ -178,6 +212,13 @@ class ProcesarChatService:
         self._registrar.ejecutar(
             RegistrarMensajeCommand(sesion_id=sesion_id, rol=RolMensaje.USER, contenido=inp.mensaje)
         )
+
+        self._hidratar_perfil_historico_si_aplica(sesion_id, inp.mensaje)
+
+        # Incrementa contador acumulado de frustracion en el perfil cuando se
+        # detecta una señal pero NO se llega a derivar (que cortaria el flujo).
+        # Esto alimenta a EvaluadorFrustracionAcumulada para el siguiente turno.
+        self._incrementar_frustracion_si_aplica(sesion_id, inp.mensaje)
 
         self._actualizar_perfil.ejecutar(
             self._extractor_perfil.extraer(sesion_id, inp.mensaje)
@@ -213,6 +254,24 @@ class ProcesarChatService:
         sc_manip = self._short_circuit_manipulacion(inp=inp, sesion_id=sesion_id, t0=t0)
         if sc_manip is not None:
             return sc_manip
+
+        # Cliente frustrado: pide humano, insulta al bot, o acumula 2+ señales
+        # de queja. Lo derivamos a ventas telefonicas antes de gastar tokens
+        # en un turno donde el cliente ya se canso del bot.
+        sc_frustracion = self._short_circuit_frustracion(
+            inp=inp, sesion_id=sesion_id, t0=t0
+        )
+        if sc_frustracion is not None:
+            return sc_frustracion
+
+        # Saturación crítica: 15+ productos vistos sin items en carrito.
+        # El cliente está en parálisis de decisión — derivamos a humano
+        # antes de seguir mostrando opciones que no van a destrabar.
+        sc_saturacion = self._short_circuit_saturacion_critica(
+            inp=inp, sesion_id=sesion_id, t0=t0
+        )
+        if sc_saturacion is not None:
+            return sc_saturacion
 
         # Boton 'Similares' del card: atajo determinista antes de cualquier
         # otro detector (follow-ups, atajos) que pueda distraer el flujo.
@@ -331,7 +390,17 @@ class ProcesarChatService:
 
         self._registrar_respuesta(sesion_id, respuesta, trace)
         self._curar_si_cerro_sesion(sesion_id, mentiras_detectadas, llevo_a_orden)
+        tiempo_ms = int((time.monotonic() - t0) * 1000)
+        self._auto_curar_si_exitoso(
+            sesion_id, inp.mensaje, respuesta, productos, "agente", tiempo_ms, mentiras_detectadas
+        )
+        self._registrar_synonym_candidato_si_no_resuelve(inp.mensaje, productos, trace)
+        self._persistir_perfil_historico_si_compra(sesion_id, inp.mensaje, trace, productos)
 
+        # Verificador de avance: detecta turnos circulares para metric / debug.
+        avanzo = self._evaluar_avance_turno(respuesta, productos, sesion_id, trace)
+
+        from ..chat.system_prompt import PROMPT_VERSION
         self._registrar_metrica.ejecutar(
             RegistrarMetricaTurnoCommand(
                 sesion_id=sesion_id,
@@ -340,8 +409,9 @@ class ProcesarChatService:
                 tool_calls=len(trace),
                 mentiras_detectadas=mentiras_detectadas,
                 productos_citados=len(productos),
-                ruta="agente",
-                tiempo_ms=int((time.monotonic() - t0) * 1000),
+                ruta="agente" if avanzo else "agente_sin_avance",
+                tiempo_ms=tiempo_ms,
+                prompt_version=PROMPT_VERSION,
             )
         )
 
@@ -629,6 +699,106 @@ class ProcesarChatService:
         )
         return ChatOutput(sesion_id=sesion_id, respuesta=texto)
 
+    def _short_circuit_frustracion(
+        self,
+        inp: ChatInput,
+        sesion_id: UUID,
+        t0: float,
+    ) -> ChatOutput | None:
+        """Deriva al canal humano en dos casos:
+        1. Frustración inmediata: el mensaje actual cruza el umbral del
+           DetectorFrustracion (pide humano, insulta, 2+ señales medias).
+        2. Frustración acumulada: el cliente acumula 3+ señales en sus
+           últimos 5 mensajes (deterioro progresivo). Lee del historial
+           sin necesidad de cambios de schema.
+        Cierra el turno sin LLM en ambos casos."""
+        motivo = self._motivo_derivacion(inp.mensaje, sesion_id)
+        if motivo is None:
+            return None
+        # Variante A/B + horario adaptativo. La variante asignada queda en
+        # la métrica (`ruta=derivar_ventas_<motivo>_<variante>`) para análisis.
+        texto = ResponderDerivarVentas.responder(
+            motivo="frustracion", sesion_id=sesion_id
+        )
+        variante = ResponderDerivarVentas.variante_asignada(sesion_id)
+        self._registrar.ejecutar(
+            RegistrarMensajeCommand(sesion_id=sesion_id, rol=RolMensaje.ASSISTANT, contenido=texto)
+        )
+        self._registrar_metrica.ejecutar(
+            RegistrarMetricaTurnoCommand(
+                sesion_id=sesion_id,
+                mensaje_usuario_len=len(inp.mensaje),
+                respuesta_len=len(texto),
+                tool_calls=0,
+                mentiras_detectadas=0,
+                productos_citados=0,
+                ruta=f"derivar_ventas_{motivo}_{variante}",
+                tiempo_ms=int((time.monotonic() - t0) * 1000),
+            )
+        )
+        return ChatOutput(sesion_id=sesion_id, respuesta=texto)
+
+    def _short_circuit_saturacion_critica(
+        self,
+        inp: ChatInput,
+        sesion_id: UUID,
+        t0: float,
+    ) -> ChatOutput | None:
+        """Si el cliente vio 15+ productos sin agregar nada al carrito, está
+        en parálisis de decisión severa. El bloque de contexto LLM ya no
+        alcanza — derivamos a un asesor humano que pueda hacer 2 preguntas
+        cara a cara y cerrar la venta."""
+        try:
+            perfil = self._obtener_perfil.ejecutar(
+                ObtenerPerfilSesionQuery(sesion_id=sesion_id)
+            )
+            skus = DetectorSaturacionCognitiva.contar_skus_acumulados(
+                perfil.ultimos_skus_mostrados
+            )
+            carrito = self._ver_carrito_handler_si_existe(sesion_id)
+            items = len(carrito.items) if carrito else 0
+        except Exception:
+            return None
+        if not DetectorSaturacionCognitiva.es_critico(skus, items):
+            return None
+        texto = ResponderDerivarVentas.responder(
+            motivo="saturacion", sesion_id=sesion_id
+        )
+        self._registrar.ejecutar(
+            RegistrarMensajeCommand(sesion_id=sesion_id, rol=RolMensaje.ASSISTANT, contenido=texto)
+        )
+        self._registrar_metrica.ejecutar(
+            RegistrarMetricaTurnoCommand(
+                sesion_id=sesion_id,
+                mensaje_usuario_len=len(inp.mensaje),
+                respuesta_len=len(texto),
+                tool_calls=0,
+                mentiras_detectadas=0,
+                productos_citados=0,
+                ruta=f"derivar_ventas_saturacion_{skus}skus",
+                tiempo_ms=int((time.monotonic() - t0) * 1000),
+            )
+        )
+        return ChatOutput(sesion_id=sesion_id, respuesta=texto)
+
+    def _motivo_derivacion(self, mensaje: str, sesion_id: UUID) -> str | None:
+        """Devuelve 'alto'/'medio' (frustración inmediata), 'acumulada'
+        (deterioro progresivo) o None (sin derivación)."""
+        if DetectorFrustracion.debe_derivar(mensaje):
+            return DetectorFrustracion.nivel(mensaje)
+        mensajes_user = self._historial_solo_user(sesion_id)
+        if EvaluadorFrustracionAcumulada.debe_derivar(mensajes_user, mensaje):
+            return "acumulada"
+        return None
+
+    def _historial_solo_user(self, sesion_id: UUID) -> list[str]:
+        """Helper: extrae solo los mensajes del cliente (rol=user) del
+        historial de chat, en orden cronológico."""
+        mensajes = self._historial.ejecutar(
+            HistorialChatQuery(sesion_id=sesion_id, limite=MAX_HISTORIAL)
+        )
+        return [m.contenido for m in mensajes if m.rol == RolMensaje.USER]
+
     def _short_circuit_similares(
         self,
         inp: ChatInput,
@@ -901,9 +1071,226 @@ class ProcesarChatService:
             self._bloque_prioridades(mensaje),
             self._bloque_formato_tres_opciones(mensaje),
             self._bloque_no_humo(mensaje),
+            # === Bloques de tono / decisión (no cortan flujo, ajustan al LLM) ===
+            self._bloque_frustracion_baja(mensaje),
+            self._bloque_indecision(mensaje),
+            self._bloque_urgencia(mensaje),
+            self._bloque_despedida(mensaje, sesion_id),
+            self._bloque_saturacion_cognitiva(sesion_id),
+            self._bloque_pregunta_repetida(mensaje, sesion_id),
+            self._bloque_cliente_recurrente(mensaje),
+            self._bloque_mensaje_vacio(mensaje, sesion_id),
         ]
         bloques_validos = [b for b in bloques if b]
         return "\n\n".join(bloques_validos) if bloques_validos else None
+
+    # ===== Bloques nuevos =====================================================
+
+    @staticmethod
+    def _bloque_frustracion_baja(mensaje: str) -> str | None:
+        """Cuando hay UNA señal blanda (no deriva pero hay tensión), pide al
+        LLM bajar el tono comercial y ser empático/conciso. Si fuera 2+
+        señales ya estaríamos en derivación — esto previene escalación."""
+        if DetectorFrustracion.debe_derivar(mensaje):
+            return None
+        if DetectorFrustracion.nivel(mensaje) != "bajo":
+            return None
+        return (
+            "TONO ESTE TURNO: el cliente muestra señal de impaciencia. "
+            "Respondé corto y empático (sin disculparte mil veces). Sin frases "
+            "comerciales largas, sin múltiples opciones — UNA respuesta directa. "
+            "Si ya hay productos mostrados, reusalos en vez de listar nuevos."
+        )
+
+    @staticmethod
+    def _bloque_indecision(mensaje: str) -> str | None:
+        if not DetectorIndecision.es_indeciso(mensaje):
+            return None
+        return (
+            "MODO DECISIVO: el cliente está indeciso y pide que elijas por él. "
+            "REGLAS:\n"
+            "- Elegí UN solo producto (no dos, no tres) de los que ya mostraste "
+            "  o de la búsqueda actual.\n"
+            "- Justificá la elección en 1-2 líneas con specs concretas.\n"
+            "- NO abras búsqueda nueva ni listes alternativas.\n"
+            "- NO digas 'depende de tu uso' si ya tenés contexto del cliente.\n"
+            "- Cerrá ofreciendo agregar al carrito."
+        )
+
+    @staticmethod
+    def _bloque_urgencia(mensaje: str) -> str | None:
+        if not DetectorUrgencia.es_urgente(mensaje):
+            return None
+        return (
+            "URGENCIA DETECTADA: el cliente necesita el producto pronto. "
+            "Al llamar buscar_productos pasá `solo_con_stock=True`. Si está "
+            "disponible la opción `envio_rapido=True` priorizala. En la "
+            "respuesta mencioná explícitamente disponibilidad y, si lo sabés, "
+            "tiempos de entrega/retiro. Si no hay producto con stock, ofrecé "
+            "el más cercano disponible y avisá del tiempo extra."
+        )
+
+    def _bloque_despedida(self, mensaje: str, sesion_id: UUID) -> str | None:
+        if not DetectorDespedida.es_despedida(mensaje):
+            return None
+        try:
+            carrito = self._ver_carrito_handler_si_existe(sesion_id)
+            tiene_compra = carrito and len(carrito.items) > 0
+        except Exception:
+            tiene_compra = False
+        if tiene_compra:
+            return (
+                "CIERRE DE CONVERSACIÓN: el cliente se despide y tiene items "
+                "en carrito. Cerrá con calidez y recordale el carrito pendiente "
+                "(que puede confirmar la orden cuando quiera). NO empujes la "
+                "venta agresivamente."
+            )
+        en_horario = HorarioAtencion.dentro_horario()
+        contactos = (
+            f"  Teléfono: {ResponderDerivarVentas.telefono()}\n"
+            f"  WhatsApp: {ResponderDerivarVentas.whatsapp_numero()} "
+            f"({ResponderDerivarVentas.whatsapp_link()})"
+        )
+        if en_horario:
+            tono_horario = (
+                "Tono: 'cuando quieras volver, escribime; o si preferís hablar "
+                "con alguien del equipo de ventas, ahí tenés los contactos'."
+            )
+        else:
+            cuando = HorarioAtencion.proxima_apertura()
+            tono_horario = (
+                f"FUERA DE HORARIO ({HorarioAtencion.descripcion_horario()}). "
+                f"Mencioná que si escribe al WhatsApp ahora le responden {cuando}."
+            )
+        return (
+            "CIERRE DE CONVERSACIÓN SIN COMPRA: el cliente se despide sin haber "
+            "agregado nada al carrito. Cerrá cordial y al final ofrecé como "
+            f"fallback el contacto humano de Dismac:\n{contactos}\n"
+            f"{tono_horario} NO insistas."
+        )
+
+    def _bloque_saturacion_cognitiva(self, sesion_id: UUID) -> str | None:
+        """Saturación escalada: medio (≥6) → bloque suave;  alto (≥10) →
+        bloque enfático. El nivel crítico (≥15) lo maneja el short-circuit
+        antes de llegar al LLM, así que aquí no aparece."""
+        perfil = self._obtener_perfil.ejecutar(ObtenerPerfilSesionQuery(sesion_id=sesion_id))
+        skus_acum = DetectorSaturacionCognitiva.contar_skus_acumulados(
+            perfil.ultimos_skus_mostrados
+        )
+        try:
+            carrito = self._ver_carrito_handler_si_existe(sesion_id)
+            items = len(carrito.items) if carrito else 0
+        except Exception:
+            items = 0
+        nivel = DetectorSaturacionCognitiva.nivel(skus_acum, items)
+        if nivel == DetectorSaturacionCognitiva.NIVEL_NINGUNO:
+            return None
+        if nivel == DetectorSaturacionCognitiva.NIVEL_ALTO:
+            return (
+                f"SATURACIÓN ALTA ({skus_acum} productos vistos sin decisión). "
+                "REGLAS DURAS este turno:\n"
+                "- PROHIBIDO abrir buscar_productos (ya viste suficiente).\n"
+                "- PROHIBIDO listar productos nuevos.\n"
+                "- Elegí UN solo SKU de los ya mostrados con justificación de "
+                "  3-4 specs concretas.\n"
+                "- Si el cliente pregunta cosas vagas, preguntá UNA concreta "
+                "  para destrabar (ej. '¿priorizás precio o cámara?').\n"
+                "- Cerrá ofreciendo agregar al carrito."
+            )
+        # NIVEL_MEDIO
+        return (
+            f"SATURACIÓN COGNITIVA: el cliente lleva {skus_acum} productos "
+            f"vistos sin decidirse (umbral {DetectorSaturacionCognitiva.umbral()}). "
+            "Cambiá de estrategia: en vez de listar más opciones, recomendá UN "
+            "producto concreto de los ya mostrados con justificación clara. O "
+            "hacé UNA pregunta concreta para reducir el espacio (ej. "
+            "'¿priorizás cámara o batería?'). NO listes más SKUs nuevos."
+        )
+
+    def _bloque_pregunta_repetida(self, mensaje: str, sesion_id: UUID) -> str | None:
+        mensajes_user = self._historial_solo_user(sesion_id)
+        if not DetectorPreguntaRepetida.es_repetida(mensaje, mensajes_user):
+            return None
+        return (
+            "PREGUNTA REPETIDA: el cliente está volviendo a preguntar lo "
+            "mismo (señal de que tu respuesta anterior no fue clara). "
+            "REGLAS este turno:\n"
+            "- Reconocé la repetición ('te explico de otra forma').\n"
+            "- Respondé MÁS SIMPLE: una idea por línea, máximo 3 líneas.\n"
+            "- NO listes productos nuevos.\n"
+            "- Si el cliente pregunta sobre un producto/atributo específico, "
+            "  contestá ese atributo concreto sin rodeos comerciales."
+        )
+
+    def _ver_carrito_handler_si_existe(self, sesion_id: UUID):
+        """Devuelve el carrito o None si la lectura falla. Wrapper defensivo
+        porque los bloques de contexto no deben tirar excepciones."""
+        try:
+            from ..queries.ver_carrito import VerCarritoQuery
+            return self._dispatcher.ver_carrito.ejecutar(VerCarritoQuery(sesion_id=sesion_id))
+        except Exception:
+            return None
+
+    def _bloque_cliente_recurrente(self, mensaje: str) -> str | None:
+        """Cross-session memory: si el mensaje contiene email o telefono, busca
+        en perfiles_historicos. Si encontramos al cliente, le avisamos al LLM
+        que es recurrente y sus preferencias previas para personalizar."""
+        if self._obtener_perfil_historico is None:
+            return None
+        from .detector_contacto_cliente import DetectorContactoCliente
+        from .hasher_contacto import HasherContacto
+        contacto = DetectorContactoCliente.detectar(mensaje)
+        if not (contacto.email or contacto.telefono):
+            return None
+        contacto_hash = (
+            HasherContacto.email(contacto.email) if contacto.email
+            else HasherContacto.telefono(contacto.telefono)
+        )
+        try:
+            res = self._obtener_perfil_historico.ejecutar(
+                ObtenerPerfilHistoricoQuery(contacto_hash=contacto_hash)
+            )
+        except Exception:
+            return None
+        if not res or not res.encontrado:
+            return None
+        partes = [
+            f"CLIENTE RECURRENTE: visita #{res.visitas + 1} (este es su {res.visitas + 1}º contacto)."
+        ]
+        if res.ultima_categoria:
+            partes.append(f"- Última categoría comprada: {res.ultima_categoria}")
+        if res.ultima_marca:
+            partes.append(f"- Marca preferida histórica: {res.ultima_marca}")
+        if res.ultima_compra_sku:
+            partes.append(f"- Último SKU comprado: [{res.ultima_compra_sku}]")
+        snapshot = res.perfil_snapshot or {}
+        frust_h = snapshot.get("frustracion_count")
+        if frust_h and frust_h >= 3:
+            partes.append(
+                f"- ALERTA: cliente acumuló {frust_h} señales de frustración "
+                "antes. Tratá con extra cuidado, sé directo y empático."
+            )
+        partes.append(
+            "Personalizá el saludo (sin ser invasivo, sin nombre que no diste). "
+            "Si pregunta sobre la categoría histórica, asumí continuidad. "
+            "Si cambia de categoría, no insistas con la anterior."
+        )
+        return "\n".join(partes)
+
+    def _bloque_mensaje_vacio(self, mensaje: str, sesion_id: UUID) -> str | None:
+        """Si el cliente envía 3 mensajes vacíos seguidos ('si', '?', 'ok'),
+        pedile que aclare en lugar de gastar tokens en una respuesta vaga."""
+        from .detector_mensajes_vacios import DetectorMensajesVacios
+        mensajes_user = self._historial_solo_user(sesion_id)
+        if not DetectorMensajesVacios.hay_racha(mensajes_user, mensaje):
+            return None
+        return (
+            f"RACHA DE MENSAJES VACÍOS ({DetectorMensajesVacios.umbral_racha()} "
+            "turnos seguidos sin contenido). NO abras búsqueda nueva ni asumas "
+            "lo que el cliente quiere. Pedile UNA pregunta concreta para "
+            "destrabar: '¿Buscás algo en particular o querés que te muestre "
+            "ofertas del día?'"
+        )
 
     def _bloque_categoria_bloqueada(self, sesion_id: UUID) -> str | None:
         """Intent/Category Lock: cuando el cliente ya estableció una categoría en
@@ -1392,6 +1779,219 @@ class ProcesarChatService:
             mentiras_detectadas=mentiras_detectadas,
             llevo_a_orden=llevo_a_orden,
         )
+
+    def _hidratar_perfil_historico_si_aplica(self, sesion_id: UUID, mensaje: str) -> None:
+        """Si el cliente menciona email o telefono y existe perfil historico,
+        precarga categoria/marca preferidas + frustracion_count acumulado en
+        el perfil de la sesion actual.
+
+        Esto es la pieza central de cross-session memory: cuando el cliente
+        vuelve y se identifica, recupera el contexto que tenia antes."""
+        if self._obtener_perfil_historico is None:
+            return
+        from ..commands.actualizar_perfil_sesion import ActualizarPerfilSesionCommand
+        from .detector_contacto_cliente import DetectorContactoCliente
+        from .hasher_contacto import HasherContacto
+        contacto = DetectorContactoCliente.detectar(mensaje)
+        if not (contacto.email or contacto.telefono):
+            return
+        contacto_hash = (
+            HasherContacto.email(contacto.email) if contacto.email
+            else HasherContacto.telefono(contacto.telefono)
+        )
+        try:
+            res = self._obtener_perfil_historico.ejecutar(
+                ObtenerPerfilHistoricoQuery(contacto_hash=contacto_hash)
+            )
+            if not res.encontrado:
+                return
+            snapshot = res.perfil_snapshot or {}
+            # Sembramos frustracion_count del snapshot histórico — si el
+            # cliente venia frustrado, esta sesion arranca consciente de eso.
+            frust_historico = snapshot.get("frustracion_count")
+            self._actualizar_perfil.ejecutar(ActualizarPerfilSesionCommand(
+                sesion_id=sesion_id,
+                categoria_foco=res.ultima_categoria,
+                marca_preferida=res.ultima_marca,
+                uso_declarado=snapshot.get("uso_declarado"),
+                presupuesto_max=snapshot.get("presupuesto_max"),
+                ram_gb_min=snapshot.get("ram_gb_min"),
+                ssd_gb_min=snapshot.get("ssd_gb_min"),
+                gpu_dedicada=snapshot.get("gpu_dedicada"),
+                frustracion_delta=frust_historico,
+            ))
+        except Exception:
+            pass
+
+    def _evaluar_avance_turno(
+        self,
+        respuesta: str,
+        productos: list,
+        sesion_id: UUID,
+        trace: list,
+    ) -> bool:
+        """Verifica si el turno aportó valor (tool transaccional, SKU nuevo
+        citado, o dato concreto). Devuelve True si hubo avance."""
+        try:
+            perfil = self._obtener_perfil.ejecutar(
+                ObtenerPerfilSesionQuery(sesion_id=sesion_id)
+            )
+            historicos_str = perfil.ultimos_skus_mostrados or ""
+            historicos = [s.strip() for s in historicos_str.split(",") if s.strip()]
+        except Exception:
+            historicos = []
+        skus_actuales = [str(p.get("sku")) for p in (productos or []) if p.get("sku")]
+        return VerificadorAvanceTurno.hubo_avance(
+            respuesta=respuesta,
+            skus_citados_actuales=skus_actuales,
+            skus_historicos_mostrados=historicos,
+            trace=trace,
+        )
+
+    def _incrementar_frustracion_si_aplica(self, sesion_id: UUID, mensaje: str) -> None:
+        """Si el mensaje tiene cualquier señal de frustración (alto/medio/bajo)
+        y NO va a derivar (eso lo decide el short-circuit más abajo), suma 1
+        al contador acumulado del perfil. NO se incrementa cuando se deriva
+        porque ese turno se cierra antes y la sesión termina."""
+        nivel = DetectorFrustracion.nivel(mensaje)
+        if nivel in ("ninguno",):
+            return
+        # Si va a derivar el short-circuit, no acumulamos (la sesión cierra).
+        if DetectorFrustracion.debe_derivar(mensaje):
+            return
+        try:
+            from ..commands.actualizar_perfil_sesion import ActualizarPerfilSesionCommand
+            self._actualizar_perfil.ejecutar(ActualizarPerfilSesionCommand(
+                sesion_id=sesion_id,
+                frustracion_delta=1,
+            ))
+        except Exception:
+            pass
+
+    def _persistir_perfil_historico_si_compra(
+        self, sesion_id: UUID, mensaje_usuario: str, trace: list, productos: list
+    ) -> None:
+        """Si el turno cerro con confirmar_orden y hay email/telefono, guarda
+        snapshot del perfil para futuras visitas del mismo cliente."""
+        if self._guardar_perfil_historico is None:
+            return
+        confirmados = [
+            p for p in trace
+            if p.tool == "confirmar_orden" and not (p.result or {}).get("error")
+        ]
+        if not confirmados:
+            return
+        args_confirm = confirmados[-1].args or {}
+        email = args_confirm.get("email") or args_confirm.get("cliente_email")
+        telefono = args_confirm.get("telefono") or args_confirm.get("cliente_telefono")
+        if not (email or telefono):
+            from .detector_contacto_cliente import DetectorContactoCliente
+            contacto = DetectorContactoCliente.detectar(mensaje_usuario)
+            email = contacto.email
+            telefono = contacto.telefono
+        if not (email or telefono):
+            return
+        from .hasher_contacto import HasherContacto
+        contacto_hash = HasherContacto.email(email) if email else HasherContacto.telefono(telefono)
+        perfil = self._obtener_perfil.ejecutar(
+            ObtenerPerfilSesionQuery(sesion_id=sesion_id)
+        )
+        primer_sku = (productos[0].get("sku") if productos else None)
+        try:
+            self._guardar_perfil_historico.ejecutar(GuardarPerfilHistoricoCommand(
+                contacto_hash=contacto_hash,
+                perfil_snapshot={
+                    "categoria_foco": perfil.categoria_foco,
+                    "marca_preferida": perfil.marca_preferida,
+                    "uso_declarado": perfil.uso_declarado,
+                    "presupuesto_max": perfil.presupuesto_max,
+                    "ram_gb_min": perfil.ram_gb_min,
+                    "ssd_gb_min": perfil.ssd_gb_min,
+                    "gpu_dedicada": perfil.gpu_dedicada,
+                    # Persistir contador de frustracion para que cross-session
+                    # arranque consciente del estado emocional historico.
+                    "frustracion_count": perfil.frustracion_count,
+                },
+                ultima_categoria=perfil.categoria_foco,
+                ultima_marca=perfil.marca_preferida,
+                ultima_compra_sku=primer_sku,
+            ))
+        except Exception:
+            pass
+
+    def _registrar_synonym_candidato_si_no_resuelve(
+        self, mensaje_usuario: str, productos: list, trace: list
+    ) -> None:
+        """Si el turno termino sin productos citados Y NO se invoco
+        comparar/ver_carrito (no es follow-up), registramos el termino
+        principal del mensaje como candidato a sinonimo."""
+        if self._registrar_synonym is None or productos:
+            return
+        tools_relevantes = {p.tool for p in trace if p.tool == "buscar_productos"}
+        if not tools_relevantes:
+            return
+        from .extractor_termino_no_resuelto import ExtractorTerminoNoResuelto
+        termino = ExtractorTerminoNoResuelto.extraer(mensaje_usuario)
+        if not termino:
+            return
+        try:
+            self._registrar_synonym.ejecutar(
+                RegistrarSynonymCandidatoCommand(termino=termino, categoria_inferida=None)
+            )
+        except Exception:
+            pass
+
+    def _auto_curar_si_exitoso(
+        self,
+        sesion_id: UUID,
+        mensaje_usuario: str,
+        respuesta: str,
+        productos: list,
+        ruta: str,
+        tiempo_ms: int,
+        mentiras_detectadas: int,
+    ) -> None:
+        """Si el turno cumple criterios de exito, lo persiste como
+        ConversacionCurada con flag auto_curada para futuro few-shot."""
+        if self._auto_curar is None:
+            return
+        from .clasificador_turno_exitoso import ClasificadorTurnoExitoso
+        clasif = ClasificadorTurnoExitoso.evaluar(
+            mensaje_usuario=mensaje_usuario,
+            respuesta=respuesta,
+            productos_citados=productos,
+            ruta=ruta,
+            tiempo_ms=tiempo_ms,
+            mentiras_detectadas=mentiras_detectadas,
+        )
+        if not clasif.es_exitoso:
+            return
+        try:
+            perfil = self._obtener_perfil.ejecutar(
+                ObtenerPerfilSesionQuery(sesion_id=sesion_id)
+            )
+            perfil_dict = {
+                "categoria_foco": perfil.categoria_foco,
+                "subcategoria_foco": perfil.subcategoria_foco,
+                "marca_preferida": perfil.marca_preferida,
+                "uso_declarado": perfil.uso_declarado,
+                "presupuesto_max": perfil.presupuesto_max,
+                "ram_gb_min": perfil.ram_gb_min,
+                "ssd_gb_min": perfil.ssd_gb_min,
+                "gpu_dedicada": perfil.gpu_dedicada,
+                "nombre_excluye_acum": perfil.nombre_excluye_acum,
+            }
+            self._auto_curar.ejecutar(AutoCurarConversacionCommand(
+                sesion_id=sesion_id,
+                cliente_texto=mensaje_usuario,
+                asistente_texto=respuesta,
+                score=clasif.score,
+                etiqueta="auto_curada",
+                productos_citados=productos,
+                perfil_estado=perfil_dict,
+            ))
+        except Exception:
+            pass
 
     def _debe_forzar_busqueda(
         self, respuesta: str, trace: list[PasoAgente], mensaje: str

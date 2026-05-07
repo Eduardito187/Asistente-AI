@@ -39,4 +39,5 @@ class ObtenerPerfilSesionHandler:
             ssd_gb_min=perfil.ssd_gb_min,
             nombre_excluye_acum=perfil.nombre_excluye_acum,
             presupuesto_ideal=perfil.presupuesto_ideal,
+            frustracion_count=perfil.frustracion_count,
         )

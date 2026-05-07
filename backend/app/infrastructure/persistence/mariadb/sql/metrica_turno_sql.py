@@ -7,6 +7,8 @@ class MetricaTurnoSql:
     REGISTRAR = (
         "INSERT INTO metricas_turno "
         "(sesion_id, mensaje_usuario_len, respuesta_len, tool_calls, "
-        "mentiras_detectadas, productos_citados, ruta, tiempo_ms) "
-        "VALUES (:sesion_id, :mlen, :rlen, :tools, :mentiras, :prods, :ruta, :ms)"
+        "mentiras_detectadas, productos_citados, ruta, tiempo_ms, "
+        "prompt_version, quality_score, reason_code) "
+        "VALUES (:sesion_id, :mlen, :rlen, :tools, :mentiras, :prods, :ruta, :ms, "
+        ":pversion, :qscore, :reason)"
     )

@@ -315,6 +315,15 @@ CREATE TABLE IF NOT EXISTS perfiles_sesion (
     pulgadas                DECIMAL(4,1) NULL,
     tipo_panel              VARCHAR(32)  NULL,
     resolucion              VARCHAR(16)  NULL,
+    ram_gb_min              INT          NULL,
+    gpu_dedicada            TINYINT(1)   NULL,
+    ssd_gb_min              INT          NULL,
+    nombre_excluye_acum     TEXT         NULL,
+    presupuesto_ideal       DECIMAL(12,2) NULL,
+    -- Contador acumulado de señales de frustración detectadas en la sesión.
+    -- Se suma 1 por cada señal (alto/medio/bajo) al final del turno cuando
+    -- NO se derivó. Sirve para escalar derivación en sesiones largas.
+    frustracion_count       INT          NULL DEFAULT 0,
     ultimos_skus_mostrados  TEXT         NULL,
     precio_min_mostrado     DECIMAL(12,2) NULL,
     precio_max_mostrado     DECIMAL(12,2) NULL,
@@ -324,6 +333,18 @@ CREATE TABLE IF NOT EXISTS perfiles_sesion (
 
     CONSTRAINT fk_perfil_sesion FOREIGN KEY (sesion_id) REFERENCES sesiones(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Auto-ALTER para DBs existentes: añade columnas que pudieran faltar tras
+-- iteraciones del schema (init.sql es idempotente con IF NOT EXISTS, los
+-- ALTER abajo cubren installs viejas que NO se recrean al rebootear).
+-- IGNORE evita error si la columna ya existe.
+-- frustracion_count: contador acumulado de señales de frustración por sesión.
+-- ALTER TABLE perfiles_sesion ADD COLUMN frustracion_count INT NULL DEFAULT 0;
+-- ALTER TABLE perfiles_sesion ADD COLUMN ram_gb_min INT NULL;
+-- ALTER TABLE perfiles_sesion ADD COLUMN gpu_dedicada TINYINT(1) NULL;
+-- ALTER TABLE perfiles_sesion ADD COLUMN ssd_gb_min INT NULL;
+-- ALTER TABLE perfiles_sesion ADD COLUMN nombre_excluye_acum TEXT NULL;
+-- ALTER TABLE perfiles_sesion ADD COLUMN presupuesto_ideal DECIMAL(12,2) NULL;
 
 -- ------------------------------------------------------------
 -- Feedback post-orden: rating + comentario del cliente tras cerrar.

@@ -34,6 +34,11 @@ class PerfilSesion:
     ssd_gb_min: Optional[int] = None
     nombre_excluye_acum: Optional[str] = None  # comma-separated acumulado
     presupuesto_ideal: Optional[float] = None  # techo blando: prefiere no exceder
+    # Acumula señales de frustración detectadas en la sesión (suma, no pick).
+    # Usado por EvaluadorFrustracionAcumulada para escalar más rápido si
+    # el deterioro persiste. Se semilla desde sesiones pasadas del mismo
+    # cliente cuando hay identidad (cross-session memory).
+    frustracion_count: Optional[int] = None
 
     @staticmethod
     def vacio(sesion_id: UUID) -> "PerfilSesion":
@@ -62,6 +67,13 @@ class PerfilSesion:
     def _pick(nuevo, viejo):
         return nuevo or viejo
 
+    @staticmethod
+    def _sumar(nuevo, viejo) -> Optional[int]:
+        """Para contadores acumulativos (ej. frustracion_count). NULL+NULL = NULL."""
+        if nuevo is None and viejo is None:
+            return None
+        return (nuevo or 0) + (viejo or 0)
+
     def fusionar(self, otro: "PerfilSesion") -> "PerfilSesion":
         """Devuelve un nuevo perfil: los campos no nulos de `otro` pisan los de self."""
         p = self._pick
@@ -88,4 +100,5 @@ class PerfilSesion:
             ssd_gb_min=p(otro.ssd_gb_min, self.ssd_gb_min),
             nombre_excluye_acum=p(otro.nombre_excluye_acum, self.nombre_excluye_acum),
             presupuesto_ideal=p(otro.presupuesto_ideal, self.presupuesto_ideal),
+            frustracion_count=self._sumar(otro.frustracion_count, self.frustracion_count),
         )

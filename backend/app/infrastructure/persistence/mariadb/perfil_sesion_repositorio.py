@@ -46,6 +46,7 @@ class MariaDbPerfilSesionRepository(PerfilSesionRepository):
                 "ssd": perfil.ssd_gb_min,
                 "excluye": perfil.nombre_excluye_acum,
                 "pideal": perfil.presupuesto_ideal,
+                "frust": perfil.frustracion_count,
             },
         )
 

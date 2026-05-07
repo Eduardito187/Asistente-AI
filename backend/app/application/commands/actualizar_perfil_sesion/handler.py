@@ -39,6 +39,7 @@ class ActualizarPerfilSesionHandler:
             ssd_gb_min=cmd.ssd_gb_min,
             nombre_excluye_acum=cmd.nombre_excluye_nuevas,
             presupuesto_ideal=cmd.presupuesto_ideal,
+            frustracion_count=cmd.frustracion_delta,
         )
         try:
             with self._uow_factory() as uow:

@@ -18,6 +18,7 @@ class PerfilSesionMapper:
         gpu = r.get("gpu_dedicada")
         ssd = r.get("ssd_gb_min")
         pideal = r.get("presupuesto_ideal")
+        frust = r.get("frustracion_count")
         return PerfilSesion(
             sesion_id=UUID(r["sesion_id"]),
             presupuesto_max=float(pmax) if pmax is not None else None,
@@ -41,4 +42,5 @@ class PerfilSesionMapper:
             ssd_gb_min=int(ssd) if ssd is not None else None,
             nombre_excluye_acum=r.get("nombre_excluye_acum"),
             presupuesto_ideal=float(pideal) if pideal is not None else None,
+            frustracion_count=int(frust) if frust is not None else None,
         )

@@ -28,6 +28,7 @@ class ResultadoObtenerPerfilSesion:
     ssd_gb_min: Optional[int] = None
     nombre_excluye_acum: Optional[str] = None  # comma-separated
     presupuesto_ideal: Optional[float] = None  # techo blando preferido del cliente
+    frustracion_count: Optional[int] = None  # contador acumulado de señales
 
     def esta_vacio(self) -> bool:
         return not any(

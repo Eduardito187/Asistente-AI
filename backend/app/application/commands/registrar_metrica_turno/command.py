@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Optional
 from uuid import UUID
 
 
@@ -16,3 +17,6 @@ class RegistrarMetricaTurnoCommand:
     productos_citados: int
     ruta: str
     tiempo_ms: int
+    prompt_version: Optional[str] = None
+    quality_score: Optional[int] = None
+    reason_code: Optional[str] = None

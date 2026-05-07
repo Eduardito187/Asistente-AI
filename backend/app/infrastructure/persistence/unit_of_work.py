@@ -8,10 +8,16 @@ from .mariadb.carrito_repositorio import MariaDbCarritoRepository
 from .mariadb.catalogo_keywords_repositorio import MariaDbCatalogoKeywordsRepository
 from .mariadb.chat_repositorio import MariaDbChatRepository
 from .mariadb.conversaciones_curadas_repositorio import MariaDbConversacionesCuradasRepository
+from .mariadb.conversaciones_fallidas_repositorio import MariaDbConversacionesFallidasRepository
 from .mariadb.feedback_ordenes_repositorio import MariaDbFeedbackOrdenesRepository
+from .mariadb.feedback_turnos_repositorio import MariaDbFeedbackTurnosRepository
+from .mariadb.golden_conversations_repositorio import MariaDbGoldenConversationsRepository
+from .mariadb.negative_patterns_repositorio import MariaDbNegativePatternsRepository
 from .mariadb.metricas_turno_repositorio import MariaDbMetricasTurnoRepository
 from .mariadb.orden_repositorio import MariaDbOrdenRepository
 from .mariadb.perfil_sesion_repositorio import MariaDbPerfilSesionRepository
+from .mariadb.perfiles_historicos_repositorio import MariaDbPerfilesHistoricosRepository
+from .mariadb.synonyms_candidatos_repositorio import MariaDbSynonymsCandidatosRepository
 from .mariadb.producto_repositorio import MariaDbProductoRepository
 from .mariadb.productos_embeddings_repositorio import MariaDbProductosEmbeddingsRepository
 from .mariadb.sesion_repositorio import MariaDbSesionRepository
@@ -38,6 +44,12 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
         self.feedback_ordenes = MariaDbFeedbackOrdenesRepository(self._session)
         self.productos_embeddings = MariaDbProductosEmbeddingsRepository(self._session)
         self.catalogo_keywords = MariaDbCatalogoKeywordsRepository(self._session)
+        self.conversaciones_fallidas = MariaDbConversacionesFallidasRepository(self._session)
+        self.synonyms_candidatos = MariaDbSynonymsCandidatosRepository(self._session)
+        self.perfiles_historicos = MariaDbPerfilesHistoricosRepository(self._session)
+        self.feedback_turnos = MariaDbFeedbackTurnosRepository(self._session)
+        self.golden_conversations = MariaDbGoldenConversationsRepository(self._session)
+        self.negative_patterns = MariaDbNegativePatternsRepository(self._session)
         return self
 
     def __exit__(self, exc_type, exc, tb) -> None:

@@ -21,3 +21,6 @@ class MetricaTurno:
     ruta: str
     tiempo_ms: int
     created_at: datetime
+    prompt_version: Optional[str] = None
+    quality_score: Optional[int] = None
+    reason_code: Optional[str] = None
