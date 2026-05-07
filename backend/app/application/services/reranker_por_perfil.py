@@ -4,12 +4,13 @@ from ...domain.productos import Producto
 from ..queries.obtener_perfil_sesion import ResultadoObtenerPerfilSesion
 from .calculador_boost_comercial import CalculadorBoostComercial
 from .calculador_boost_perfil import CalculadorBoostPerfil
+from .calculador_boost_uso_tecnico import CalculadorBoostUsoTecnico
 
 
 class ReRankerPorPerfil:
     """SRP: reordenar productos combinando boost de perfil (lo que el cliente
-    declaro) con boost comercial (calidad intrinseca del producto: panel premium,
-    resolucion alta, smart TV, oferta activa)."""
+    declaro), boost comercial (calidad intrinseca: panel premium, oferta) y
+    boost-de-uso-tecnico (specs reales ponderadas segun uso_declarado)."""
 
     def reordenar(
         self,
@@ -33,8 +34,12 @@ class ReRankerPorPerfil:
         perfil: ResultadoObtenerPerfilSesion,
         marca_indiferente: bool,
     ) -> float:
-        perfil_score = (
-            0.0 if perfil.esta_vacio()
-            else CalculadorBoostPerfil.score(producto, perfil, marca_indiferente=marca_indiferente)
-        )
-        return perfil_score + CalculadorBoostComercial.score(producto)
+        if perfil.esta_vacio():
+            perfil_score = 0.0
+            uso_score = 0.0
+        else:
+            perfil_score = CalculadorBoostPerfil.score(
+                producto, perfil, marca_indiferente=marca_indiferente,
+            )
+            uso_score = CalculadorBoostUsoTecnico.score(producto, perfil)
+        return perfil_score + uso_score + CalculadorBoostComercial.score(producto)

@@ -68,19 +68,46 @@ class ExtractorAtributosMensaje:
     _RAM_VALIDOS = frozenset([4, 8, 12, 16, 24, 32, 48, 64])
     _SSD_VALIDOS = frozenset([32, 64, 128, 256, 512, 1024, 2048])
 
-    _RX_RAM_A = re.compile(r"\b(\d+)\s*gb\s+(?:de\s+)?ram\b", re.IGNORECASE)
-    _RX_RAM_B = re.compile(r"\bram\s+(?:de\s+)?(\d+)\s*gb\b", re.IGNORECASE)
-
+    # Permitimos: "16gb ram", "16 gb de ram", "16 ram" (sin GB), "16 de ram",
+    # "minimo 16 ran" (typo de 'ram'). Tambien sinonimos: ram/ran/memoria/mem.
+    # Mantengo dos regex separadas (numero antes vs despues) para no inflar
+    # la complejidad del patron.
+    _RAM_PALABRAS = r"(?:ram|ran|memoria|mem)"
+    _RX_RAM_A = re.compile(
+        rf"\b(\d+)\s*(?:gb)?\s+(?:de\s+)?{_RAM_PALABRAS}\b",
+        re.IGNORECASE,
+    )
+    _RX_RAM_B = re.compile(
+        rf"\b{_RAM_PALABRAS}\s+(?:de\s+)?(\d+)\s*(?:gb)?\b",
+        re.IGNORECASE,
+    )
+    # SSD/almacenamiento — lista ampliada con typos comunes ('disko', 'almasen-'),
+    # 'gb' opcional cuando va con la palabra explicita ('512 disco', '512 ssd').
+    _SSD_PALABRAS = (
+        r"(?:ssd|disco|disko|almacenamiento|almasenamiento|almacenam|"
+        r"storage|nvme|sata)"
+    )
     _RX_SSD_A = re.compile(
-        r"\b(\d+)\s*(gb|tb)\s+(?:de\s+)?(?:ssd|almacenamiento|disco|storage|nvme|sata)\b",
+        rf"\b(\d+)\s*(gb|tb)\s+(?:de\s+)?{_SSD_PALABRAS}\b",
         re.IGNORECASE,
     )
     _RX_SSD_B = re.compile(
-        r"\b(?:ssd|almacenamiento|disco|storage|nvme)\s+(?:de\s+)?(\d+)\s*(gb|tb)\b",
+        rf"\b{_SSD_PALABRAS}\s+(?:de\s+)?(\d+)\s*(gb|tb)\b",
         re.IGNORECASE,
     )
     _RX_SSD_C = re.compile(
-        r"\bm[íi]nimo\s+(\d+)\s*(gb|tb)\s+(?:de\s+)?(?:ssd|almacenamiento|disco)\b",
+        rf"\bm[íi]nimo\s+(\d+)\s*(gb|tb)\s+(?:de\s+)?{_SSD_PALABRAS}\b",
+        re.IGNORECASE,
+    )
+    # SSD sin unidad explicita: "512 disco", "512 ssd", "512 de almacenamiento"
+    # — solo aceptamos numeros que coincidan con _SSD_VALIDOS (256/512/1024)
+    # para no confundir con precios.
+    _RX_SSD_NUM_PRE = re.compile(
+        rf"\b(\d+)\s+(?:de\s+)?{_SSD_PALABRAS}\b",
+        re.IGNORECASE,
+    )
+    _RX_SSD_NUM_POS = re.compile(
+        rf"\b{_SSD_PALABRAS}\s+(?:de\s+)?(\d+)\b",
         re.IGNORECASE,
     )
 
@@ -268,6 +295,15 @@ class ExtractorAtributosMensaje:
             if unit == "tb":
                 val *= 1024
             if val in cls._SSD_VALIDOS:
+                return val
+        # Variante sin unidad: "512 disco", "ssd 512". Solo acepta valores
+        # canonicos para evitar capturar precios o RAM.
+        for rx in (cls._RX_SSD_NUM_PRE, cls._RX_SSD_NUM_POS):
+            m = rx.search(texto)
+            if not m:
+                continue
+            val = int(m.group(1))
+            if val in cls._SSD_VALIDOS and val >= 128:
                 return val
         return None
 

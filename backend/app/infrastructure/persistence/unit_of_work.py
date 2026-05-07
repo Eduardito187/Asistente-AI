@@ -13,6 +13,7 @@ from .mariadb.feedback_ordenes_repositorio import MariaDbFeedbackOrdenesReposito
 from .mariadb.feedback_turnos_repositorio import MariaDbFeedbackTurnosRepository
 from .mariadb.golden_conversations_repositorio import MariaDbGoldenConversationsRepository
 from .mariadb.negative_patterns_repositorio import MariaDbNegativePatternsRepository
+from .mariadb.prompt_variants_repositorio import MariaDbPromptVariantsRepository
 from .mariadb.metricas_turno_repositorio import MariaDbMetricasTurnoRepository
 from .mariadb.orden_repositorio import MariaDbOrdenRepository
 from .mariadb.perfil_sesion_repositorio import MariaDbPerfilSesionRepository
@@ -50,6 +51,7 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
         self.feedback_turnos = MariaDbFeedbackTurnosRepository(self._session)
         self.golden_conversations = MariaDbGoldenConversationsRepository(self._session)
         self.negative_patterns = MariaDbNegativePatternsRepository(self._session)
+        self.prompt_variants = MariaDbPromptVariantsRepository(self._session)
         return self
 
     def __exit__(self, exc_type, exc, tb) -> None:

@@ -30,14 +30,20 @@ class DetectorComparacionExplicita:
     # Disparadores de intención de comparación.
     _RX_DISPARADORES = re.compile(
         r"\b(?:"
-        r"compar(?:a|ame|alos|alas|amelos)\s+(?:el|la|los|las)?"
+        # "compara/compárame/comparame/compares/comparas/compáralos/etc."
+        r"compar(?:a|e|as|es|ame|eme|alos|elos|alas|elas|amelos|emelos)?"
+        r"\s+(?:el|la|los|las|un|una|unos|unas)?"
         r"|diferenc(?:ia|ias)\s+entre"
-        r"|entre\s+(?:el|la|los|las)?"
+        r"|entre\s+(?:el|la|los|las|un|una)?"
         r"|cual\s+(?:es\s+)?(?:el\s+)?mejor\s+(?:entre|el|la)?"
         r"|estoy\s+(?:entre|dudando\s+entre)"
         r"|dudas?\s+entre"
-        r"|(?:quiero|queres)\s+comparar"
-        r"|que\s+(?:me\s+)?conviene\s+(?:mas\s+)?entre"
+        # "quiero/queres/quisiera comparar/que me compares/etc."
+        r"|(?:quiero|queres|quisiera|quer[ií]a|me\s+gustar[ií]a)\s+(?:que\s+me\s+)?compar(?:ar|es|e|en|emos)"
+        r"|que\s+me\s+(?:compar|recomien)\w+"
+        # "cual me conviene/queda mejor/me sirve" — implica comparar
+        r"|cual\s+(?:de\s+(?:los|las|estos|estas|estos\s+dos|los\s+dos))?\s*me\s+(?:conviene|queda|sirve|recomendas|recomiendas)"
+        r"|que\s+(?:me\s+)?conviene\s+(?:mas\s+)?(?:entre|de\s+(?:estos|las|los|estas|los\s+dos))?"
         r")\b",
         re.IGNORECASE,
     )

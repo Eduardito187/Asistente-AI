@@ -27,7 +27,14 @@ class DetectorIntencionAsesoria:
         r"|asesor(?:ame|arme|ar|ate|eme|e|a)"
         r"|aconseja(?:me|rme|r)?"
         r"|ayuda(?:me|rme)?\s+a\s+(?:elegir|decidir|escoger)"
-        r"|no\s+se\s+(?:cual|que|por\s+donde|bien|mucho)"
+        # "no sé" + producto/decisión: SI dispara asesor.
+        # "no sé bien" / "no sé mucho" sueltos NO disparan — son
+        # expresiones de duda sobre cualquier cosa (carrera, decisión
+        # personal, etc.) y daban falso positivo cuando el cliente
+        # dudaba sobre algo NO relacionado al producto.
+        r"|no\s+se\s+(?:cual|que|por\s+donde)"
+        r"|no\s+se\s+(?:bien|mucho)\s+(?:cual|que|por\s+donde|de\s+laptop"
+        r"|de\s+celular|de\s+tv|de\s+computa|de\s+tecnolog)"
         r"|no\s+me\s+(?:interesa|importa|convence)\s+(?:la\s+)?marca"
         r"|me\s+da\s+(?:igual|lo\s+mismo)"
         r"|primera\s+(?:laptop|tv|televisor|celular|compra)"

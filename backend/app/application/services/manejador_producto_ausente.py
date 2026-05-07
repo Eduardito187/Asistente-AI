@@ -8,6 +8,7 @@ from ..commands.registrar_sugerencia_catalogo import (
     RegistrarSugerenciaCatalogoCommand,
     RegistrarSugerenciaCatalogoHandler,
 )
+from .filtros_duros_busqueda import FiltrosDurosBusqueda
 from .refinamiento_shown import RefinamientoShown
 from .resolvedor_categoria_cercana import CategoriaCercana, ResolvedorCategoriaCercana
 from .respuesta_producto_ausente import RespuestaProductoAusente
@@ -59,12 +60,7 @@ class ManejadorProductoAusente:
         subcategoria_activa: str | None = None,
         refinamiento: RefinamientoShown | None = None,
         marca_preferida: str | None = None,
-        precio_max: float | None = None,
-        precio_min: float | None = None,
-        nombre_excluye: tuple[str, ...] | None = None,
-        tipo_producto_excluye: tuple[str, ...] | None = None,
-        marca_excluye: tuple[str, ...] | None = None,
-        pulgadas: float | None = None,
+        duros: FiltrosDurosBusqueda | None = None,
     ) -> RespuestaProductoAusente:
         cercana = self._resolvedor.resolver(texto_cliente)
         validacion = None
@@ -78,11 +74,7 @@ class ManejadorProductoAusente:
             categoria_activa, subcategoria_activa, cercana, validacion,
             marca_preferida=marca_preferida,
         )
-        alternativas = self._buscar_alternativas(
-            filtros, precio_max=precio_max, precio_min=precio_min,
-            nombre_excluye=nombre_excluye, tipo_producto_excluye=tipo_producto_excluye,
-            marca_excluye=marca_excluye, pulgadas=pulgadas,
-        )
+        alternativas = self._buscar_alternativas(filtros, duros or FiltrosDurosBusqueda())
         alternativas = self._aplicar_refinamiento(alternativas, refinamiento)
 
         if not alternativas:
@@ -104,9 +96,10 @@ class ManejadorProductoAusente:
             alternativas, cercana
         )
         texto = self._armar_texto_con_alternativas(
-            nombre_pedido=(
-                (validacion.nombre_canonico if validacion else None)
-                or texto_cliente.strip()
+            nombre_pedido=self._nombre_pedido_legible(
+                validacion=validacion,
+                texto_cliente=texto_cliente,
+                cercana=cercana,
             ),
             es_producto_real=bool(validacion and validacion.es_real),
             cercana=cercana,
@@ -147,12 +140,7 @@ class ManejadorProductoAusente:
     def _buscar_alternativas(
         self,
         filtros: tuple[str | None, str | None, str | None, str | None],
-        precio_max: float | None = None,
-        precio_min: float | None = None,
-        nombre_excluye: tuple[str, ...] | None = None,
-        tipo_producto_excluye: tuple[str, ...] | None = None,
-        marca_excluye: tuple[str, ...] | None = None,
-        pulgadas: float | None = None,
+        duros: FiltrosDurosBusqueda,
     ):
         categoria, subcategoria, marca, nombre = filtros
         return self._sugeridor.sugerir(
@@ -160,12 +148,7 @@ class ManejadorProductoAusente:
             marca=marca,
             nombre_canonico=nombre,
             subcategoria=subcategoria,
-            precio_max=precio_max,
-            precio_min=precio_min,
-            nombre_excluye=nombre_excluye,
-            tipo_producto_excluye=tipo_producto_excluye,
-            marca_excluye=marca_excluye,
-            pulgadas=pulgadas,
+            duros=duros,
         )
 
     @staticmethod
@@ -233,9 +216,50 @@ class ManejadorProductoAusente:
             return False
         return razon_norm.lstrip().startswith(("tenemos", "hay ", "si tenemos"))
 
-    @staticmethod
+    # Tope conservador para "nombre" — más allá de esto sospechamos que es
+    # la frase completa del cliente y NO el nombre del producto buscado.
+    _MAX_LARGO_NOMBRE_PEDIDO = 60
+
+    @classmethod
+    def _nombre_pedido_legible(
+        cls,
+        validacion,
+        texto_cliente: str,
+        cercana: "CategoriaCercana | None",
+    ) -> str | None:
+        """Resuelve el nombre humano del producto para incluir en el mensaje
+        'X no lo tenemos tal cual'. Devuelve None cuando no hay un nombre
+        razonable — el caller debe usar el texto sin nombre en ese caso.
+
+        Cascada de prioridades:
+        1. `validacion.nombre_canonico` — si el validador lo identificó.
+        2. `cercana.palabra_clave` — palabra del catálogo que matcheó.
+        3. `cercana.subcategoria` o `cercana.categoria`.
+        4. Si el `texto_cliente` es corto y parece nombre (≤60 chars), úsalo.
+        5. None — caller usa el fallback sin nombre."""
+        if validacion and getattr(validacion, "nombre_canonico", None):
+            return validacion.nombre_canonico
+        if cercana is not None:
+            return (
+                getattr(cercana, "palabra_clave", None)
+                or cercana.subcategoria
+                or cercana.categoria
+            )
+        texto = (texto_cliente or "").strip()
+        if not texto:
+            return None
+        # Si es muy largo, es la frase entera del cliente — NO incluir.
+        if len(texto) > cls._MAX_LARGO_NOMBRE_PEDIDO:
+            return None
+        # Si tiene varias frases (puntos/comas múltiples), también es ruido.
+        if texto.count(",") >= 2 or texto.count(".") >= 2:
+            return None
+        return texto
+
+    @classmethod
     def _armar_texto_con_alternativas(
-        nombre_pedido: str,
+        cls,
+        nombre_pedido: str | None,
         es_producto_real: bool,
         cercana: CategoriaCercana | None,
         alternativas_resumen: list[dict],
@@ -243,43 +267,78 @@ class ManejadorProductoAusente:
         contexto_activo: bool = False,
         refinamiento: RefinamientoShown | None = None,
     ) -> str:
+        encabezado = cls._encabezado(
+            nombre_pedido=nombre_pedido,
+            es_producto_real=es_producto_real,
+            cercana=cercana,
+            razon_falaz=razon_falaz,
+            contexto_activo=contexto_activo,
+            refinamiento=refinamiento,
+        )
+        return "\n".join([encabezado, *cls._lineas_alternativas(alternativas_resumen)])
+
+    @classmethod
+    def _encabezado(
+        cls,
+        nombre_pedido: str | None,
+        es_producto_real: bool,
+        cercana: CategoriaCercana | None,
+        razon_falaz: bool,
+        contexto_activo: bool,
+        refinamiento: RefinamientoShown | None,
+    ) -> str:
         if cercana is not None:
-            razon_base = cercana.razon or (
-                f"lo mas cercano que tenemos es {cercana.subcategoria or cercana.categoria}"
-            )
-            if razon_falaz and cercana.marca:
-                razon = (
-                    f"no tenemos {cercana.marca} en esa categoria, pero si otras "
-                    f"marcas de {cercana.subcategoria or cercana.categoria}"
-                )
-            else:
-                razon = razon_base
-            encabezado = (
-                f'"{nombre_pedido}" no lo tenemos tal cual — {razon}. '
-                "Mira estas opciones del catalogo:"
-            )
-        elif contexto_activo:
-            if refinamiento is not None and not refinamiento.vacio():
-                encabezado = (
-                    f"Dentro de esa linea, estas son las {refinamiento.descripcion_humana()}:"
-                )
-            else:
-                encabezado = (
-                    "Siguiendo con lo que te mostre, estas son las opciones que "
-                    "tengo dentro de esa linea:"
-                )
-        elif es_producto_real:
-            encabezado = (
+            return cls._encabezado_cercana(nombre_pedido, cercana, razon_falaz)
+        if contexto_activo:
+            return cls._encabezado_contexto_activo(refinamiento)
+        if es_producto_real and nombre_pedido:
+            return (
                 f'Uy, "{nombre_pedido}" ahorita no lo tenemos en el catalogo — '
                 "muy pronto posiblemente lo tengamos. Mientras tanto, mira "
                 "estas opciones similares que si hay en stock:"
             )
-        else:
-            encabezado = (
-                "Eso exacto no lo tengo en el catalogo, pero encontre estas "
-                "opciones parecidas por si te sirven:"
+        return (
+            "Eso exacto no lo tengo en el catalogo, pero encontre estas "
+            "opciones parecidas por si te sirven:"
+        )
+
+    @staticmethod
+    def _encabezado_cercana(
+        nombre_pedido: str | None,
+        cercana: CategoriaCercana,
+        razon_falaz: bool,
+    ) -> str:
+        if razon_falaz and cercana.marca:
+            razon = (
+                f"no tenemos {cercana.marca} en esa categoria, pero si otras "
+                f"marcas de {cercana.subcategoria or cercana.categoria}"
             )
-        lineas = [encabezado]
+        else:
+            razon = cercana.razon or (
+                f"lo mas cercano que tenemos es {cercana.subcategoria or cercana.categoria}"
+            )
+        if nombre_pedido:
+            return (
+                f'"{nombre_pedido}" no lo tenemos tal cual — {razon}. '
+                "Mira estas opciones del catalogo:"
+            )
+        return (
+            f"Eso exacto no lo tengo, pero {razon}. "
+            "Mira estas opciones del catalogo:"
+        )
+
+    @staticmethod
+    def _encabezado_contexto_activo(refinamiento: RefinamientoShown | None) -> str:
+        if refinamiento is not None and not refinamiento.vacio():
+            return f"Dentro de esa linea, estas son las {refinamiento.descripcion_humana()}:"
+        return (
+            "Siguiendo con lo que te mostre, estas son las opciones que "
+            "tengo dentro de esa linea:"
+        )
+
+    @staticmethod
+    def _lineas_alternativas(alternativas_resumen: list[dict]) -> list[str]:
+        lineas: list[str] = []
         for p in alternativas_resumen:
             extra = (
                 f" (antes Bs {p['precio_anterior_bob']:.0f})"
@@ -289,4 +348,4 @@ class ManejadorProductoAusente:
             lineas.append(
                 f"- {p['nombre']} — Bs {p['precio_bob']:.0f}{extra} [{p['sku']}]"
             )
-        return "\n".join(lineas)
+        return lineas

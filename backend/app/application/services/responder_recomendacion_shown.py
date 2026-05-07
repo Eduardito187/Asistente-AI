@@ -57,18 +57,13 @@ class ResponderRecomendacionShown:
             limite=12,
             excluir_accesorios=True,
         )
-        if perfil.uso_declarado:
-            from dataclasses import replace as _replace
-            productos = self._buscar.ejecutar(_replace(query_base, query=perfil.uso_declarado))
-            # Cuando el uso_declarado es poco frecuente en nombres (ej. "gaming" solo
-            # aparece en 1 laptop), complementamos con una búsqueda amplia para
-            # tener al menos 3 candidatos que el reranker pueda ordenar.
-            if len(productos) < 3:
-                extras = self._buscar.ejecutar(query_base)
-                skus_vistos = {str(p.sku) for p in productos}
-                productos = productos + [p for p in extras if str(p.sku) not in skus_vistos]
-        else:
-            productos = self._buscar.ejecutar(query_base)
+        # Buscar SIEMPRE filtrando por categoría (ya validamos en
+        # `_suficiente_contexto` que existe). NO usamos `uso_declarado` como
+        # query fulltext: es un campo categórico (estudio/gaming/diseño)
+        # que palabras del catálogo confunden ('estudio' → micrófono de
+        # estudio). El reranker se encarga de priorizar productos que
+        # matchean uso_declarado en su descripción.
+        productos = self._buscar.ejecutar(query_base)
         if not productos:
             return None
 
@@ -115,11 +110,17 @@ class ResponderRecomendacionShown:
 
     @staticmethod
     def _suficiente_contexto(perfil: ResultadoObtenerPerfilSesion) -> bool:
-        tiene_que = bool(perfil.categoria_foco or perfil.pulgadas or perfil.uso_declarado)
-        tiene_ancla = bool(
-            perfil.presupuesto_max or perfil.pulgadas or perfil.tipo_panel or perfil.uso_declarado
+        """REQUIERE categoría confirmada. Sin ella, la búsqueda fulltext
+        con uso_declarado matchearía productos random (ej. uso='estudio'
+        matchea 'Micrófono de estudio' o 'Estudio de belleza' que NO son
+        del catálogo del cliente). Es la causa raíz del bug del
+        2026-05-07 donde un pedido de laptop devolvía hermético + micrófono."""
+        if not perfil.categoria_foco:
+            return False
+        return bool(
+            perfil.presupuesto_max or perfil.pulgadas or perfil.tipo_panel
+            or perfil.uso_declarado or perfil.ram_gb_min or perfil.gpu_dedicada
         )
-        return tiene_que and tiene_ancla
 
     @classmethod
     def _score(cls, p: Producto) -> tuple[float, float, float, float]:

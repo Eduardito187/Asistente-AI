@@ -866,6 +866,132 @@ img { max-width: 100%; display: block; }
 [data-theme="dark"] .chat-table tbody tr:nth-child(even) { background: #1e293b; }
 [data-theme="dark"] .chat-table tbody tr:hover { background: #334155; }
 
+/* ===== TABLA COMPARATIVA EN MODAL ===== */
+.chat-table-launcher {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  margin: 6px 0;
+  background: var(--brand);
+  color: #fff;
+  border: 0;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter 0.15s, transform 0.05s;
+}
+.chat-table-launcher:hover { filter: brightness(0.92); }
+.chat-table-launcher:active { transform: scale(0.97); }
+
+.chat-table-source { display: none; }
+
+.chat-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 20px;
+  animation: chatModalFadeIn 0.15s ease-out;
+}
+@keyframes chatModalFadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+.chat-modal {
+  background: var(--bg, #fff);
+  border-radius: 12px;
+  max-width: 95vw;
+  max-height: 90vh;
+  /* Desktop: hasta 1100px de ancho — entran 3-4 productos sin scroll
+     horizontal; nombres pueden ir en 2 lineas. Mobile: 95vw. */
+  width: min(1100px, 95vw);
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+  position: relative;
+  overflow: hidden;
+}
+.chat-modal-header {
+  padding: 14px 18px;
+  font-weight: 700;
+  font-size: 15px;
+  border-bottom: 1px solid var(--line, #e5e7eb);
+  background: var(--brand-soft, #f3f4f6);
+}
+.chat-modal-close {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  background: transparent;
+  font-size: 22px;
+  cursor: pointer;
+  color: var(--text, #111);
+  border-radius: 6px;
+}
+.chat-modal-close:hover { background: rgba(0, 0, 0, 0.08); }
+.chat-modal-body {
+  padding: 16px;
+  overflow: auto;
+  flex: 1;
+}
+
+/* Tabla dentro del modal: nombres de producto en 2 lineas, columna de
+   atributo angosta, columnas de productos con ancho equitativo. */
+.chat-modal-body .chat-table {
+  width: 100%;
+  table-layout: fixed;
+}
+.chat-modal-body .chat-table th,
+.chat-modal-body .chat-table td {
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  vertical-align: top;
+  line-height: 1.35;
+}
+.chat-modal-body .chat-table thead th {
+  padding-top: 10px;
+  padding-bottom: 10px;
+  font-size: 13px;
+  /* Permite hasta 3 lineas para nombres largos sin perder lectura. */
+  max-height: none;
+}
+/* Primera columna (atributo) angosta y fija; el resto reparte espacio. */
+.chat-modal-body .chat-table thead th:first-child,
+.chat-modal-body .chat-table td.row-header {
+  width: 18%;
+  min-width: 110px;
+  font-weight: 600;
+}
+
+[data-theme="dark"] .chat-modal { background: #1e293b; color: var(--text); }
+[data-theme="dark"] .chat-modal-header { background: #0f172a; border-color: var(--line); }
+[data-theme="dark"] .chat-modal-close:hover { background: rgba(255, 255, 255, 0.1); }
+
+/* En mobile (<=600px) bajamos padding de celdas y permitimos scroll
+   horizontal solo dentro del modal-body — el modal ocupa casi toda la
+   pantalla y no hay forma de evitar columnas estrechas con 3 productos. */
+@media (max-width: 600px) {
+  .chat-modal-body { padding: 10px; }
+  .chat-modal-body .chat-table { table-layout: auto; min-width: 520px; }
+  .chat-modal-body .chat-table th,
+  .chat-modal-body .chat-table td {
+    padding: 6px 8px;
+    font-size: 12px;
+  }
+  .chat-modal-body .chat-table thead th:first-child,
+  .chat-modal-body .chat-table td.row-header {
+    min-width: 90px;
+    width: auto;
+  }
+}
+
 /* ===== RESPONSIVE ===== */
 @media (max-width: 900px) {
   .hero { grid-template-columns: 1fr; padding: 32px 20px; }

@@ -10,9 +10,11 @@ from ....application.commands.registrar_feedback_turno import (
     RegistrarFeedbackTurnoCommand,
     RegistrarFeedbackTurnoHandler,
 )
+from ....application.services.evaluador_shadow import EvaluadorShadow
 from ....domain.conversaciones_curadas import ConversacionCurada
 from ....domain.golden_conversations import GoldenConversation
 from ....domain.negative_patterns import NegativePattern
+from ....domain.prompt_variants import PromptVariant
 from ..deps import uow_factory
 
 router = APIRouter(prefix="/admin/aprendizaje", tags=["aprendizaje"])
@@ -56,6 +58,19 @@ class NegativePatternInput(BaseModel):
 class DesactivarFewshotInput(BaseModel):
     motivo: str
     reason_code: str | None = None
+
+
+class PromptVariantInput(BaseModel):
+    variant_name: str
+    prompt_extra: str = ""
+    weight: int = 50
+    activa: bool = True
+    descripcion: str | None = None
+
+
+class ShadowRunInput(BaseModel):
+    origen: str = "fallidas"  # "fallidas" | "curadas"
+    limite: int = 50
 
 
 @router.get("/fallos")
@@ -409,3 +424,151 @@ def rechazar_synonym(id_: int) -> dict:
         )
         uow.commit()
     return {"ok": True, "id": id_}
+
+
+# ===== A/B TESTING =====
+
+@router.get("/ab/variantes")
+def listar_variantes() -> dict:
+    """Lista las variantes activas del prompt usadas en runtime."""
+    with uow_factory() as uow:
+        items = uow.prompt_variants.listar_activas()
+    return {
+        "items": [
+            {
+                "id": v.id, "variant_name": v.variant_name,
+                "weight": v.weight, "activa": v.activa,
+                "descripcion": v.descripcion,
+                "prompt_extra_len": len(v.prompt_extra or ""),
+            }
+            for v in items
+        ],
+    }
+
+
+@router.post("/ab/variantes")
+def upsert_variante(inp: PromptVariantInput) -> dict:
+    """Crea o actualiza una variante. Bumpear weight=0 para desactivar
+    sin borrar."""
+    v = PromptVariant(
+        id=None,
+        variant_name=inp.variant_name,
+        prompt_extra=inp.prompt_extra,
+        weight=int(inp.weight),
+        activa=bool(inp.activa),
+        descripcion=inp.descripcion,
+    )
+    with uow_factory() as uow:
+        uow.prompt_variants.upsert(v)
+        uow.commit()
+    return {"ok": True, "variant_name": inp.variant_name}
+
+
+@router.get("/ab/comparar")
+def comparar_variantes(limite: int = Query(500, ge=1, le=5000)) -> dict:
+    """Reporta metricas por variante sobre las ultimas N metricas."""
+    from sqlalchemy import text
+    with uow_factory() as uow:
+        sess = uow._session
+        rows = sess.execute(text(
+            "SELECT variant_name, ruta, productos_citados, quality_score, reason_code "
+            "FROM metricas_turno WHERE variant_name IS NOT NULL "
+            "ORDER BY id DESC LIMIT :n"
+        ), {"n": int(limite)}).mappings().all()
+    if not rows:
+        return {"variantes": [], "nota": "aun no hay metricas con variant_name registradas"}
+    by_variant: dict = {}
+    for r in rows:
+        v = r["variant_name"]
+        b = by_variant.setdefault(v, {
+            "n": 0, "fallback": 0, "sin_productos": 0,
+            "quality_acum": 0, "quality_n": 0, "criticos": 0,
+        })
+        b["n"] += 1
+        if (r.get("ruta") or "").endswith("sin_avance"):
+            b["fallback"] += 1
+        if (r.get("productos_citados") or 0) == 0:
+            b["sin_productos"] += 1
+        if r.get("quality_score"):
+            b["quality_acum"] += int(r["quality_score"])
+            b["quality_n"] += 1
+        rc = (r.get("reason_code") or "").upper()
+        if rc in ("CATEGORY_MISMATCH", "HARD_FILTER_IGNORED",
+                  "TECHNICAL_HALLUCINATION", "BACKEND_ERROR_VISIBLE"):
+            b["criticos"] += 1
+    return {
+        "variantes": [
+            {
+                "name": v,
+                "n": b["n"],
+                "rate_fallback": round(b["fallback"] / b["n"] * 100, 2),
+                "rate_sin_productos": round(b["sin_productos"] / b["n"] * 100, 2),
+                "rate_criticos": round(b["criticos"] / b["n"] * 100, 2),
+                "quality_avg": round(b["quality_acum"] / max(b["quality_n"], 1), 1),
+            }
+            for v, b in by_variant.items()
+        ],
+        "interpretacion": (
+            "Comparar mismas N: la variante con menor rate_fallback + "
+            "rate_sin_productos + rate_criticos y mayor quality_avg es la "
+            "ganadora. Mover su weight a 100 y desactivar las demas."
+        ),
+    }
+
+
+# ===== SHADOW EVALUATION =====
+
+@router.post("/shadow/run")
+def shadow_run(inp: ShadowRunInput) -> dict:
+    """Re-evalua material historico contra los validators ACTUALES.
+
+    - origen='fallidas': re-corre quality gate sobre conversaciones_fallidas
+      antiguas. Veredicto 'fixed' = hoy ya no falla; 'still_broken' = sigue
+      fallando con un reason_code u otro.
+    - origen='curadas': drift check sobre conversaciones_curadas activas.
+      Veredicto 'drift' = una curada vieja ahora reprueba el quality gate."""
+    evaluador = EvaluadorShadow(uow_factory)
+    if inp.origen == "fallidas":
+        resultados = evaluador.evaluar_fallos_recientes(limite=inp.limite)
+    elif inp.origen == "curadas":
+        resultados = evaluador.evaluar_curadas_activas(limite=inp.limite)
+    else:
+        raise HTTPException(status_code=400, detail="origen debe ser 'fallidas' o 'curadas'")
+    veredictos: dict = {}
+    for r in resultados:
+        veredictos[r.veredicto] = veredictos.get(r.veredicto, 0) + 1
+    return {
+        "evaluados": len(resultados),
+        "distribucion_veredictos": veredictos,
+        "items": [
+            {
+                "origen_id": r.origen_id,
+                "veredicto": r.veredicto,
+                "reason_anterior": r.reason_code_anterior,
+                "reason_nuevo": r.reason_code_nuevo,
+                "score": r.score_nuevo,
+                "detalle": r.detalle,
+            }
+            for r in resultados[:50]
+        ],
+    }
+
+
+@router.get("/shadow/resultados")
+def shadow_resultados(limite: int = Query(100, ge=1, le=1000)) -> dict:
+    """Lista resultados historicos de shadow evaluations."""
+    from sqlalchemy import text
+    with uow_factory() as uow:
+        sess = uow._session
+        rows = sess.execute(text(
+            "SELECT id, origen, origen_id, prompt_version_evaluado, "
+            "reason_code_anterior, reason_code_nuevo, score_nuevo, "
+            "veredicto, detalle, evaluado_en "
+            "FROM evaluaciones_shadow ORDER BY id DESC LIMIT :n"
+        ), {"n": int(limite)}).mappings().all()
+    return {
+        "items": [
+            {**dict(r), "evaluado_en": r["evaluado_en"].isoformat() if r["evaluado_en"] else None}
+            for r in rows
+        ],
+    }

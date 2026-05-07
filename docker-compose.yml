@@ -11,6 +11,19 @@ services:
       - ollama_data:/root/.ollama
     environment:
       - OLLAMA_KEEP_ALIVE=24h
+      # Concurrencia: 4 requests paralelas. Qwen 2.5 7B Q4_K_M ocupa ~5.3GB
+      # de VRAM; con la RTX 5090 (32GB) hay margen para 4 contextos paralelos
+      # antes de saturar. Si se sube a 14B/32B reducir a 2.
+      - OLLAMA_NUM_PARALLEL=4
+      # No descargar modelo entre requests (ya tenemos KEEP_ALIVE 24h pero
+      # esto refuerza). Mantiene el modelo siempre caliente en VRAM.
+      - OLLAMA_MAX_LOADED_MODELS=2
+      # Flash attention: kernels GPU optimizados, ~20% menos latencia en
+      # inference. Soportado en arquitecturas Ampere+ (la 5090 es Blackwell).
+      - OLLAMA_FLASH_ATTENTION=1
+      # KV cache cuantizado a Q8_0: reduce uso de VRAM por turno ~50%,
+      # permite contextos más largos sin saturar.
+      - OLLAMA_KV_CACHE_TYPE=q8_0
     deploy:
       resources:
         reservations:

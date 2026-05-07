@@ -24,6 +24,8 @@ from ...application.commands.registrar_feedback_orden import (
 )
 from ...application.commands.registrar_mensaje import RegistrarMensajeHandler
 from ...application.commands.auto_curar_conversacion import AutoCurarConversacionHandler
+from ...application.services.asignador_variante_ab import AsignadorVarianteAB
+from ...application.services.skills import SkillRegistry
 from ...application.commands.guardar_perfil_historico import GuardarPerfilHistoricoHandler
 from ...application.commands.registrar_conversacion_fallida import RegistrarConversacionFallidaHandler
 from ...application.commands.registrar_metrica_turno import RegistrarMetricaTurnoHandler
@@ -110,6 +112,7 @@ from ...application.services.validador_producto_real import ValidadorProductoRea
 from ...application.ports import Cache
 from ...infrastructure.cache import CacheNulo, RedisCache
 from ...infrastructure.config import settings
+from ...infrastructure.llm.llm_cache_adapter import LLMCacheAdapter
 from ...infrastructure.llm.ollama_adapter import OllamaAdapter
 from ...infrastructure.llm.ollama_embedder_adapter import OllamaEmbedderAdapter
 from ...infrastructure.persistence.mariadb.carrito_read_model import MariaDbCarritoReadModel
@@ -124,8 +127,11 @@ def uow_factory() -> SqlAlchemyUnitOfWork:
 
 
 @lru_cache()
-def llm_port() -> OllamaAdapter:
-    return OllamaAdapter(host=settings.ollama_host, model=settings.ollama_model)
+def llm_port():
+    """LLM con cache de respuestas idénticas (TTL 60s).
+    Reduce inference repetidos en saludos y casos genéricos paralelos."""
+    base = OllamaAdapter(host=settings.ollama_host, model=settings.ollama_model)
+    return LLMCacheAdapter(llm=base, cache=cache_port(), ttl_segundos=60)
 
 
 @lru_cache()
@@ -146,6 +152,14 @@ def dashboard_metricas_read_model() -> MariaDbDashboardMetricasReadModel:
 @lru_cache()
 def buscador_semantico() -> BuscadorSemantico:
     return BuscadorSemantico(embedder=embedder_port(), uow_factory=uow_factory)
+
+
+@lru_cache()
+def skill_registry_singleton() -> SkillRegistry:
+    """Auto-descubre skills custom de app/skills/ una sola vez por proceso.
+    Cache vía lru_cache: el escaneo de filesystem ocurre solo al primer
+    uso. Para recargar tras agregar skills nuevos, recompilar el backend."""
+    return SkillRegistry(paquete="app.skills")
 
 
 @lru_cache()
@@ -361,8 +375,15 @@ def procesar_chat_service() -> ProcesarChatService:
         llm=llm_port(),
         dispatcher=dispatcher,
         inyector_fewshot=inyector_fewshot(),
-        max_iter=5,
+        # max_iter=3: suficiente para (1) buscar_productos, (2) eventual
+        # corrección por DetectorLoopTool, (3) generación final.
+        # Bajado de 5: cada iteración añade ~10s de LLM en GPU compartida.
+        # En max_iter el agente cae al fallback determinístico
+        # (SintetizadorRespuestaTrace) que igual entrega productos del
+        # último buscar exitoso.
+        max_iter=3,
         registrar_fallida=registrar_conversacion_fallida_handler(),
+        asignador_variante=AsignadorVarianteAB(uow_factory),
     )
     atajo_sku = AtajoSkuDirecto(detector=DetectorSkuMensaje(), dispatcher=dispatcher)
     atajo_ordinal = AtajoOrdinalCarrito(
@@ -441,4 +462,5 @@ def procesar_chat_service() -> ProcesarChatService:
         registrar_synonym=registrar_synonym_candidato_handler(),
         guardar_perfil_historico=guardar_perfil_historico_handler(),
         obtener_perfil_historico=obtener_perfil_historico_handler(),
+        skill_registry=skill_registry_singleton(),
     )

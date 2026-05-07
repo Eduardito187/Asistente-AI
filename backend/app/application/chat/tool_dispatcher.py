@@ -193,10 +193,22 @@ class ToolDispatcher:
             "sugeridos": [self._proyectar(p, perfil) for p in sugeridos],
         }
         respuesta.update(self._inteligencia_turno(productos_web, perfil))
+        self._anotar_metadatos_busqueda(
+            respuesta, productos_web, descontinuados, perfil, filtros, flags,
+        )
+        return respuesta
+
+    def _anotar_metadatos_busqueda(
+        self,
+        respuesta: dict,
+        productos_web: list,
+        descontinuados: list,
+        perfil,
+        filtros: dict,
+        flags: dict,
+    ) -> None:
         if perfil.sku_foco and productos_web and str(productos_web[0].sku) == perfil.sku_foco:
             respuesta["producto_foco_sku"] = perfil.sku_foco
-        # Post Retrieval Validation: cuando hay 1 solo resultado el LLM debe
-        # comunicar cuántos filtros cumple y ofrecer relajar uno (regla 9a).
         if len(productos_web) == 1:
             nota = ValidadorFiltrosDuros.resumir_cumplimiento(productos_web[0], filtros)
             if nota:
@@ -204,12 +216,15 @@ class ToolDispatcher:
                     nota + " Ofrecé al cliente relajar el filtro más restrictivo si quiere más opciones."
                 )
         respuesta.update(self._avisos_fallback(flags, filtros))
+        if not productos_web:
+            aviso_estrictos = self._aviso_filtros_estrictos(filtros)
+            if aviso_estrictos:
+                respuesta["aviso_filtros_estrictos"] = aviso_estrictos
         if descontinuados:
             respuesta["tienda_fisica"] = (
                 "Este producto ya no está disponible para compra online. "
                 "Para adquirirlo debés acercarte a una tienda física Dismac."
             )
-        return respuesta
 
     def _buscar_con_fallbacks(self, filtros: dict) -> tuple[list, dict]:
         """Ejecuta búsqueda principal y aplica la jerarquía de relajación honesta:
@@ -261,6 +276,38 @@ class ToolDispatcher:
                 f"dato de refresh rate confirmado en ficha para estos modelos."
             )
         return avisos
+
+    @staticmethod
+    def _aviso_filtros_estrictos(filtros: dict) -> str | None:
+        """Cuando 0 productos pasan los filtros incluso tras los relajamientos
+        existentes (genero/panel/hz/marca), enumera los filtros DUROS que aun
+        quedan activos para que el LLM le ofrezca al cliente cual relajar.
+        Devuelve None si no hay filtros relajables."""
+        relajables: list[str] = []
+        if filtros.get("ram_gb_min"):
+            relajables.append(f"RAM minima ({filtros['ram_gb_min']}GB)")
+        if filtros.get("capacidad_gb_min"):
+            relajables.append(f"almacenamiento minimo ({filtros['capacidad_gb_min']}GB)")
+        if filtros.get("gpu_dedicada"):
+            relajables.append("GPU dedicada confirmada")
+        if filtros.get("capacidad_kg_min"):
+            relajables.append(f"capacidad minima ({filtros['capacidad_kg_min']}kg)")
+        if filtros.get("capacidad_litros_min"):
+            relajables.append(f"capacidad minima ({filtros['capacidad_litros_min']}L)")
+        if filtros.get("precio_max"):
+            relajables.append(f"presupuesto maximo (Bs {filtros['precio_max']:.0f})")
+        if filtros.get("pulgadas"):
+            relajables.append(f"tamanio ({filtros['pulgadas']}\")")
+        if not relajables:
+            return None
+        return (
+            "BUSQUEDA CON 0 RESULTADOS — los filtros activos son demasiado "
+            "estrictos en combinacion. Filtros que se podrian relajar:\n  - "
+            + "\n  - ".join(relajables)
+            + "\nDecile honestamente al cliente: 'No encontre nada que cumpla TODO "
+            "lo que pediste. Si relajamos <filtro>, tengo X opciones'. NO inventes "
+            "productos para llenar el espacio."
+        )
 
     def _fallback_sin_query(self, productos: list, filtros: dict) -> list:
         """Si el LLM mando la oracion entera como `query` (ej. 'un reloj para
@@ -701,18 +748,71 @@ class ToolDispatcher:
             "cliente_telefono": res.cliente_telefono,
         }
 
-    def _comparar(self, a: dict, _sid: UUID) -> dict:
+    def _comparar(self, a: dict, sid: UUID) -> dict:
         skus_arg = a.get("skus") or []
         if isinstance(skus_arg, str):
             skus_arg = [s.strip() for s in skus_arg.split(",") if s.strip()]
         resultado = self.comparar.ejecutar(CompararProductosQuery(skus=tuple(skus_arg)))
+        productos_filtrados, descartados = self._dropear_skus_fuera_de_categoria(
+            resultado.productos, sid
+        )
+        if descartados and len(productos_filtrados) < 2:
+            # Bloqueo duro: no se puede comparar peras con manzanas — el
+            # LLM debe pedirle al cliente skus de la misma categoria.
+            cat_lock = (
+                self.obtener_perfil.ejecutar(ObtenerPerfilSesionQuery(sesion_id=sid))
+                .categoria_foco or "tu categoria"
+            )
+            return {
+                "error": (
+                    f"No puedo comparar productos de categorias distintas. "
+                    f"El cliente busca {cat_lock} pero los SKUs propuestos son de "
+                    f"otras categorias ({', '.join(descartados)}). "
+                    "Pedile al cliente que indique SKUs reales de productos "
+                    "previamente mostrados, o usa buscar_productos para traer "
+                    "candidatos consistentes con la categoria activa."
+                ),
+                "skus_descartados_por_categoria": descartados,
+            }
         # La tabla + conclusión ya vienen armadas por ComparadorProductos.
         # El LLM solo debe renderizar, no recalcular.
         salida: dict = {
-            "productos": [ProductoSerializer.resumen(p) for p in resultado.productos],
+            "productos": [ProductoSerializer.resumen(p) for p in productos_filtrados],
             "tabla": resultado.tabla,
             "conclusion": resultado.conclusion,
         }
         if resultado.skus_no_encontrados:
             salida["skus_no_encontrados"] = resultado.skus_no_encontrados
+        if descartados:
+            salida["skus_descartados_por_categoria"] = descartados
+            salida["aviso_categoria"] = (
+                f"Filtré {len(descartados)} SKU(s) que no pertenecen a la categoría "
+                "del cliente — solo comparo productos de la misma categoría."
+            )
         return salida
+
+    def _dropear_skus_fuera_de_categoria(
+        self, productos: list, sid: UUID,
+    ) -> tuple[list, list[str]]:
+        """Retorna (productos_que_pasan, skus_descartados). Si el perfil
+        tiene categoria_foco, drop productos cuya categoria NO matchea
+        (case-insensitive substring, igual que CategoryConsistencyValidator).
+        Sin categoria_foco: deja todo pasar."""
+        if not productos:
+            return productos, []
+        try:
+            perfil = self.obtener_perfil.ejecutar(ObtenerPerfilSesionQuery(sesion_id=sid))
+        except Exception:
+            return productos, []
+        cat_lock = (perfil.categoria_efectiva() or "").strip().lower()
+        if not cat_lock:
+            return productos, []
+        pasan: list = []
+        descartados: list[str] = []
+        for p in productos:
+            cat_p = (getattr(p, "categoria", None) or "").strip().lower()
+            if cat_p and (cat_lock in cat_p or cat_p in cat_lock):
+                pasan.append(p)
+            else:
+                descartados.append(str(getattr(p, "sku", "?")))
+        return pasan, descartados

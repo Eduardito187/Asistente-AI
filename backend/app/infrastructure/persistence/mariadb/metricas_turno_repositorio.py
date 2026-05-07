@@ -28,6 +28,7 @@ class MariaDbMetricasTurnoRepository(MetricasTurnoRepository):
                 "pversion": getattr(metrica, "prompt_version", None),
                 "qscore": getattr(metrica, "quality_score", None),
                 "reason": getattr(metrica, "reason_code", None),
+                "variant": getattr(metrica, "variant_name", None),
             },
         )
         return int(res.lastrowid or 0)

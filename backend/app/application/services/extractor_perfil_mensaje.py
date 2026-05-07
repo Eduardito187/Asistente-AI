@@ -12,6 +12,7 @@ from ..queries.resolver_categoria_sinonimo import (
 from .detector_exclusiones_mensaje import DetectorExclusionesMensaje
 from .detector_genero_mencion import DetectorGeneroMencion
 from .detector_gpu_dedicada import DetectorGpuDedicada
+from .detector_sku_mensaje import DetectorSkuMensaje
 from .detector_requisitos_obligatorios import DetectorRequisitosObligatorios
 from .detector_tier_deseado import DetectorTierDeseado
 from .detector_uso_tecnico import DetectorUsoTecnico
@@ -52,6 +53,12 @@ class ExtractorPerfilMensaje:
         texto = (mensaje or "").strip()
         atributos = ExtractorAtributosMensaje.extraer(texto)
         categoria, subcategoria, sku_foco = self._resolver_entidad(texto)
+        # Si el cliente menciona un SKU explícito (ej. [ACE-NHU1PAA001] o
+        # ACE-NHU1PAA001 pelado), gana sobre lo que devolvió el resolver
+        # de sinónimos: es el ancla más fuerte para los siguientes turnos.
+        sku_explicito = DetectorSkuMensaje.extraer(texto)
+        if sku_explicito:
+            sku_foco = sku_explicito
 
         # Inferir specs mínimas desde uso técnico declarado
         uso_specs = DetectorUsoTecnico.detectar(texto)
@@ -133,14 +140,106 @@ class ExtractorPerfilMensaje:
     def _resolver_entidad(
         self, texto: str
     ) -> tuple[Optional[str], Optional[str], Optional[str]]:
+        """Resuelve (categoria, subcategoria, sku) desde el texto.
+
+        Estrategia en cascada:
+        1. Si el sanitizador acepta la frase, intenta resolver completa.
+        2. Si no, fragmenta por palabras significativas y prueba la primera
+           que matchee. Esto evita que mensajes largos conversacionales
+           ('hola, quiero una laptop bueno en realidad para mi hermano...')
+           queden sin categoría — donde 'laptop' está claramente presente
+           pero el sanitizador rechaza la frase entera por las stopwords.
+        """
         if not texto:
             return None, None, None
-        if SanitizadorQueryBusqueda.sanitizar(texto) is None:
-            return None, None, None
-        resultado = self._resolver.ejecutar(
-            ResolverCategoriaSinonimoQuery(texto=texto, limite_relaciones=0)
-        )
-        sin = resultado.sinonimo_directo
-        if sin is None:
-            return None, None, None
-        return sin.categoria, sin.subcategoria, sin.sku_especifico
+        # Intento 1: frase completa (si pasa el sanitizador)
+        if SanitizadorQueryBusqueda.sanitizar(texto) is not None:
+            resultado = self._resolver.ejecutar(
+                ResolverCategoriaSinonimoQuery(texto=texto, limite_relaciones=0)
+            )
+            sin = resultado.sinonimo_directo
+            if sin is not None:
+                return sin.categoria, sin.subcategoria, sin.sku_especifico
+        # Intento 2: token por token, filtrando negaciones explícitas.
+        return self._resolver_por_tokens(texto)
+
+    def _resolver_por_tokens(
+        self, texto: str
+    ) -> tuple[Optional[str], Optional[str], Optional[str]]:
+        """Recorre las palabras significativas del texto y devuelve la
+        primera que el resolver identifica como sinónimo del catálogo.
+
+        Filtra palabras que vienen después de un negador en la misma
+        cláusula ('no quiero chromebook', 'tampoco celeron') para que
+        esas palabras NO se usen como categoría positiva."""
+        tokens = self._tokens_significativos(texto)
+        for token in tokens:
+            try:
+                resultado = self._resolver.ejecutar(
+                    ResolverCategoriaSinonimoQuery(texto=token, limite_relaciones=0)
+                )
+            except Exception:
+                continue
+            sin = resultado.sinonimo_directo
+            if sin is not None:
+                return sin.categoria, sin.subcategoria, sin.sku_especifico
+        return None, None, None
+
+    # Stopwords que NO son nombres de producto/categoría — se filtran.
+    _STOPWORDS_TOKENIZER = frozenset({
+        "hola", "buenos", "buenas", "dias", "tardes", "noches",
+        "quiero", "queria", "necesito", "busco", "buscar", "tengo",
+        "para", "por", "con", "sin", "una", "uno", "del", "los", "las",
+        "este", "esta", "esto", "ese", "esa", "eso", "que", "como",
+        "donde", "cuando", "porque", "porqué", "porque", "cual",
+        "muy", "mas", "más", "menos", "mucho", "poco", "tampoco",
+        "bueno", "buena", "mejor", "peor", "mismo", "misma",
+        "realidad", "realmente", "creo", "pienso", "supongo",
+        "hermano", "hermana", "mama", "papa", "amigo", "novio",
+        "la", "el", "le", "lo", "se", "te", "me", "nos",
+        "mi", "tu", "su", "es", "ya", "ahora", "hoy", "mañana",
+        "estudiar", "estudia", "estudios",  # son uso, no producto
+        "ingenieria", "ingeniería", "ingeniero", "civil", "industrial",
+        "medicina", "carrera", "universidad", "u", "colegio",
+        "programa", "programas", "pesados", "pesado",
+        "puedo", "puede", "podes", "podes", "ayudar",
+        "carisimo", "barato", "caro", "precio", "presupuesto",
+        "minimo", "mínimo", "máximo", "maximo",
+        "ram", "gb", "tb", "mb", "ghz", "hz", "watts", "mah",
+        "dame", "dime", "decime",
+        "explicame", "explica", "explíca", "explicar", "explicaci",
+        "alguien", "sabe", "sabes",
+        "compus", "computacion",  # ambiguo, mejor exigir "laptop/notebook"
+        "opciones", "opcion", "ficha", "specs",
+    })
+
+    # Negadores: si una palabra del catálogo viene después de uno de
+    # estos en la misma cláusula, se descarta como detección positiva.
+    _RX_CLAUSULA_NEGADA = re.compile(
+        r"(?:^|[.,;]|\b)(?:no\s+(?:quiero|me\s+gusta|me\s+interesa|"
+        r"me\s+sirve|necesito|busco)|tampoco|nada\s+de|excepto|"
+        r"sin|menos\s+que\s+sea|que\s+no\s+sea|odio|detesto|"
+        r"jam[áa]s)\b[^.,;]*",
+        re.IGNORECASE,
+    )
+
+    @classmethod
+    def _tokens_significativos(cls, texto: str) -> list[str]:
+        """Tokens que pueden ser candidato a producto: ≥4 chars, no stopword,
+        no dentro de cláusula negada. Devuelve en orden de aparición."""
+        if not texto:
+            return []
+        # Marca rangos de cláusulas negadas para excluir tokens en ese span
+        rangos_negados = [
+            (m.start(), m.end()) for m in cls._RX_CLAUSULA_NEGADA.finditer(texto)
+        ]
+        tokens: list[str] = []
+        for m in re.finditer(r"\b[A-Za-zÁÉÍÓÚáéíóúÑñ]{4,}\b", texto):
+            posicion = m.start()
+            palabra = m.group(0).lower()
+            if palabra in cls._STOPWORDS_TOKENIZER:
+                continue
+            if any(ini <= posicion < fin for ini, fin in rangos_negados):
+                continue
+            tokens.append(palabra)
+        return tokens

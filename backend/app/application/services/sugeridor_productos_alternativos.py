@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from ...domain.productos import Producto
 from ..queries.buscar_productos import BuscarProductosHandler, BuscarProductosQuery
+from .filtros_duros_busqueda import FiltrosDurosBusqueda
 
 
 class SugeridorProductosAlternativos:
@@ -20,17 +21,11 @@ class SugeridorProductosAlternativos:
         marca: str | None,
         nombre_canonico: str | None = None,
         subcategoria: str | None = None,
-        precio_max: float | None = None,
-        precio_min: float | None = None,
-        nombre_excluye: tuple[str, ...] | None = None,
-        tipo_producto_excluye: tuple[str, ...] | None = None,
-        marca_excluye: tuple[str, ...] | None = None,
-        pulgadas: float | None = None,
+        duros: FiltrosDurosBusqueda | None = None,
     ) -> list[Producto]:
         intentos = self._armar_intentos(
             categoria, subcategoria, marca, nombre_canonico,
-            precio_max, precio_min, nombre_excluye, tipo_producto_excluye, marca_excluye,
-            pulgadas,
+            duros or FiltrosDurosBusqueda(),
         )
         for q in intentos:
             productos = self._buscar.ejecutar(q)
@@ -55,12 +50,7 @@ class SugeridorProductosAlternativos:
         subcategoria: str | None,
         marca: str | None,
         nombre_canonico: str | None,
-        precio_max: float | None = None,
-        precio_min: float | None = None,
-        nombre_excluye: tuple[str, ...] | None = None,
-        tipo_producto_excluye: tuple[str, ...] | None = None,
-        marca_excluye: tuple[str, ...] | None = None,
-        pulgadas: float | None = None,
+        duros: FiltrosDurosBusqueda,
     ) -> list[BuscarProductosQuery]:
         valores = {
             "query": (nombre_canonico or "").strip() or None,
@@ -68,16 +58,13 @@ class SugeridorProductosAlternativos:
             "subcategoria": (subcategoria or "").strip() or None,
             "marca": (marca or "").strip() or None,
         }
+        duros_kwargs = duros.como_kwargs()
         exige_subcat = valores["subcategoria"] is not None
         combos = (c for c in self._COMBINACIONES if not (exige_subcat and "subcategoria" not in c))
         intentos: list[BuscarProductosQuery] = []
         vistos: set[tuple] = set()
         for combo in combos:
-            query = self._intento_para(
-                combo, valores, vistos,
-                precio_max, precio_min, nombre_excluye, tipo_producto_excluye,
-                marca_excluye, pulgadas,
-            )
+            query = self._intento_para(combo, valores, vistos, duros_kwargs)
             if query is not None:
                 intentos.append(query)
         return intentos
@@ -88,12 +75,7 @@ class SugeridorProductosAlternativos:
         combo: tuple[str, ...],
         valores: dict[str, str | None],
         vistos: set[tuple],
-        precio_max: float | None = None,
-        precio_min: float | None = None,
-        nombre_excluye: tuple[str, ...] | None = None,
-        tipo_producto_excluye: tuple[str, ...] | None = None,
-        marca_excluye: tuple[str, ...] | None = None,
-        pulgadas: float | None = None,
+        duros: dict,
     ) -> BuscarProductosQuery | None:
         kwargs = {k: valores[k] for k in combo if valores[k]}
         if len(kwargs) != len(combo):
@@ -102,18 +84,7 @@ class SugeridorProductosAlternativos:
         if clave in vistos:
             return None
         vistos.add(clave)
-        if precio_max is not None:
-            kwargs["precio_max"] = precio_max
-        if precio_min is not None:
-            kwargs["precio_min"] = precio_min
-        if nombre_excluye:
-            kwargs["nombre_excluye"] = nombre_excluye
-        if tipo_producto_excluye:
-            kwargs["tipo_producto_excluye"] = tipo_producto_excluye
-        if marca_excluye:
-            kwargs["marca_excluye"] = marca_excluye
-        if pulgadas is not None:
-            kwargs["pulgadas"] = pulgadas
+        kwargs.update(duros)
         # Accesorios (portahuevos, fundas, cables) nunca son alternativas
         # validas de un producto principal ausente en catalogo.
         kwargs["excluir_accesorios"] = True

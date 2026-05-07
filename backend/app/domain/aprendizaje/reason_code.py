@@ -26,6 +26,13 @@ class ReasonCode(str, Enum):
     UNSAFE_COMMERCIAL_CLAIM = "UNSAFE_COMMERCIAL_CLAIM"
     MAX_ITER_NO_TEXT = "MAX_ITER_NO_TEXT"
     QUALITY_GATE_FAILED = "QUALITY_GATE_FAILED"
+    # Subtipos especificos del feedback 2026-05-07 (mas accionables que
+    # los codigos genericos para correlacionar fallos con casos concretos).
+    CATEGORY_MISMATCH_PORTATIL = "CATEGORY_MISMATCH_PORTATIL"
+    CATEGORY_MISMATCH_RANDOM_PRODUCTS = "CATEGORY_MISMATCH_RANDOM_PRODUCTS"
+    HARD_FILTER_RAM_STORAGE_IGNORED = "HARD_FILTER_RAM_STORAGE_IGNORED"
+    FREE_TEXT_COMPARISON_FAILED = "FREE_TEXT_COMPARISON_FAILED"
+    WRONG_HANDOFF = "WRONG_HANDOFF"
     OK = "OK"
 
     @classmethod
@@ -33,8 +40,13 @@ class ReasonCode(str, Enum):
         c = code if isinstance(code, ReasonCode) else ReasonCode(code)
         return c in {
             cls.CATEGORY_MISMATCH,
+            cls.CATEGORY_MISMATCH_PORTATIL,
+            cls.CATEGORY_MISMATCH_RANDOM_PRODUCTS,
             cls.HARD_FILTER_IGNORED,
+            cls.HARD_FILTER_RAM_STORAGE_IGNORED,
             cls.TECHNICAL_HALLUCINATION,
             cls.BACKEND_ERROR_VISIBLE,
             cls.UNSAFE_COMMERCIAL_CLAIM,
+            cls.FREE_TEXT_COMPARISON_FAILED,
+            cls.WRONG_HANDOFF,
         }

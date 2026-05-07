@@ -204,6 +204,8 @@
 
   // Convierte un grupo de líneas con pipe en tabla HTML.
   // Retorna null si no es una tabla válida (< 2 filas o sin separador).
+  // En vez de inline, genera un boton "Ver tabla" que abre la tabla en
+  // popup — evita scroll dentro del chat.
   function renderTabla(lineas) {
     const parseFila = l => l.trim().replaceAll(/^\||\|$/g, '').split('|').map(c => c.trim());
     const esSep    = l => /^\|[\s|:-]+\|/.test(l.trim());
@@ -214,13 +216,56 @@
       .map(parseFila)
       .filter(f => f.some(Boolean));
     if (!filas.length) return null;
+    // Filtrar filas donde TODOS los valores son '—' o 'No disponible' o vacios.
+    const filasConDatos = filas.filter(f => {
+      const valores = f.slice(1);
+      return valores.some(v => v && v !== '—' && v !== 'No disponible' && v !== 'N/D');
+    });
+    if (!filasConDatos.length) return null;
     const ths = cabeceras.map(h => `<th>${h}</th>`).join('');
-    const trs = filas.map(f => {
+    const trs = filasConDatos.map(f => {
       const tds = f.map((c, i) => `<td${i === 0 ? ' class="row-header"' : ''}>${c || '—'}</td>`).join('');
       return `<tr>${tds}</tr>`;
     }).join('');
-    return `<div class="chat-table-wrap"><table class="chat-table"><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table></div>`;
+    const tablaHtml = `<table class="chat-table"><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table>`;
+    const id = `tabla-${Math.random().toString(36).slice(2, 10)}`;
+    // Guardamos la tabla en un atributo data para el handler global del modal.
+    return (
+      `<button type="button" class="chat-table-launcher" data-tabla-id="${id}">` +
+      `📊 Ver tabla comparativa (${filasConDatos.length} atributos · ${cabeceras.length - 1} productos)` +
+      `</button>` +
+      `<template id="${id}" class="chat-table-source">${tablaHtml}</template>`
+    );
   }
+
+  function abrirModalTabla(launcher) {
+    const id = launcher.dataset.tablaId;
+    const tpl = document.getElementById(id);
+    if (!tpl) return;
+    const overlay = document.createElement('div');
+    overlay.className = 'chat-modal-overlay';
+    overlay.innerHTML = (
+      '<div class="chat-modal" role="dialog" aria-modal="true">' +
+      '<button type="button" class="chat-modal-close" aria-label="Cerrar">×</button>' +
+      '<div class="chat-modal-header">Tabla comparativa</div>' +
+      `<div class="chat-modal-body">${tpl.innerHTML}</div>` +
+      '</div>'
+    );
+    const cerrar = () => overlay.remove();
+    overlay.addEventListener('click', e => { if (e.target === overlay) cerrar(); });
+    overlay.querySelector('.chat-modal-close').addEventListener('click', cerrar);
+    document.addEventListener('keydown', function escListener(e) {
+      if (e.key === 'Escape') { cerrar(); document.removeEventListener('keydown', escListener); }
+    });
+    document.body.appendChild(overlay);
+  }
+
+  // Listener delegado para botones que abren tabla comparativa en modal.
+  // Funciona para botones renderizados ahora y en futuros mensajes.
+  document.addEventListener('click', e => {
+    const launcher = e.target.closest('.chat-table-launcher');
+    if (launcher) abrirModalTabla(launcher);
+  });
 
   // Procesa una línea de bullet o texto plano; devuelve el nuevo estado enLista.
   function _mdBullet(linea, enLista, out) {
@@ -317,10 +362,10 @@
   }
 
   // ========== Flujo ==========
-  // Timeout amplio — el backend puede tardar 5-15s cuando el modelo piensa
-  // una consulta nueva. Abortamos recién después de 60s para no cortar
-  // respuestas válidas pero lentas.
-  const TIMEOUT_MS = 60000;
+  // Timeout amplio — turnos con tool-calling y LLM local pueden tardar
+  // 30-90s especialmente cuando el modelo encadena varias tools (buscar +
+  // ver_producto + comparar). 120s evita cortes prematuros.
+  const TIMEOUT_MS = 120000;
 
   // Parser SSE incremental: devuelve eventos completos y el buffer restante
   // (lo que quedo sin cerrar por el delimitador "\n\n").
@@ -417,13 +462,17 @@
       guardarEstado();
     } catch (err) {
       quitarTyping();
-      const causa = err.name === "AbortError"
-        ? "tardé mucho (timeout 60s)"
-        : (err.message || "error de red");
-      agregarMensaje(
-        "bot",
-        `Uy, se me complicó la conexión 🙈 (${causa}) ¿Me lo repetís?`
-      );
+      let mensaje;
+      if (err.name === "AbortError") {
+        mensaje = "Tuve una demora consultando el catálogo. " +
+                  "Volvé a intentarlo en un momento — guardé tu consulta.";
+      } else if (err.message === "error de red") {
+        mensaje = "Tuve un problema temporal consultando el catálogo. " +
+                  "Probemos otra vez en un momento.";
+      } else {
+        mensaje = "Tuve un problema temporal. Volvé a intentarlo en un momento.";
+      }
+      agregarMensaje("bot", mensaje);
       console.error("chat stream error:", err);
     } finally {
       clearTimeout(timer);

@@ -79,7 +79,9 @@ class DetectorFrustracion:
         r"\bno\s+sirves?\b"
         r"|\bno\s+funcion[áa]s?\b"
         r"|\bno\s+sabes\s+nada\b"
-        r"|\bpara\s+(?:que|qu[ée])\s+sirves?\b"
+        # "para qué sirves" (con S = ataque al bot). NO matchea "para qué sirve"
+        # (sin S = pregunta legítima sobre el USO del producto).
+        r"|\bpara\s+(?:que|qu[ée])\s+sirves\b"
         r"|\bno\s+haces\s+nada\s+bien\b"
         r"|\bno\s+entendiste\s+nada\b"
         r")",
@@ -190,6 +192,16 @@ class DetectorFrustracion:
             or cls._RX_INSULTO_BOT.search(mensaje)
             or cls._RX_NO_SIRVE_BOT.search(mensaje)
         )
+
+    @classmethod
+    def pidio_humano_explicito(cls, mensaje: str) -> bool:
+        """True solo cuando el cliente pidio EXPLICITAMENTE hablar con humano /
+        asesor / agente / numero / whatsapp. NO incluye los regex genericos
+        de 'no sirve' / 'no funciona' que pueden dar falso positivo cuando
+        son preguntas tecnicas ('sirve o no sirve este modelo')."""
+        if not mensaje:
+            return False
+        return bool(cls._RX_PIDE_HUMANO.search(mensaje))
 
     @classmethod
     def _cuenta_senales_medias(cls, mensaje: str) -> int:

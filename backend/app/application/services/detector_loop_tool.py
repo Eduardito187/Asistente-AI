@@ -20,7 +20,11 @@ class DetectorLoopTool:
 
     _UMBRAL_VER_PRODUCTO_ERROR = 2
     _UMBRAL_BUSCAR_VACIO = 2
-    _UMBRAL_LISTAR_CATEGORIAS = 2
+    # Listar_categorias raramente es útil — el LLM lo usa para "explorar" pero
+    # nunca aporta SKUs comprables. Disparamos correctivo desde la PRIMERA
+    # llamada para forzar buscar_productos rápidamente. Reduce 1 iteración
+    # del loop = ~10-15s menos de latencia bajo concurrencia.
+    _UMBRAL_LISTAR_CATEGORIAS = 1
     _UMBRAL_REPETICION_IDENTICA = 3
 
     @classmethod

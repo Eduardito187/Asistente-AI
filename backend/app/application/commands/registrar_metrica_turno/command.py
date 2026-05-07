@@ -20,3 +20,4 @@ class RegistrarMetricaTurnoCommand:
     prompt_version: Optional[str] = None
     quality_score: Optional[int] = None
     reason_code: Optional[str] = None
+    variant_name: Optional[str] = None

@@ -8,6 +8,7 @@ from ..commands.registrar_conversacion_fallida import (
     RegistrarConversacionFallidaHandler,
 )
 from ..ports.llm_port import LLMPort
+from ..services.asignador_variante_ab import AsignadorVarianteAB
 from ..services.detector_loop_tool import DetectorLoopTool
 from ..services.inyector_fewshot import InyectorFewShot
 from ..services.sintetizador_respuesta_trace import SintetizadorRespuestaTrace
@@ -29,12 +30,36 @@ class AgenteService:
         inyector_fewshot: InyectorFewShot,
         max_iter: int = 3,
         registrar_fallida: RegistrarConversacionFallidaHandler | None = None,
+        asignador_variante: AsignadorVarianteAB | None = None,
     ) -> None:
         self._llm = llm
         self._dispatcher = dispatcher
         self._inyector = inyector_fewshot
         self._max_iter = max_iter
         self._registrar_fallida = registrar_fallida
+        self._asignador_variante = asignador_variante
+        self._variante_actual: str = "control"
+
+    @property
+    def variante_actual(self) -> str:
+        return self._variante_actual
+
+    def _armar_system_content(self, sesion_id: UUID, contexto_turno: str | None) -> str:
+        """Construye el system content con prompt base + variante A/B + few-shot
+        + contexto de turno. Persiste self._variante_actual para metricas."""
+        partes = [SYSTEM_PROMPT]
+        self._variante_actual = "control"
+        if self._asignador_variante is not None:
+            v = self._asignador_variante.asignar_runtime(sesion_id)
+            self._variante_actual = v.name
+            if v.prompt_extra:
+                partes.append(v.prompt_extra)
+        bloque_fewshot = self._inyector.bloque()
+        if bloque_fewshot:
+            partes.append(bloque_fewshot)
+        if contexto_turno:
+            partes.append(contexto_turno)
+        return "\n\n".join(partes)
 
     async def conversar(
         self,
@@ -43,13 +68,7 @@ class AgenteService:
         contexto_turno: str | None = None,
         marca_indiferente: bool = False,
     ) -> RespuestaAgente:
-        bloque_fewshot = self._inyector.bloque()
-        partes = [SYSTEM_PROMPT]
-        if bloque_fewshot:
-            partes.append(bloque_fewshot)
-        if contexto_turno:
-            partes.append(contexto_turno)
-        system_content = "\n\n".join(partes)
+        system_content = self._armar_system_content(sesion_id, contexto_turno)
         mensajes: list[dict] = [{"role": "system", "content": system_content}, *historial]
         trace: list[PasoAgente] = []
         skus: list[str] = []
@@ -60,24 +79,22 @@ class AgenteService:
             "",
         )
 
+        loop_critico = False
         for i in range(self._max_iter):
             ultima_iter = i == self._max_iter - 1
-            tools = [] if ultima_iter else TOOLS_SPEC
+            tools = [] if (ultima_iter or loop_critico) else TOOLS_SPEC
             msg = await self._llm.chat(mensajes, tools)
             mensajes.append(msg.to_dict())
-
             if not msg.tool_calls:
                 return RespuestaAgente(
                     texto=(msg.content or "").strip(),
                     trace=trace,
                     skus_tocados=SkuExtractor.dedupe(skus),
                 )
-
-            for tc in msg.tool_calls:
-                self._procesar_tool_call(
-                    tc, sesion_id, marca_indiferente, mensaje_usuario,
-                    trace, skus, mensajes,
-                )
+            loop_critico = loop_critico or self._procesar_tool_calls_msg(
+                msg.tool_calls, sesion_id, marca_indiferente, mensaje_usuario,
+                trace, skus, mensajes,
+            )
 
         # Si el LLM consumio todas las iteraciones sin responder, hacemos una
         # llamada final SIN tools para forzar texto. Si igual no devuelve nada,
@@ -97,6 +114,27 @@ class AgenteService:
             skus_tocados=SkuExtractor.dedupe(skus),
         )
 
+    def _procesar_tool_calls_msg(
+        self,
+        tool_calls: list,
+        sesion_id: UUID,
+        marca_indiferente: bool,
+        mensaje_usuario: str,
+        trace: list,
+        skus: list,
+        mensajes: list,
+    ) -> bool:
+        """Procesa todas las tool_calls de un mensaje del LLM. Devuelve True
+        si alguna disparo loop_critico — el caller cortara tool-calling."""
+        critico = False
+        for tc in tool_calls:
+            if self._procesar_tool_call(
+                tc, sesion_id, marca_indiferente, mensaje_usuario,
+                trace, skus, mensajes,
+            ):
+                critico = True
+        return critico
+
     def _procesar_tool_call(
         self,
         tc: dict,
@@ -106,9 +144,11 @@ class AgenteService:
         trace: list,
         skus: list,
         mensajes: list,
-    ) -> None:
-        """Ejecuta una tool call individual, actualiza trace/skus, e inyecta
-        mensaje correctivo al LLM si DetectorLoopTool detecta patrón nocivo."""
+    ) -> bool:
+        """Ejecuta una tool call, actualiza trace/skus e inyecta correctivo
+        si DetectorLoopTool detecta patron nocivo. Devuelve True si detecto
+        loop critico (repeticion identica 3+) — el caller debe romper el
+        bucle de tool calling y forzar respuesta de texto."""
         fn = tc.get("function") or {}
         nombre = fn.get("name", "")
         args = ValueParser.parse_args(fn.get("arguments"))
@@ -121,11 +161,8 @@ class AgenteService:
         trace.append(PasoAgente(tool=nombre, args=args, result=resultado))
         skus.extend(SkuExtractor.extraer(resultado))
 
-        # Anti-loop: si el LLM se estanca en un patrón nocivo
-        # (ver_producto con SKUs inventados, buscar_productos con
-        # resultados vacíos), inyectamos un mensaje correctivo en el
-        # resultado para forzar cambio de estrategia.
         correctivo = DetectorLoopTool.correctivo(trace, nombre, resultado)
+        loop_critico = correctivo is not None and "loop infinito" in correctivo
         resultado_para_llm = (
             {**resultado, "_instruccion_sistema": correctivo}
             if correctivo else resultado
@@ -134,6 +171,7 @@ class AgenteService:
             "role": "tool",
             "content": json.dumps(resultado_para_llm, ensure_ascii=False, default=str),
         })
+        return loop_critico
 
     def _registrar_fallo(
         self, sesion_id: UUID, mensaje_usuario: str, trace: list, razon: str

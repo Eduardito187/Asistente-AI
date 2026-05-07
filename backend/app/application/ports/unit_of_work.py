@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from ...domain.feedback_turnos import FeedbackTurnosRepository
     from ...domain.golden_conversations import GoldenConversationsRepository
     from ...domain.negative_patterns import NegativePatternsRepository
+    from ...domain.prompt_variants import PromptVariantsRepository
     from ...domain.metricas_turno import MetricasTurnoRepository
     from ...domain.ordenes import OrdenRepository
     from ...domain.perfiles_historicos import PerfilesHistoricosRepository
@@ -45,6 +46,7 @@ class UnitOfWork(ABC):
     feedback_turnos: "FeedbackTurnosRepository"
     golden_conversations: "GoldenConversationsRepository"
     negative_patterns: "NegativePatternsRepository"
+    prompt_variants: "PromptVariantsRepository"
 
     @abstractmethod
     def __enter__(self) -> "UnitOfWork": ...

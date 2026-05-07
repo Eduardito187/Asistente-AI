@@ -135,10 +135,11 @@ class ComparadorProductos:
         subcats = {s.get("subcategoria") for s in specs if s.get("subcategoria")}
         subcat = next(iter(subcats)) if len(subcats) == 1 else None
         atributos = cls._ATRIBUTOS_POR_SUBCATEGORIA.get(subcat or "", cls._ATRIBUTOS_GENERICOS)
-        filas = [
+        filas_raw = [
             cls._fila(titulo, [cls._formatear(s.get(clave), clave) for s in specs])
             for clave, titulo in (*cls._COMUNES, *atributos)
         ]
+        filas = cls._filtrar_filas_sin_datos(filas_raw)
         return {
             "tabla": {
                 "skus": [s["sku"] for s in specs],
@@ -147,6 +148,16 @@ class ComparadorProductos:
             },
             "conclusion": cls._concluir(specs),
         }
+
+    @staticmethod
+    def _filtrar_filas_sin_datos(filas: list[dict]) -> list[dict]:
+        """Si para una fila TODOS los productos devuelven 'No disponible',
+        la fila no aporta info — la sacamos de la tabla. Si al menos UN
+        producto tiene el dato, la fila se mantiene."""
+        return [
+            f for f in filas
+            if not all(v == "No disponible" for v in f.get("valores", []))
+        ]
 
     @staticmethod
     def _fila(titulo: str, valores: list[str]) -> dict:

@@ -75,6 +75,7 @@ from .detector_exclusiones_mensaje import DetectorExclusionesMensaje
 from .clasificador_etapa_conversacional import ClasificadorEtapaConversacional
 from .recortador_cierres_comerciales import RecortadorCierresComerciales
 from .renderizador_tabla_comparacion import RenderizadorTablaComparacion
+from .limpiador_secciones_vacias import LimpiadorSeccionesVacias
 from .silenciador_preguntas_redundantes import SilenciadorPreguntasRedundantes
 from .normalizador_acentos_respuesta import NormalizadorAcentosRespuesta
 from .normalizador_formato_producto import NormalizadorFormatoProducto
@@ -88,7 +89,21 @@ from .detector_sku_mensaje import DetectorSkuMensaje
 from .extractor_perfil_mensaje import ExtractorPerfilMensaje
 from .gestor_feedback_post_orden import GestorFeedbackPostOrden
 from .gestor_follow_ups_contextuales import GestorFollowUpsContextuales
+from .ajustador_respuesta_formato import AjustadorRespuestaFormato
+from .bloque_conclusion_riesgo import BloqueConclusionRiesgo
+from .bloque_fallback_marca import BloqueFallbackMarca
+from .bloque_formato_solicitado import BloqueFormatoSolicitado
+from .bloque_freedos_warning import BloqueFreedosWarning
+from .bloque_requisitos_nd import BloqueRequisitosND
+from .bloque_tres_secciones_filtros import BloqueTresSeccionesFiltros
+from .detector_formato_solicitado import DetectorFormatoSolicitado
+from .filtros_duros_busqueda import FiltrosDurosBusqueda
+from .formato_solicitado import FormatoSolicitado
+from .generador_cierre_contextual import GeneradorCierreContextual
 from .manejador_producto_ausente import ManejadorProductoAusente
+from .parser_productos_pegados import ParserProductosPegados
+from .renderizador_formato_forzado import RenderizadorFormatoForzado
+from .renderizador_productos_pegados import RenderizadorProductosPegados
 from .normalizador_moneda import NormalizadorMoneda
 from .resolvedor_categoria_cercana import ResolvedorCategoriaCercana
 from .detector_marca_mensaje import DetectorMarcaMensaje
@@ -108,7 +123,9 @@ from .responder_consulta_politica import ResponderConsultaPolitica
 from .respuesta_follow_up import RespuestaFollowUp
 from .detector_despedida import DetectorDespedida
 from .detector_frustracion import DetectorFrustracion
+from .detector_pregunta_tecnica import DetectorPreguntaTecnica
 from .detector_indecision import DetectorIndecision
+from .detector_jailbreak import DetectorJailbreak
 from .detector_manipulacion import DetectorManipulacion
 from .detector_pregunta_repetida import DetectorPreguntaRepetida
 from .detector_saturacion_cognitiva import DetectorSaturacionCognitiva
@@ -116,6 +133,10 @@ from .detector_urgencia import DetectorUrgencia
 from .evaluador_frustracion_acumulada import EvaluadorFrustracionAcumulada
 from .horario_atencion import HorarioAtencion
 from .responder_derivar_ventas import ResponderDerivarVentas
+from .responder_rechazo_jailbreak import ResponderRechazoJailbreak
+from .formateador_detalle_producto import FormateadorDetalleProducto
+from .resolvedor_sku_contextual import ResolvedorSkuContextual
+from .skills import ContextoSkill, SkillRegistry
 from .verificador_avance_turno import VerificadorAvanceTurno
 from .sanitizador_query_busqueda import SanitizadorQueryBusqueda
 from .tools_mark import ToolsMark
@@ -168,6 +189,7 @@ class ProcesarChatService:
         registrar_synonym: "RegistrarSynonymCandidatoHandler | None" = None,
         guardar_perfil_historico: "GuardarPerfilHistoricoHandler | None" = None,
         obtener_perfil_historico: "ObtenerPerfilHistoricoHandler | None" = None,
+        skill_registry: "SkillRegistry | None" = None,
     ) -> None:
         self._uow_factory = uow_factory
         self._crear_sesion = crear_sesion
@@ -199,6 +221,7 @@ class ProcesarChatService:
         self._registrar_synonym = registrar_synonym
         self._guardar_perfil_historico = guardar_perfil_historico
         self._obtener_perfil_historico = obtener_perfil_historico
+        self._skill_registry = skill_registry
 
     async def procesar(self, inp: ChatInput) -> ChatOutput:
         t0 = time.monotonic()
@@ -255,6 +278,13 @@ class ProcesarChatService:
         if sc_manip is not None:
             return sc_manip
 
+        # Intento de prompt injection / role hijacking: cambiar identidad del
+        # agente, override de instrucciones, cambio de tienda, inyección
+        # estructural. Distinto de manipulación comercial — corta antes del LLM.
+        sc_jailbreak = self._short_circuit_jailbreak(inp=inp, sesion_id=sesion_id, t0=t0)
+        if sc_jailbreak is not None:
+            return sc_jailbreak
+
         # Cliente frustrado: pide humano, insulta al bot, o acumula 2+ señales
         # de queja. Lo derivamos a ventas telefonicas antes de gastar tokens
         # en un turno donde el cliente ya se canso del bot.
@@ -273,6 +303,14 @@ class ProcesarChatService:
         if sc_saturacion is not None:
             return sc_saturacion
 
+        # Skills custom del usuario (auto-descubiertos en app/skills/).
+        # Se evalúan después de defensas y antes de atajos UI: si un skill
+        # devuelve respuesta, corta el turno; si solo devuelve contexto,
+        # se inyecta más abajo en _contexto_del_turno.
+        sc_skill = self._short_circuit_skill(inp=inp, sesion_id=sesion_id, t0=t0)
+        if sc_skill is not None:
+            return sc_skill
+
         # Boton 'Similares' del card: atajo determinista antes de cualquier
         # otro detector (follow-ups, atajos) que pueda distraer el flujo.
         similares_sc = self._short_circuit_similares(
@@ -281,9 +319,26 @@ class ProcesarChatService:
         if similares_sc is not None:
             return similares_sc
 
+        # Productos pegados: si el cliente pego >=2 lineas con specs (marca
+        # + ram/ssd/precio), gana SOBRE atajo_sku — el cliente quiere comparar
+        # lo pegado, no que lookee 'asus x515' como alias del catalogo.
+        sc_pegados = self._short_circuit_productos_pegados(inp, sesion_id, t0)
+        if sc_pegados is not None:
+            return sc_pegados
+
         sku_directo = self._atajo_sku.resolver(inp.mensaje, sesion_id)
         if sku_directo is not None:
             return self._responder_atajo_sku(sesion_id, inp.mensaje, sku_directo, t0)
+
+        # Pedido de detalle pronominal: "sus características", "más info", "specs"
+        # SIN nombrar producto. Resolvemos el SKU desde el contexto persistido
+        # (sku_foco / ultimos_skus_mostrados / historial assistant) y devolvemos
+        # ficha completa formateada — sin pasar por el LLM.
+        sc_detalle = self._short_circuit_detalle_contextual(
+            inp=inp, sesion_id=sesion_id, t0=t0
+        )
+        if sc_detalle is not None:
+            return sc_detalle
 
         ordinal = self._atajo_ordinal.resolver(inp.mensaje, sesion_id)
         if ordinal is not None:
@@ -412,6 +467,7 @@ class ProcesarChatService:
                 ruta="agente" if avanzo else "agente_sin_avance",
                 tiempo_ms=tiempo_ms,
                 prompt_version=PROMPT_VERSION,
+                variant_name=getattr(self._agente, "variante_actual", None),
             )
         )
 
@@ -619,6 +675,45 @@ class ProcesarChatService:
             pasos=[{"tool": p.tool, "args": p.args, "result": p.result} for p in trace],
         )
 
+    def _short_circuit_productos_pegados(
+        self,
+        inp: ChatInput,
+        sesion_id: UUID,
+        t0: float,
+    ) -> ChatOutput | None:
+        """Cuando el cliente pega varios productos con specs (formato libre),
+        no buscamos en catalogo — comparamos lo que pego deterministicamente.
+        Caso: 'asus tuf f16 i5 16 ram 512 bs 10699 / asus x515 i7 16 ram 512 bs 10799 / ...'.
+        Antes: bot decia 'no tenemos similares'. Ahora: tabla comparativa."""
+        listado = ParserProductosPegados.parsear(inp.mensaje)
+        if listado.vacio():
+            return None
+        texto = RenderizadorProductosPegados.renderizar(listado)
+        if not texto:
+            return None
+        trace = [
+            PasoAgente(
+                tool="parser_productos_pegados",
+                args={"n_productos": len(listado.productos)},
+                result={"productos": [p.raw[:80] for p in listado.productos]},
+                fallback=True,
+            )
+        ]
+        self._registrar_respuesta(sesion_id, texto, trace)
+        self._registrar_metrica.ejecutar(
+            RegistrarMetricaTurnoCommand(
+                sesion_id=sesion_id,
+                mensaje_usuario_len=len(inp.mensaje),
+                respuesta_len=len(texto),
+                tool_calls=0,
+                mentiras_detectadas=0,
+                productos_citados=0,
+                ruta="productos_pegados",
+                tiempo_ms=int((time.monotonic() - t0) * 1000),
+            )
+        )
+        return ChatOutput(sesion_id=sesion_id, respuesta=texto)
+
     def _short_circuit_comparacion_explicita(
         self,
         inp: ChatInput,
@@ -694,6 +789,37 @@ class ProcesarChatService:
                 mentiras_detectadas=0,
                 productos_citados=0,
                 ruta="rechazo_manipulacion",
+                tiempo_ms=int((time.monotonic() - t0) * 1000),
+            )
+        )
+        return ChatOutput(sesion_id=sesion_id, respuesta=texto)
+
+    def _short_circuit_jailbreak(
+        self,
+        inp: ChatInput,
+        sesion_id: UUID,
+        t0: float,
+    ) -> ChatOutput | None:
+        """Si el cliente intenta cambiar identidad/rol/instrucciones del
+        agente (prompt injection / role hijacking), corta el turno con
+        una respuesta firme que reafirma identidad. Métrica:
+        ruta=rechazo_jailbreak_<tipo> para análisis posterior."""
+        tipo = DetectorJailbreak.tipo(inp.mensaje)
+        if tipo is None:
+            return None
+        texto = ResponderRechazoJailbreak.responder(tipo)
+        self._registrar.ejecutar(
+            RegistrarMensajeCommand(sesion_id=sesion_id, rol=RolMensaje.ASSISTANT, contenido=texto)
+        )
+        self._registrar_metrica.ejecutar(
+            RegistrarMetricaTurnoCommand(
+                sesion_id=sesion_id,
+                mensaje_usuario_len=len(inp.mensaje),
+                respuesta_len=len(texto),
+                tool_calls=0,
+                mentiras_detectadas=0,
+                productos_citados=0,
+                ruta=f"rechazo_jailbreak_{tipo}",
                 tiempo_ms=int((time.monotonic() - t0) * 1000),
             )
         )
@@ -781,9 +907,159 @@ class ProcesarChatService:
         )
         return ChatOutput(sesion_id=sesion_id, respuesta=texto)
 
+    def _short_circuit_skill(
+        self,
+        inp: ChatInput,
+        sesion_id: UUID,
+        t0: float,
+    ) -> ChatOutput | None:
+        """Si algún skill custom (auto-descubierto en app/skills/) decide
+        cortar el flujo con respuesta directa, ejecuta y registra."""
+        if self._skill_registry is None or self._skill_registry.cuenta() == 0:
+            return None
+        ctx = self._construir_contexto_skill(inp.mensaje, sesion_id)
+        if ctx is None:
+            return None
+        match = self._skill_registry.short_circuit_respuesta(ctx)
+        if match is None:
+            return None
+        nombre_skill, texto = match
+        self._registrar.ejecutar(
+            RegistrarMensajeCommand(sesion_id=sesion_id, rol=RolMensaje.ASSISTANT, contenido=texto)
+        )
+        self._registrar_metrica.ejecutar(
+            RegistrarMetricaTurnoCommand(
+                sesion_id=sesion_id,
+                mensaje_usuario_len=len(inp.mensaje),
+                respuesta_len=len(texto),
+                tool_calls=0,
+                mentiras_detectadas=0,
+                productos_citados=0,
+                ruta=f"skill_{nombre_skill}",
+                tiempo_ms=int((time.monotonic() - t0) * 1000),
+            )
+        )
+        return ChatOutput(sesion_id=sesion_id, respuesta=texto)
+
+    def _short_circuit_detalle_contextual(
+        self,
+        inp: ChatInput,
+        sesion_id: UUID,
+        t0: float,
+    ) -> ChatOutput | None:
+        """Resuelve 'cuéntame más / sus características / dame las specs'
+        cuando el cliente NO menciona SKU pero hay uno claro en el contexto
+        (sku_foco, último mostrado, último citado por el assistant). Llama
+        ver_producto y formatea ficha completa — todo determinístico,
+        sin LLM, para que NUNCA pierda el hilo entre turnos."""
+        if not DetectorPedidoDetalle.es_pedido_detalle(inp.mensaje):
+            return None
+        # Si ya hay SKU en el mensaje actual, lo maneja AtajoSkuDirecto.
+        if DetectorSkuMensaje.extraer(inp.mensaje):
+            return None
+        try:
+            perfil = self._obtener_perfil.ejecutar(
+                ObtenerPerfilSesionQuery(sesion_id=sesion_id)
+            )
+            historial_assistant = self._historial_solo_assistant(sesion_id)
+            historial_user = self._historial_solo_user(sesion_id)
+        except Exception:
+            return None
+        sku = ResolvedorSkuContextual.resolver(
+            perfil,
+            historial_assistant=historial_assistant,
+            historial_user=historial_user,
+        )
+        if not sku:
+            return None
+        try:
+            ficha = self._dispatcher.ejecutar("ver_producto", {"sku": sku}, sesion_id)
+        except Exception:
+            return None
+        if not ficha or ficha.get("error"):
+            return None
+        texto = FormateadorDetalleProducto.formatear(ficha)
+        self._registrar.ejecutar(
+            RegistrarMensajeCommand(sesion_id=sesion_id, rol=RolMensaje.ASSISTANT, contenido=texto)
+        )
+        self._registrar_metrica.ejecutar(
+            RegistrarMetricaTurnoCommand(
+                sesion_id=sesion_id,
+                mensaje_usuario_len=len(inp.mensaje),
+                respuesta_len=len(texto),
+                tool_calls=1,
+                mentiras_detectadas=0,
+                productos_citados=1,
+                ruta="detalle_contextual",
+                tiempo_ms=int((time.monotonic() - t0) * 1000),
+            )
+        )
+        return ChatOutput(
+            sesion_id=sesion_id,
+            respuesta=texto,
+            productos_citados=[ficha],
+        )
+
+    def _historial_solo_assistant(self, sesion_id: UUID) -> list[str]:
+        """Helper: extrae solo los mensajes del assistant del historial,
+        cronológico. Usado por ResolvedorSkuContextual para encontrar
+        SKUs `[XXX]` que el agente citó previamente."""
+        mensajes = self._historial.ejecutar(
+            HistorialChatQuery(sesion_id=sesion_id, limite=MAX_HISTORIAL)
+        )
+        return [m.contenido for m in mensajes if m.rol == RolMensaje.ASSISTANT]
+
+    def _construir_contexto_skill(self, mensaje: str, sesion_id: UUID) -> ContextoSkill | None:
+        """Arma el ContextoSkill leyendo perfil + historial UNA vez para
+        que múltiples skills no hagan N consultas a la BD."""
+        try:
+            from datetime import datetime, timezone
+            perfil = self._obtener_perfil.ejecutar(
+                ObtenerPerfilSesionQuery(sesion_id=sesion_id)
+            )
+            historial_user = self._historial_solo_user(sesion_id)
+            return ContextoSkill(
+                mensaje=mensaje,
+                sesion_id=sesion_id,
+                perfil=perfil,
+                historial_user=historial_user,
+                ahora=datetime.now(timezone.utc),
+            )
+        except Exception:
+            return None
+
+    def _bloque_skills(self, mensaje: str, sesion_id: UUID) -> str | None:
+        """Concatena los bloques de contexto de todos los skills activos
+        para inyectar al system prompt del LLM."""
+        if self._skill_registry is None or self._skill_registry.cuenta() == 0:
+            return None
+        ctx = self._construir_contexto_skill(mensaje, sesion_id)
+        if ctx is None:
+            return None
+        bloques = self._skill_registry.bloques_contexto(ctx)
+        if not bloques:
+            return None
+        return "\n\n".join(
+            f"=== SKILL «{nombre}» ===\n{texto}"
+            for nombre, texto in bloques
+        )
+
     def _motivo_derivacion(self, mensaje: str, sesion_id: UUID) -> str | None:
         """Devuelve 'alto'/'medio' (frustración inmediata), 'acumulada'
-        (deterioro progresivo) o None (sin derivación)."""
+        (deterioro progresivo) o None (sin derivación).
+
+        Guard contra falsos positivos: si la unica senal es 'no sirve/no
+        funciona/insulto' (que puede ser pregunta tecnica como 'sirve este
+        modelo o no?'), NO derivamos cuando el mensaje es claramente una
+        pregunta tecnica. Solo `pidio_humano_explicito` (pase a humano,
+        whatsapp, telefono) NO se bloquea NUNCA."""
+        # Pidio humano explicito: deriva siempre.
+        if DetectorFrustracion.pidio_humano_explicito(mensaje):
+            return DetectorFrustracion.nivel(mensaje)
+        # Pregunta tecnica: bloquea cualquier otro motivo (alto-falso, medio,
+        # acumulada). El cliente esta consultando, no pidiendo humano.
+        if DetectorPreguntaTecnica.es_pregunta_tecnica(mensaje):
+            return None
         if DetectorFrustracion.debe_derivar(mensaje):
             return DetectorFrustracion.nivel(mensaje)
         mensajes_user = self._historial_solo_user(sesion_id)
@@ -1054,8 +1330,13 @@ class ProcesarChatService:
             ObtenerPerfilSesionQuery(sesion_id=sesion_id)
         )
         etapa = ClasificadorEtapaConversacional.clasificar(mensaje, perfil, trace)
+        respuesta = LimpiadorSeccionesVacias.limpiar(respuesta)
         respuesta = SilenciadorPreguntasRedundantes.silenciar(respuesta, perfil)
-        return RecortadorCierresComerciales.recortar(respuesta, etapa)
+        respuesta = RecortadorCierresComerciales.recortar(respuesta, etapa)
+        # Caps duros del formato pedido por el cliente — corre AL FINAL
+        # para que tope la respuesta ya saneada (no las plantillas vacias).
+        fmt = DetectorFormatoSolicitado.detectar(mensaje)
+        return AjustadorRespuestaFormato.ajustar(respuesta, fmt)
 
     def _contexto_del_turno(self, mensaje: str, sesion_id: UUID) -> str | None:
         bloques = [
@@ -1070,6 +1351,12 @@ class ProcesarChatService:
             self._bloque_preferencia_blanda(mensaje),
             self._bloque_prioridades(mensaje),
             self._bloque_formato_tres_opciones(mensaje),
+            self._bloque_formato_solicitado(mensaje),
+            BloqueRequisitosND.renderizar(mensaje),
+            BloqueFreedosWarning.renderizar(mensaje),
+            BloqueFallbackMarca.renderizar(mensaje),
+            BloqueConclusionRiesgo.renderizar(mensaje),
+            BloqueTresSeccionesFiltros.renderizar(mensaje),
             self._bloque_no_humo(mensaje),
             # === Bloques de tono / decisión (no cortan flujo, ajustan al LLM) ===
             self._bloque_frustracion_baja(mensaje),
@@ -1080,6 +1367,9 @@ class ProcesarChatService:
             self._bloque_pregunta_repetida(mensaje, sesion_id),
             self._bloque_cliente_recurrente(mensaje),
             self._bloque_mensaje_vacio(mensaje, sesion_id),
+            # Skills custom del usuario (auto-descubiertos): se inyectan
+            # como un único bloque concatenado al final del system prompt.
+            self._bloque_skills(mensaje, sesion_id),
         ]
         bloques_validos = [b for b in bloques if b]
         return "\n\n".join(bloques_validos) if bloques_validos else None
@@ -1356,6 +1646,15 @@ class ProcesarChatService:
         r"\b(?:tres?|3)\s*(?:opciones?|modelos?|alternativas?)\b",
         re.IGNORECASE,
     )
+
+    @staticmethod
+    def _bloque_formato_solicitado(mensaje: str) -> str | None:
+        """Inyecta directiva al LLM cuando el cliente pide un formato
+        explicito ('comprar/evitar', 'segura/barata', 'maximo N', 'una frase').
+        Independiente del bloque de tres-opciones existente — pueden coexistir
+        si el cliente combina formatos."""
+        fmt = DetectorFormatoSolicitado.detectar(mensaje)
+        return BloqueFormatoSolicitado.renderizar(fmt)
 
     @classmethod
     def _bloque_formato_tres_opciones(cls, mensaje: str) -> str | None:
@@ -1674,6 +1973,18 @@ class ProcesarChatService:
         follow_up: RespuestaFollowUp,
         t0: float,
     ) -> ChatOutput:
+        # Caps de formato: el path follow-up se saltaba la cadena de
+        # post-procesadores; aplicamos limpieza+cap aqui para que
+        # 'maximo 3', 'una frase', etc tambien funcionen en follow-ups.
+        texto_post = LimpiadorSeccionesVacias.limpiar(follow_up.texto)
+        fmt = DetectorFormatoSolicitado.detectar(mensaje_usuario)
+        texto_post = AjustadorRespuestaFormato.ajustar(texto_post, fmt)
+        follow_up = RespuestaFollowUp(
+            texto=texto_post,
+            productos=follow_up.productos[: fmt.max_productos] if fmt.max_productos else follow_up.productos,
+            skus=follow_up.skus[: fmt.max_productos] if fmt.max_productos else follow_up.skus,
+            ruta=follow_up.ruta,
+        )
         self._registrar.ejecutar(
             RegistrarMensajeCommand(
                 sesion_id=sesion_id,
@@ -2074,8 +2385,24 @@ class ProcesarChatService:
                 min(techo_tier, precio_max_efectivo) if precio_max_efectivo else techo_tier
             )
         nombre_excluye = tuple(DetectorExclusionesMensaje.detectar(mensaje)) or None
+        # Acumulamos exclusiones nuevas con las ya guardadas en el perfil
+        # ('chromebook', 'celeron', 'pentium' detectadas antes). Garantiza que
+        # las alternativas del fallback respeten lo que el cliente dijo en
+        # turnos previos, no solo lo que dijo en este mensaje.
+        nombre_excluye = self._unir_exclusiones(nombre_excluye, perfil.nombre_excluye_acum)
         tipo_producto_excluye = tuple(DetectorExclusionesMensaje.tipos_a_excluir(mensaje)) or None
         marca_excluye = tuple(DetectorMarcaExcluida.detectar(mensaje)) or None
+        duros = FiltrosDurosBusqueda(
+            precio_max=precio_max_efectivo,
+            precio_min=piso_tier,
+            nombre_excluye=nombre_excluye,
+            tipo_producto_excluye=tipo_producto_excluye,
+            marca_excluye=marca_excluye,
+            pulgadas=perfil.pulgadas or None,
+            ram_gb_min=perfil.ram_gb_min or None,
+            capacidad_gb_min=perfil.ssd_gb_min or None,
+            gpu_dedicada=perfil.gpu_dedicada or None,
+        )
         res = await self._manejador_ausente.manejar(
             mensaje,
             contexto,
@@ -2083,12 +2410,7 @@ class ProcesarChatService:
             subcategoria_activa=perfil.subcategoria_efectiva() or None,
             refinamiento=DetectorRefinamientoShown.detectar(mensaje),
             marca_preferida=perfil.marca_preferida or None,
-            precio_max=precio_max_efectivo,
-            precio_min=piso_tier,
-            nombre_excluye=nombre_excluye,
-            tipo_producto_excluye=tipo_producto_excluye,
-            marca_excluye=marca_excluye,
-            pulgadas=perfil.pulgadas or None,
+            duros=duros,
         )
         if res.categoria_ofrecida:
             self._registrar_alternativa.ejecutar(
@@ -2118,6 +2440,24 @@ class ProcesarChatService:
         partes = [f"{m['role']}: {m['content']}" for m in ultimos]
         partes.append(f"user: {mensaje_actual}")
         return "\n".join(partes)[:2000]
+
+    @staticmethod
+    def _unir_exclusiones(
+        nuevas: tuple[str, ...] | None, acumuladas_csv: str | None,
+    ) -> tuple[str, ...] | None:
+        """Une exclusiones del turno actual con las acumuladas en el perfil
+        ('chromebook,celeron,pentium' detectadas en turnos previos), sin
+        duplicados y preservando orden — turno actual primero."""
+        salida: list[str] = []
+        for k in (nuevas or ()):
+            kn = (k or "").strip().lower()
+            if kn and kn not in salida:
+                salida.append(kn)
+        for k in (acumuladas_csv or "").split(","):
+            kn = (k or "").strip().lower()
+            if kn and kn not in salida:
+                salida.append(kn)
+        return tuple(salida) or None
 
     def _forzar_busqueda(
         self,
@@ -2164,7 +2504,9 @@ class ProcesarChatService:
             trace, query, productos_efectivos, sugeridos, perfil, genero_sin_resultados
         )
         texto = self._texto_resultados_forzados(
-            productos_efectivos, genero_sin_resultados, query, aviso_fallback
+            productos_efectivos, genero_sin_resultados, query, aviso_fallback,
+            perfil=perfil,
+            formato=DetectorFormatoSolicitado.detectar(mensaje),
         )
         if contradiccion:
             texto = f"{contradiccion.mensaje}\n\n{texto}"
@@ -2179,6 +2521,14 @@ class ProcesarChatService:
         """Construye el BuscarProductosQuery para _forzar_busqueda."""
         perfil = self._obtener_perfil.ejecutar(ObtenerPerfilSesionQuery(sesion_id=sesion_id))
         mensaje_limpio = SanitizadorQueryBusqueda.sanitizar(mensaje)
+        # Si el sanitizador rechaza la frase entera (típico en frases
+        # conversacionales: "Hola Dismi, necesito una laptop para X"), uso
+        # el resolvedor de sinónimos como fallback: si matchea una palabra
+        # de producto del catálogo, esa es la query.
+        if mensaje_limpio is None:
+            cercana = self._resolvedor_categoria.resolver(mensaje)
+            if cercana is not None and cercana.fuente == "sinonimo":
+                mensaje_limpio = cercana.palabra_clave or None
         mensaje_norm = NormalizadorTexto.normalizar(mensaje_limpio or "")
         tiene_terminos = bool(mensaje_limpio) and TokensConsulta.hay_terminos(mensaje_norm)
         cat_ef = perfil.categoria_efectiva() or None
@@ -2364,12 +2714,22 @@ class ProcesarChatService:
         genero_sin_resultados: bool,
         query: BuscarProductosQuery,
         aviso_fallback: str | None = None,
+        perfil=None,
+        formato: FormatoSolicitado | None = None,
     ) -> str:
         if not productos_efectivos:
             return (
                 "Ups, no encontre nada exacto con eso en el catalogo. "
                 "Me das mas pistas? Marca preferida, presupuesto o tamanio me ayudarian un monton."
             )
+        # Si el cliente pidio un formato estructural (comprar/evitar, segura/barata),
+        # el path determinista renderiza con esa forma — no la lista clasica.
+        if formato is not None and not formato.vacio() and formato.forma:
+            forzado = RenderizadorFormatoForzado.renderizar(
+                formato, productos_efectivos[:3], perfil,
+            )
+            if forzado:
+                return forzado
         aviso = ""
         if genero_sin_resultados:
             aviso = (
@@ -2398,29 +2758,10 @@ class ProcesarChatService:
         for p in productos_efectivos[:3]:
             extra = f" (antes Bs {p.precio_anterior.monto:.0f})" if p.precio_anterior else ""
             lineas.append(f"- {p.nombre} — Bs {p.precio.monto:.0f}{extra} [{p.sku}]")
-        cierre = ProcesarChatService._cierre_contextual(aviso_fallback)
+        cierre = GeneradorCierreContextual.generar(aviso_fallback, perfil)
         if cierre:
             lineas.append(cierre)
         return "\n".join(lineas)
-
-    @staticmethod
-    def _cierre_contextual(aviso_fallback: str | None) -> str:
-        """Pregunta de cierre adaptada al contexto del fallback."""
-        if aviso_fallback == "gpu_dedicada_no_confirmada":
-            return (
-                "Estas opciones no tienen GPU dedicada confirmada — pueden servir para "
-                "oficina y estudio pero no para render o CAD serio. "
-                "Queres que busque algo especifico o ajustamos el presupuesto?"
-            )
-        if aviso_fallback and aviso_fallback.startswith("gpu_sobre_presupuesto:"):
-            presupuesto = aviso_fallback.split(":", 1)[1]
-            return (
-                f"Estan sobre tu presupuesto de Bs {presupuesto}, pero son las unicas "
-                f"con GPU confirmada en catalogo. Vale la pena la diferencia para render/CAD?"
-            )
-        if aviso_fallback and aviso_fallback.startswith("marca_no_encontrada:"):
-            return "Son alternativas de otras marcas — si queres ajustar la busqueda, avisame."
-        return "Contame que te importa mas (presupuesto, marca, uso) y te ayudo a elegir."
 
     def _ejecutar_fallback_acciones(
         self,

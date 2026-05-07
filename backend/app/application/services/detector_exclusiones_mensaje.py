@@ -4,6 +4,7 @@ import re
 from typing import Iterable
 
 from ...domain.shared.normalizacion import NormalizadorTexto
+from .matcher_fuzzy_keywords import MatcherFuzzyKeywords
 
 
 class DetectorExclusionesMensaje:
@@ -50,16 +51,31 @@ class DetectorExclusionesMensaje:
     )
     _DISTANCIA_MAX = 1
 
+    # Trigger de negacion tolerante a typos: "no quiero", "no qiero", "no kiero",
+    # "tampoko", etc. La parte gatillo se detecta SOLO via regex; la palabra
+    # negada (group 1) se valida despues con fuzzy match contra el diccionario.
     _RX_NEGACION = re.compile(
         r"\b(?:"
-        r"menos\s+que\s+sea|que\s+no\s+sea|nada\s+de|tampoco"
-        r"|no\s+quiero\s+(?:una?\s+|el\s+|la\s+|ver\s+|que\s+sea\s+)?"
+        r"menos\s+que\s+sea|que\s+no\s+sea|nada\s+de|tampoco|tampoko"
+        r"|no\s+(?:lo\s+)?(?:quiero|qiero|kiero|quero|kero|kiero|deseo|"
+        r"muestres?|incluyas?|pongas?|necesito|nesesito|busco)\s+(?:una?\s+|el\s+|la\s+|ver\s+|que\s+sea\s+)?"
         r"|pero\s+no\s+(?:una?\s+|el\s+|la\s+)?"
         r"|sino\s+(?:una?\s+|el\s+|la\s+)?"
         r"|excepto\s+(?:una?\s+|el\s+|la\s+)?"
         r"|no\s+una?\s+|menos|sin|no\s+"
         r")"
         r"([a-zñáéíóúü]{3,})",
+        re.IGNORECASE,
+    )
+
+    # Captura de listas tras un trigger de negacion ("no quiero X ni Y ni Z").
+    # Devuelve el segmento entero hasta el siguiente punto/coma fuerte para
+    # que se escanee con fuzzy contra el diccionario. Tolera 'me'/'lo' entre
+    # 'no' y el verbo ("no me muestres", "no lo quiero").
+    _RX_NEGACION_BLOQUE = re.compile(
+        r"\b(?:no\s+(?:me\s+|lo\s+|la\s+)?(?:quiero|qiero|kiero|quero|kero|deseo|"
+        r"muestres?|incluyas?|pongas?|necesito|nesesito|busco|deseas?)|"
+        r"tampoco|tampoko|nada\s+de|sin\s+|excepto|excluye)\b([^.;]+)",
         re.IGNORECASE,
     )
 
@@ -87,6 +103,31 @@ class DetectorExclusionesMensaje:
         # térmicas (POS/recibos/etiquetas) salvo que el cliente lo pida.
         "impresora": (("impresora_termica",), ("termica", "termicas", "pos", "recibos", "etiquetas", "etiqueta")),
         "impresoras": (("impresora_termica",), ("termica", "termicas", "pos", "recibos", "etiquetas", "etiqueta")),
+        # 'refri/refrigerador/refrigeradora' por default = principal de cocina;
+        # excluimos exhibidores comerciales, freezers horizontales, frigobars
+        # y minibars salvo que el cliente los pida explicitamente.
+        "refri": (
+            ("frigobar", "minibar", "freezer", "exhibidor", "vitrina"),
+            ("frigobar", "minibar", "freezer", "exhibidor", "vitrina", "comercial", "negocio", "tienda"),
+        ),
+        "refrigerador": (
+            ("frigobar", "minibar", "freezer", "exhibidor", "vitrina"),
+            ("frigobar", "minibar", "freezer", "exhibidor", "vitrina", "comercial", "negocio", "tienda"),
+        ),
+        "refrigeradora": (
+            ("frigobar", "minibar", "freezer", "exhibidor", "vitrina"),
+            ("frigobar", "minibar", "freezer", "exhibidor", "vitrina", "comercial", "negocio", "tienda"),
+        ),
+        "heladera": (
+            ("frigobar", "minibar", "freezer", "exhibidor", "vitrina"),
+            ("frigobar", "minibar", "freezer", "exhibidor", "vitrina", "comercial", "negocio", "tienda"),
+        ),
+        # 'lavadora' por default = principal de hogar; excluimos secadoras
+        # solas y centros de lavado mini.
+        "lavadora": (
+            ("secadora", "centro_lavado_mini"),
+            ("secadora", "secado", "centro", "compacta"),
+        ),
     }
 
     @classmethod
@@ -101,11 +142,34 @@ class DetectorExclusionesMensaje:
             *cls._componentes_tech_negados(norm),
         })
 
+    # Solo estos terminos low-end aceptan fuzzy en el escaneo post-negacion.
+    # Los otros (colores, partes) requieren match exacto para evitar falsos
+    # positivos cuando el cliente menciona algo neutro ('rojo' como adjetivo).
+    _TECH_FUZZY = ("celeron", "pentium", "chromebook")
+
+    # Umbral mas permisivo para tech keywords ('chrombuk' -> 'chromebook' tiene
+    # ratio ~0.778, debajo del 0.78 default). Diccionario chico + alto recall
+    # justifican bajar a 0.74 sin riesgo de falso positivo.
+    _RATIO_TECH = 0.74
+
     @classmethod
     def _componentes_tech_negados(cls, norm: str) -> list[str]:
         """Captura procesadores/componentes low-end citados en lista tras señal de exclusión.
-        Cubre 'no me muestres Celeron, Pentium' donde _RX_NEGACION solo captura una palabra."""
-        return [m.group(1).lower() for m in cls._RX_TECH_NEGADA.finditer(norm)]
+        Cubre 'no me muestres Celeron, Pentium' y typos como 'chrombuk' o 'celeron'."""
+        salida: list[str] = []
+        for m in cls._RX_TECH_NEGADA.finditer(norm):
+            salida.append(m.group(1).lower())
+        # Tras un trigger de negacion ('no quiero/qiero/kiero...'), escanear
+        # cada palabra del bloque hasta el siguiente punto/coma y matchear
+        # con fuzzy contra _TECH_FUZZY.
+        for m in cls._RX_NEGACION_BLOQUE.finditer(norm):
+            for palabra in re.findall(r"[a-zñáéíóúü]{4,}", m.group(1)):
+                match = MatcherFuzzyKeywords.mejor_match(
+                    palabra, cls._TECH_FUZZY, ratio_min=cls._RATIO_TECH,
+                )
+                if match and match not in salida:
+                    salida.append(match)
+        return salida
 
     @classmethod
     def tipos_a_excluir(cls, mensaje: str | None) -> list[str]:
@@ -161,15 +225,21 @@ class DetectorExclusionesMensaje:
 
     @classmethod
     def _corregir_typo(cls, palabra: str) -> str | None:
-        """Mapea 'pered' → 'pared' buscando la palabra del diccionario con
-        distancia de edición mínima. Devuelve la palabra canónica si está
-        dentro del umbral; None si no hay match razonable."""
+        """Mapea 'pered' -> 'pared' buscando la palabra del diccionario con
+        match fuzzy (Levenshtein 1 + ratio fonetico para typos mayores como
+        'chrombuk' -> 'chromebook'). Devuelve la palabra canonica si hay
+        match razonable, None si no."""
         p = palabra.lower()
         if p in cls._DICCIONARIO_TOLERANTE:
             return p
+        # Levenshtein 1 — barato y preciso para typos chicos.
         for candidato in cls._DICCIONARIO_TOLERANTE:
             if cls._distancia(p, candidato) <= cls._DISTANCIA_MAX:
                 return candidato
+        # Si la palabra es lo suficientemente larga (≥ 6 chars), tolerar
+        # typos mayores con fuzzy fonetico — captura 'chrombuk'/'chromebok'.
+        if len(p) >= 6:
+            return MatcherFuzzyKeywords.mejor_match(p, cls._DICCIONARIO_TOLERANTE)
         return None
 
     @staticmethod
