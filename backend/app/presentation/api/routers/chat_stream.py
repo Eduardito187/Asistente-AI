@@ -9,11 +9,14 @@ from fastapi.responses import StreamingResponse
 
 from ....application.services.procesar_chat_service import ChatInput, ProcesarChatService
 from ..deps import procesar_chat_service
+from ..middlewares.rate_limiter import SessionRateLimiter
 from ..schemas import ChatRequest
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
 DELAY_TOKEN_SEG = 0.015
+
+_rate_limiter = SessionRateLimiter(max_requests=60, ventana_segundos=60.0)
 
 
 @router.post("/stream")
@@ -21,6 +24,7 @@ async def chat_stream(
     req: ChatRequest,
     service: ProcesarChatService = Depends(procesar_chat_service),
 ):
+    _rate_limiter.verificar(str(req.sesion_id))
     if not req.mensaje.strip():
         raise HTTPException(status_code=400, detail="el mensaje no puede estar vacio")
     try:

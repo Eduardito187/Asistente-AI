@@ -9,6 +9,7 @@ from ..queries.obtener_perfil_sesion import (
     ObtenerPerfilSesionQuery,
     ResultadoObtenerPerfilSesion,
 )
+from .detector_exclusiones_mensaje import DetectorExclusionesMensaje
 from .respuesta_follow_up import RespuestaFollowUp
 
 
@@ -43,10 +44,14 @@ class ResponderMasCaro:
 
         piso_nuevo = anchor + self._EPSILON
         excluidos = self._skus_mostrados(perfil)
+        nombre_excluye = tuple(perfil.exclusiones_acumuladas()) or None
+        tipo_producto_excluye = (
+            tuple(DetectorExclusionesMensaje.tipos_a_excluir(perfil.categoria_foco or "")) or None
+        )
 
-        nuevos = self._buscar_premium(perfil, piso_nuevo, excluidos)
+        nuevos = self._buscar_premium(perfil, piso_nuevo, excluidos, nombre_excluye, tipo_producto_excluye)
         if not nuevos:
-            nuevos = self._buscar_cualquier_premium_por_precio(perfil, piso_nuevo, excluidos)
+            nuevos = self._buscar_cualquier_premium_por_precio(perfil, piso_nuevo, excluidos, nombre_excluye, tipo_producto_excluye)
 
         if not nuevos:
             return RespuestaFollowUp(
@@ -79,6 +84,8 @@ class ResponderMasCaro:
         perfil: ResultadoObtenerPerfilSesion,
         piso: float,
         excluidos: set[str],
+        nombre_excluye: tuple[str, ...] | None,
+        tipo_producto_excluye: tuple[str, ...] | None,
     ) -> list:
         for panel in self._PANELES_PREMIUM:
             productos = self._buscar.ejecutar(
@@ -90,6 +97,8 @@ class ResponderMasCaro:
                     precio_min=piso,
                     limite=6,
                     excluir_accesorios=True,
+                    nombre_excluye=nombre_excluye,
+                    tipo_producto_excluye=tipo_producto_excluye,
                 )
             )
             nuevos = [p for p in productos if str(p.sku) not in excluidos][:3]
@@ -102,6 +111,8 @@ class ResponderMasCaro:
         perfil: ResultadoObtenerPerfilSesion,
         piso: float,
         excluidos: set[str],
+        nombre_excluye: tuple[str, ...] | None,
+        tipo_producto_excluye: tuple[str, ...] | None,
     ) -> list:
         productos = self._buscar.ejecutar(
             BuscarProductosQuery(
@@ -111,6 +122,8 @@ class ResponderMasCaro:
                 precio_min=piso,
                 limite=6,
                 excluir_accesorios=True,
+                nombre_excluye=nombre_excluye,
+                tipo_producto_excluye=tipo_producto_excluye,
             )
         )
         return [p for p in productos if str(p.sku) not in excluidos][:3]

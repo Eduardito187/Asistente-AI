@@ -1043,11 +1043,28 @@ _PROPS_BUSCAR_PRODUCTOS: dict = {
     "usb_puertos_min": {"type": "integer", "description": "Cantidad minima de puertos USB."},
     "solo_en_oferta": {"type": "boolean", "description": "Solo productos con precio_anterior > actual."},
     "solo_con_stock": {"type": "boolean", "default": True},
+    "limite": {
+        "type": "integer",
+        "description": (
+            "Cantidad maxima de productos a devolver (1-6). "
+            "Usar 1 si el cliente dijo 'dame solo 1' o 'una opcion'. "
+            "Usar 2-3 si dijo 'maximo 2/3'. Default: 3."
+        ),
+    },
+    "atributos": {
+        "type": "object",
+        "description": (
+            "Filtros booleanos de ficha tecnica. Pasar solo true (requiere) o false (excluye). "
+            "Claves mas usadas: inverter, no_frost, auto_limpieza, smart_tv, anc, ldac, dolby_atmos, "
+            "hdr10, bluetooth_incluido, wifi_incluido, usb_c, thunderbolt, lector_huella, dual_sim, "
+            "inalambrico, carga_inalambrica, gps, ip67, ip68, convertible, para_gaming, tactil, "
+            "camara_web, microfono, ranura_sd, video_4k, gsync, freesync, monitor_curvo, "
+            "airfryer, control_voz, eco, silencioso, bajo_consumo, compacto, filtro_hepa, "
+            "smart_home, robot_aspiradora, escaner, duplex, tinta_continua."
+        ),
+        "additionalProperties": {"type": "boolean"},
+    },
 }
-
-# Inyectar dinamicamente todos los booleanos de ficha
-for _filtro, _desc in _BOOLEANOS_FICHA:
-    _PROPS_BUSCAR_PRODUCTOS[_filtro] = {"type": "boolean", "description": _desc}
 
 
 TOOLS_SPEC: list[dict] = [
@@ -1055,13 +1072,9 @@ TOOLS_SPEC: list[dict] = [
         "buscar_productos",
         (
             "Busca productos en el catalogo Dismac. Hasta 6 resultados. Combina filtros "
-            "estructurados sobre todo el catalogo (linea blanca, electronica, computacion, "
-            "audio, smartphones, tablets, smartwatches, electrodomesticos, cocina, deportes, "
-            "vehiculos). Para filtrar por atributos prefiere los campos dedicados antes "
-            "que incrustarlos en `query`. Soporta filtros boolean derivados de la ficha "
-            "(inverter, no_frost, anc, smart_tv, hdmi_2_1, dolby_atmos, ip67, ip68, "
-            "lector_huella, dual_sim, etc.) y filtros comerciales (tiene_descuento, "
-            "descuento_pct_min, stock_min)."
+            "estructurados (precio, marca, categoria, pulgadas, procesador, RAM, SSD, panel, "
+            "resolucion) con filtros booleanos de ficha via el campo `atributos` y filtros "
+            "comerciales (tiene_descuento, descuento_pct_min, stock_min)."
         ),
         _PROPS_BUSCAR_PRODUCTOS,
     ),

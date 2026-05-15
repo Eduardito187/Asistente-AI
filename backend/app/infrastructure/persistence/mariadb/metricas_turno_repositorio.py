@@ -29,6 +29,7 @@ class MariaDbMetricasTurnoRepository(MetricasTurnoRepository):
                 "qscore": getattr(metrica, "quality_score", None),
                 "reason": getattr(metrica, "reason_code", None),
                 "variant": getattr(metrica, "variant_name", None),
+                "sin_resultado": 1 if metrica.busquedas_sin_resultado else 0,
             },
         )
         return int(res.lastrowid or 0)

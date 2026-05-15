@@ -29,3 +29,6 @@ class PerfilSesionRepository(ABC):
     def registrar_alternativa_ofrecida(
         self, sesion_id: UUID, alternativa: str
     ) -> None: ...
+
+    @abstractmethod
+    def limpiar(self, sesion_id: UUID) -> None: ...

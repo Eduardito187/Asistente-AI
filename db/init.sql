@@ -318,6 +318,7 @@ CREATE TABLE IF NOT EXISTS perfiles_sesion (
     ram_gb_min              INT          NULL,
     gpu_dedicada            TINYINT(1)   NULL,
     ssd_gb_min              INT          NULL,
+    capacidad_litros_min    DECIMAL(7,2) NULL,
     nombre_excluye_acum     TEXT         NULL,
     presupuesto_ideal       DECIMAL(12,2) NULL,
     -- Contador acumulado de señales de frustración detectadas en la sesión.
@@ -343,8 +344,19 @@ CREATE TABLE IF NOT EXISTS perfiles_sesion (
 -- ALTER TABLE perfiles_sesion ADD COLUMN ram_gb_min INT NULL;
 -- ALTER TABLE perfiles_sesion ADD COLUMN gpu_dedicada TINYINT(1) NULL;
 -- ALTER TABLE perfiles_sesion ADD COLUMN ssd_gb_min INT NULL;
+-- ALTER TABLE perfiles_sesion ADD COLUMN capacidad_litros_min DECIMAL(7,2) NULL;
 -- ALTER TABLE perfiles_sesion ADD COLUMN nombre_excluye_acum TEXT NULL;
 -- ALTER TABLE perfiles_sesion ADD COLUMN presupuesto_ideal DECIMAL(12,2) NULL;
+ALTER TABLE perfiles_sesion ADD COLUMN IF NOT EXISTS ciudad_sesion VARCHAR(50) DEFAULT NULL;
+ALTER TABLE perfiles_sesion ADD COLUMN IF NOT EXISTS presupuesto_min_buscado DECIMAL(10,2) DEFAULT NULL;
+
+-- Auto-ALTER metricas_turno: añade columnas y columnas de metricas adicionales.
+ALTER TABLE metricas_turno ADD COLUMN IF NOT EXISTS prompt_version VARCHAR(40) NULL;
+ALTER TABLE metricas_turno ADD COLUMN IF NOT EXISTS quality_score TINYINT NULL;
+ALTER TABLE metricas_turno ADD COLUMN IF NOT EXISTS reason_code VARCHAR(40) NULL;
+ALTER TABLE metricas_turno ADD COLUMN IF NOT EXISTS variant_name VARCHAR(40) NULL;
+ALTER TABLE metricas_turno ADD COLUMN IF NOT EXISTS busquedas_sin_resultado TINYINT(1) NOT NULL DEFAULT 0;
+ALTER TABLE metricas_turno ADD INDEX IF NOT EXISTS ix_sin_resultado (busquedas_sin_resultado, created_at);
 
 -- ------------------------------------------------------------
 -- Feedback post-orden: rating + comentario del cliente tras cerrar.
@@ -620,6 +632,61 @@ INSERT IGNORE INTO categorias_sinonimos (palabra_clave, palabra_clave_norm, cate
 ('tv','tv','Televisores',NULL,1.00),
 ('tvs','tvs','Televisores',NULL,0.95);
 
+-- Bolivian slang and regional synonyms (bo-BO)
+INSERT IGNORE INTO categorias_sinonimos (palabra_clave, palabra_clave_norm, categoria, subcategoria, confianza) VALUES
+-- Televisores: "plasma" still used in Bolivia even though not made anymore
+('plasma','plasma','Televisores',NULL,0.90),
+('plasmas','plasmas','Televisores',NULL,0.85),
+('pantallaza','pantallaza','Televisores',NULL,0.85),
+('pantallazo','pantallazo','Televisores',NULL,0.85),
+('pantalla grande','pantalla grande','Televisores',NULL,0.80),
+('pantalla plana','pantalla plana','Televisores',NULL,0.85),
+-- Lavado: "washa" is Bolivian slang for washing machine
+('washa','washa','Lavado',NULL,0.95),
+('washas','washas','Lavado',NULL,0.90),
+('lavarropas','lavarropas','Lavado',NULL,0.90),
+('lavarropas automatico','lavarropas automatico','Lavado',NULL,0.95),
+-- Cocina Menor: "turri" / "arrocera" are very Bolivian
+('turri','turri','Cocina Menor',NULL,0.90),
+('turris','turris','Cocina Menor',NULL,0.85),
+('arrocera','arrocera','Cocina Menor',NULL,0.95),
+('arroceras','arroceras','Cocina Menor',NULL,0.90),
+('multicocina','multicocina','Cocina Menor',NULL,0.90),
+('multicooker','multicooker','Cocina Menor',NULL,0.90),
+-- Celulares: "aparato" / "el aparato" used colloquially
+('aparato','aparato','Celulares','Smartphones',0.70),
+('aparatos','aparatos','Celulares','Smartphones',0.65),
+('telefono inteligente','telefono inteligente','Celulares','Smartphones',0.95),
+-- Laptops: "maquina" colloquially
+('maquina','maquina','Laptops',NULL,0.65),
+('compu portatil','compu portatil','Laptops',NULL,0.95),
+('computadora portatil','computadora portatil','Laptops',NULL,0.95),
+-- Refrigeración: "hela" (heladera - Argentina/BO)
+('hela','hela','Refrigeración',NULL,0.75),
+-- Cocina a Gas: additional synonyms
+('hornilla','hornilla','Cocina',NULL,0.90),
+('hornillas','hornillas','Cocina',NULL,0.85),
+('anafe','anafe','Cocina',NULL,0.85),
+-- Audio: Bolivian terms
+('equipo de musica','equipo de musica','Audio',NULL,0.90),
+('equipo musica','equipo musica','Audio',NULL,0.85),
+('minicomponente','minicomponente','Audio',NULL,0.90),
+('minicomponentes','minicomponentes','Audio',NULL,0.85),
+-- Tablets
+('tableta','tableta','Tablets',NULL,0.95),
+('tabletas','tabletas','Tablets',NULL,0.90);
+
+-- Typos y variantes regionales frecuentes (bo-BO)
+INSERT IGNORE INTO categorias_sinonimos (palabra_clave, palabra_clave_norm, categoria, subcategoria, confianza) VALUES
+('lapto','lapto','Laptops',NULL,0.92),
+('laptos','laptos','Laptops',NULL,0.90),
+('chrombuk','chrombuk','Laptops','Chromebooks',0.88),
+('chromebook','chromebook','Laptops','Chromebooks',0.95),
+('chromebooks','chromebooks','Laptops','Chromebooks',0.95),
+('netbook','netbook','Laptops',NULL,0.90),
+('frigo','frigo','Refrigeración',NULL,0.80),
+('frigobar','frigobar','Refrigeración','Frigobares',0.92);
+
 -- Seed de relaciones cross-categoria (categoria pedida != catalogo -> sugerir cercana real)
 INSERT IGNORE INTO categorias_relacionadas (categoria_origen, categoria_sugerida, subcategoria_sugerida, razon, prioridad) VALUES
 ('Aire','Climatización','Aire Acondicionado','linea de aire acondicionado',10),
@@ -671,7 +738,14 @@ INSERT IGNORE INTO categorias_relacionadas (categoria_origen, categoria_sugerida
 ('Vehiculos','Automotriz','Vehículos','tenemos motocicletas Bajaj Sunra y Huavi',10),
 ('Ventilador','Climatización','Ventiladores','linea de ventiladores',10),
 ('Xbox','Gaming','Consolas','linea de consolas Xbox',10),
-('Xiaomi','Celulares','Smartphones','tenemos varios modelos Xiaomi',20);
+('Xiaomi','Celulares','Smartphones','tenemos varios modelos Xiaomi',20),
+-- Bolivian slang cross-category relations (bo-BO)
+('Congeladora','Refrigeración','Congeladores','congeladora -> linea de congeladores',10),
+('Freezer','Refrigeración','Congeladores','freezer -> congeladores',10),
+('Washa','Lavado','Lavadoras','washa es slang boliviano para lavadora',10),
+('Plasma','Televisores','Smart TV','plasma es TV en Bolivia',10),
+('Arrocera','Cocina Menor','Arroceras','arrocera -> linea de arroceras',10),
+('Turri','Cocina Menor','Arroceras','turri es slang boliviano para arrocera',10);
 
 -- Seed extendido: marcas de autos y motos que el catalogo no tiene.
 -- El catalogo Dismac solo vende motocicletas Bajaj/Sunra/Huavi, por lo que

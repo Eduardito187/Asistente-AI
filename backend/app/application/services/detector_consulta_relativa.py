@@ -41,6 +41,15 @@ class DetectorConsultaRelativa:
         r"|no\s+tan\s+car[oa]"
         r"|(?:bajame|rebaja|reduce|baja)\s+(?:el\s+)?precio"
         r"|(?:dentro\s+de|sobre)\s+(?:lo\s+)?mas\s+(?:barat[oa]|econ[oó]mic[oa])"
+        r"|me\s+sale\s+(?:muy\s+)?car[oa]"
+        r"|[eé]st[aá]\s+(?:muy\s+)?car[oa]"
+        r"|es\s+(?:muy\s+)?car[oa]"
+        r"|demasiado\s+car[oa]"
+        r"|no\s+tengo\s+tanto"
+        r"|est[aá]\s+fuera\s+de\s+(?:mi\s+)?presupuesto"
+        r"|me\s+pasa\s+(?:el\s+)?presupuesto"
+        r"|no\s+me\s+alcanza"
+        r"|no\s+llego"
         r")\b",
         re.IGNORECASE,
     )

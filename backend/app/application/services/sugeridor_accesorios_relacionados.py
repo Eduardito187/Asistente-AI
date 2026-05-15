@@ -4,6 +4,9 @@ from ...domain.productos import Producto
 from ...domain.shared.normalizacion import NormalizadorTexto
 from ..queries.buscar_productos import BuscarProductosHandler, BuscarProductosQuery
 
+_CAT_ACC_CELULARES = "Accesorios Celulares"
+_CAT_ACC_RELOJES = "Accesorios Relojes"
+
 
 class SugeridorAccesoriosRelacionados:
     """SRP: dada una lista de productos principales, propone accesorios de la
@@ -30,20 +33,29 @@ class SugeridorAccesoriosRelacionados:
         "televisores":                  ("Accesorios TV", "Televisores"),
         "laptops":                      ("Laptops", "Computación"),
         "computacion":                  ("Computación", "Laptops"),
-        "celulares":                    ("Celulares",),
-        "smartphones":                  ("Celulares",),
+        "celulares":                    ("Celulares", _CAT_ACC_CELULARES),
+        "smartphones":                  ("Celulares", _CAT_ACC_CELULARES),
         "refrigeracion":                ("Refrigeración", "Hogar"),
-        "cocina menor":                 ("Cocina", "Cocina Menor"),
+        "refrigeradores":               ("Refrigeración", "Hogar"),
+        "cocina menor":                 ("Cocina Menor", "Cocina"),
         "cocina":                       ("Cocina", "Cocina Menor"),
         "pequenos electrodomesticos":   ("Cocina", "Pequeños Electrodomésticos"),
-        "audio":                        ("Audio", "Celulares"),
+        "audio":                        ("Audio", "Accesorios Audio", "Celulares"),
         "gaming":                       ("Gaming", "Computación"),
-        "tablets":                      ("Tablets", "Celulares"),
+        "tablets":                      ("Tablets", _CAT_ACC_CELULARES, "Celulares"),
         "climatizacion":                ("Climatización", "Hogar"),
         "cuidado personal":             ("Cuidado Personal",),
         "juguetes":                     ("Juguetería",),
         "bebes":                        ("Bebés",),
         "deportes":                     ("Deportes",),
+        # Lavado
+        "lavado":                       ("Lavado", "Hogar"),
+        "lavarropas":                   ("Lavado", "Hogar"),
+        "lavadoras":                    ("Lavado", "Hogar"),
+        # Relojes / Wearables
+        "relojes":                      (_CAT_ACC_RELOJES, "Relojes"),
+        "smartwatches":                 (_CAT_ACC_RELOJES, "Relojes"),
+        "wearables":                    (_CAT_ACC_RELOJES, "Wearables"),
     }
 
     def __init__(self, buscar: BuscarProductosHandler) -> None:

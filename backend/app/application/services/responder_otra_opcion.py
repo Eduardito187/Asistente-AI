@@ -11,6 +11,7 @@ from ..queries.obtener_perfil_sesion import (
     ObtenerPerfilSesionQuery,
     ResultadoObtenerPerfilSesion,
 )
+from .detector_exclusiones_mensaje import DetectorExclusionesMensaje
 from .respuesta_follow_up import RespuestaFollowUp
 from .umbrales_tier import UmbralesTier
 
@@ -41,6 +42,20 @@ class ResponderOtraOpcion:
 
         excluidos = self._skus_mostrados(perfil)
         piso, techo = self._rango_tier(perfil)
+        if piso is None:
+            if perfil.precio_min_mostrado is not None:
+                # El turno previo mostró productos — usar su precio mínimo como piso
+                # con 50% de margen hacia abajo para permitir alternativas más baratas.
+                piso = perfil.precio_min_mostrado * 0.5
+            elif perfil.presupuesto_max is not None:
+                # Sin historial de precios: piso = 10% del presupuesto máximo.
+                # Para presupuesto_max=8000 → piso=800, bloquea tarros a Bs 29
+                # y juguetes a Bs 399 que están mal categorizados como refri.
+                piso = perfil.presupuesto_max * 0.10
+        nombre_excluye = tuple(perfil.exclusiones_acumuladas()) or None
+        tipo_producto_excluye = (
+            tuple(DetectorExclusionesMensaje.tipos_a_excluir(perfil.categoria_foco or "")) or None
+        )
         productos = self._buscar.ejecutar(
             BuscarProductosQuery(
                 categoria=perfil.categoria_efectiva(),
@@ -53,6 +68,8 @@ class ResponderOtraOpcion:
                 resolucion=perfil.resolucion,
                 limite=12,
                 excluir_accesorios=True,
+                nombre_excluye=nombre_excluye,
+                tipo_producto_excluye=tipo_producto_excluye,
             )
         )
         nuevos = [p for p in productos if str(p.sku) not in excluidos][:3]
@@ -66,6 +83,8 @@ class ResponderOtraOpcion:
                     tipo_panel=perfil.tipo_panel,
                     resolucion=perfil.resolucion,
                     limite=12,
+                    nombre_excluye=nombre_excluye,
+                    tipo_producto_excluye=tipo_producto_excluye,
                 )
             )
             nuevos = [p for p in productos_sin_marca if str(p.sku) not in excluidos][:3]

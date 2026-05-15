@@ -34,6 +34,7 @@ class RegistrarMetricaTurnoHandler:
                 quality_score=cmd.quality_score,
                 reason_code=cmd.reason_code,
                 variant_name=cmd.variant_name,
+                busquedas_sin_resultado=cmd.busquedas_sin_resultado,
             )
             with self._uow_factory() as uow:
                 uow.metricas_turno.registrar(metrica)

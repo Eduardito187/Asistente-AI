@@ -103,7 +103,7 @@ class RenderizadorProductosPegados:
         if cls._tier_cpu(p.cpu) >= 4:
             partes.append("CPU de gama alta")
         if not partes:
-            partes.append("mejor balance de specs/precio entre las opciones pegadas")
+            partes.append("mejor balance de características/precio entre las opciones pegadas")
         if not p.gpu:
             partes.append("recordando que no confirmo GPU en el texto")
         return ", ".join(partes) + "."

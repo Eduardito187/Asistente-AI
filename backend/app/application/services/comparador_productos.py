@@ -208,7 +208,7 @@ class ComparadorProductos:
             },
             "mejor_precio_calidad": {
                 "sku": precio_calidad["sku"],
-                "razon": f"mejor relación specs/precio a Bs {int(precio_calidad['precio_bob'])}",
+                "razon": f"mejor relación características/precio a Bs {int(precio_calidad['precio_bob'])}",
             },
             "mas_economica": {
                 "sku": mas_economica["sku"],
@@ -245,5 +245,5 @@ class ComparadorProductos:
         if ganador.get("pulgadas"):
             ventajas.append(f'pantalla {ganador["pulgadas"]}"')
         if not ventajas:
-            return "mejor combinación de specs del grupo"
+            return "mejor combinación de características del grupo"
         return "lidera en " + ", ".join(ventajas[:3])

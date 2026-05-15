@@ -37,9 +37,12 @@ class ActualizarPerfilSesionHandler:
             ram_gb_min=cmd.ram_gb_min,
             gpu_dedicada=cmd.gpu_dedicada,
             ssd_gb_min=cmd.ssd_gb_min,
+            capacidad_litros_min=cmd.capacidad_litros_min,
             nombre_excluye_acum=cmd.nombre_excluye_nuevas,
             presupuesto_ideal=cmd.presupuesto_ideal,
+            presupuesto_min_buscado=cmd.presupuesto_min_buscado,
             frustracion_count=cmd.frustracion_delta,
+            ciudad_sesion=cmd.ciudad_sesion,
         )
         try:
             with self._uow_factory() as uow:

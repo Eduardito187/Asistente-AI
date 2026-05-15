@@ -32,13 +32,17 @@ class PerfilSesion:
     ram_gb_min: Optional[int] = None
     gpu_dedicada: Optional[bool] = None
     ssd_gb_min: Optional[int] = None
+    capacidad_litros_min: Optional[float] = None
     nombre_excluye_acum: Optional[str] = None  # comma-separated acumulado
     presupuesto_ideal: Optional[float] = None  # techo blando: prefiere no exceder
+    presupuesto_min_buscado: Optional[float] = None  # precio más bajo que el cliente ha considerado
     # Acumula señales de frustración detectadas en la sesión (suma, no pick).
     # Usado por EvaluadorFrustracionAcumulada para escalar más rápido si
     # el deterioro persiste. Se semilla desde sesiones pasadas del mismo
     # cliente cuando hay identidad (cross-session memory).
     frustracion_count: Optional[int] = None
+    # Ciudad boliviana mencionada por el cliente (solo contexto, no filtra búsquedas).
+    ciudad_sesion: Optional[str] = None
 
     @staticmethod
     def vacio(sesion_id: UUID) -> "PerfilSesion":
@@ -98,7 +102,10 @@ class PerfilSesion:
             ram_gb_min=p(otro.ram_gb_min, self.ram_gb_min),
             gpu_dedicada=p(otro.gpu_dedicada, self.gpu_dedicada),
             ssd_gb_min=p(otro.ssd_gb_min, self.ssd_gb_min),
+            capacidad_litros_min=p(otro.capacidad_litros_min, self.capacidad_litros_min),
             nombre_excluye_acum=p(otro.nombre_excluye_acum, self.nombre_excluye_acum),
             presupuesto_ideal=p(otro.presupuesto_ideal, self.presupuesto_ideal),
+            presupuesto_min_buscado=p(otro.presupuesto_min_buscado, self.presupuesto_min_buscado),
             frustracion_count=self._sumar(otro.frustracion_count, self.frustracion_count),
+            ciudad_sesion=p(otro.ciudad_sesion, self.ciudad_sesion),
         )

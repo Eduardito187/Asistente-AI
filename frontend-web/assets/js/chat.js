@@ -157,7 +157,7 @@
   // Plantillas de mensaje para acciones que van al chat (info, similares).
   // "agregar" NO va al chat — se maneja directamente contra la API del carrito.
   const MENSAJE_ACCION = {
-    info:      (sku, nombre) => `Contame más del ${nombre} [${sku}] — specs clave.`,
+    info:      (sku, nombre) => `Contame más del ${nombre} [${sku}] — características clave.`,
     similares: (sku, nombre) => `Mostrame opciones similares al ${nombre} [${sku}], distintas a esa.`,
   };
 

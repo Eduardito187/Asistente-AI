@@ -83,5 +83,5 @@ class RenderizadorFormatoForzado:
         if getattr(perfil, "gpu_dedicada", None):
             partes.append("y la GPU dedicada")
         if not partes:
-            return "balance entre specs y precio segun tu rango."
+            return "balance entre características y precio según tu rango."
         return ", ".join(partes) + " mas que un precio bajo."

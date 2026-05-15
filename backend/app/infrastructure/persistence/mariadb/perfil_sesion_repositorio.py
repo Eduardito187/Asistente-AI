@@ -44,11 +44,19 @@ class MariaDbPerfilSesionRepository(PerfilSesionRepository):
                 "ram": perfil.ram_gb_min,
                 "gpu": 1 if perfil.gpu_dedicada else None,
                 "ssd": perfil.ssd_gb_min,
+                "litros_min": perfil.capacidad_litros_min,
                 "excluye": perfil.nombre_excluye_acum,
                 "pideal": perfil.presupuesto_ideal,
+                "pmin_buscado": perfil.presupuesto_min_buscado,
                 "frust": perfil.frustracion_count,
+                "ciudad": perfil.ciudad_sesion,
             },
         )
+
+    def limpiar(self, sesion_id: UUID) -> None:
+        """Limpia campos de búsqueda: categoria, marca, SKU, uso, specs.
+        Preserva presupuesto, ciudad, frustracion_count."""
+        self._s.execute(text(PerfilSesionSql.LIMPIAR_BUSQUEDA), {"sid": str(sesion_id)})
 
     def registrar_turno(
         self,

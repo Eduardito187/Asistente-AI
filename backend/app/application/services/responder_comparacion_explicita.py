@@ -28,6 +28,20 @@ class ResponderComparacionExplicita:
     llama al comparador estructurado. Devuelve texto markdown con tabla y
     conclusión — el LLM no participa."""
 
+    # Fragmentos que son líneas de producto pero cuya marca real difiere.
+    # Ej: "iphone" → buscar marca="apple", no query="iphone" (que matchea audio).
+    _ALIAS_MARCA: dict[str, str] = {
+        "iphone": "apple",
+        "ipad": "apple",
+        "macbook": "apple",
+        "galaxy": "samsung",
+        "xperia": "sony",
+        "moto": "motorola",
+        "redmi": "xiaomi",
+        "poco": "xiaomi",
+        "honor": "huawei",
+    }
+
     def __init__(
         self,
         resolver: ResolverCategoriaSinonimoHandler,
@@ -61,22 +75,63 @@ class ResponderComparacionExplicita:
 
     def _fragmentos_a_skus(self, fragmentos: list[str]) -> list[str]:
         """Cada fragmento pasa por el resolver; si tiene sku_especifico lo usa
-        directamente. Si no, busca en el catálogo por texto para encontrar el
-        producto más relevante — permite comparar 'galaxy s25' con 'iphone 16'
-        aunque no estén mapeados como aliases con SKU específico."""
+        directamente. Si no, busca por marca o texto según el tipo de fragmento.
+
+        Reglas de búsqueda en cascade:
+        1. Resolver sinónimo → sku_especifico directo.
+        2. Si el fragmento es un alias de marca (iphone→apple, galaxy→samsung),
+           busca con marca= para no matchear productos random por fulltext.
+        3. Si no, fulltext query= con categoria_inferida del primer resultado.
+        La categoría del primer producto encontrado se aplica a todos los
+        siguientes para mantener coherencia (ej: iPhone en celulares → Samsung
+        en celulares, no Samsung en TV)."""
         skus: list[str] = []
         vistos: set[str] = set()
+        categoria_inferida: str | None = None
         for frag in fragmentos:
             res = self._resolver.ejecutar(
                 ResolverCategoriaSinonimoQuery(texto=frag, limite_relaciones=0)
             )
             sin = res.sinonimo_directo
             sku = sin.sku_especifico if sin else None
+            # Propagar categoría del resolver aunque no haya sku_especifico
+            # (ej: "samsung galaxy" → Celulares sin SKU específico).
+            if sin and sin.categoria and categoria_inferida is None:
+                categoria_inferida = sin.categoria
             if not sku and self._buscar:
-                resultados = self._buscar.ejecutar(
-                    BuscarProductosQuery(query=frag, limite=1, excluir_accesorios=True)
-                )
-                sku = str(resultados[0].sku) if resultados else None
+                frag_lower = frag.lower().strip()
+                marca_alias = self._ALIAS_MARCA.get(frag_lower)
+                # Si no es alias exacto, comprueba si el fragmento completo
+                # es solo el nombre de una marca conocida (ej. "samsung").
+                if not marca_alias:
+                    from .detector_marca_mensaje import DetectorMarcaMensaje
+                    m = DetectorMarcaMensaje.extraer(frag)
+                    # Solo usa búsqueda por marca cuando el fragmento ES la
+                    # marca (<=2 tokens) para no perder modelo en "samsung A55".
+                    if m and len(frag_lower.split()) <= 2:
+                        marca_alias = m
+                if marca_alias:
+                    resultados = self._buscar.ejecutar(
+                        BuscarProductosQuery(
+                            marca=marca_alias,
+                            categoria=categoria_inferida,
+                            limite=1,
+                            excluir_accesorios=True,
+                        )
+                    )
+                else:
+                    resultados = self._buscar.ejecutar(
+                        BuscarProductosQuery(
+                            query=frag,
+                            categoria=categoria_inferida,
+                            limite=1,
+                            excluir_accesorios=True,
+                        )
+                    )
+                if resultados:
+                    sku = str(resultados[0].sku)
+                    if categoria_inferida is None:
+                        categoria_inferida = resultados[0].categoria
             if sku and sku not in vistos:
                 vistos.add(sku)
                 skus.append(sku)

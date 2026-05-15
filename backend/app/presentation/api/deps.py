@@ -10,6 +10,10 @@ from ...application.commands.activar_conversacion_curada import (
 from ...application.commands.actualizar_perfil_sesion import (
     ActualizarPerfilSesionHandler,
 )
+from ...application.commands.limpiar_perfil_sesion import (
+    LimpiarPerfilSesionCommand,
+    LimpiarPerfilSesionHandler,
+)
 from ...application.commands.agregar_al_carrito import AgregarAlCarritoHandler
 from ...application.commands.confirmar_orden import ConfirmarOrdenHandler
 from ...application.commands.crear_sesion import CrearSesionHandler
@@ -114,6 +118,7 @@ from ...infrastructure.cache import CacheNulo, RedisCache
 from ...infrastructure.config import settings
 from ...infrastructure.llm.llm_cache_adapter import LLMCacheAdapter
 from ...infrastructure.llm.ollama_adapter import OllamaAdapter
+from ...infrastructure.llm.ollama_circuit_breaker import OllamaCircuitBreaker
 from ...infrastructure.llm.ollama_embedder_adapter import OllamaEmbedderAdapter
 from ...infrastructure.persistence.mariadb.carrito_read_model import MariaDbCarritoReadModel
 from ...infrastructure.persistence.mariadb.dashboard_metricas_read_model import (
@@ -128,10 +133,13 @@ def uow_factory() -> SqlAlchemyUnitOfWork:
 
 @lru_cache()
 def llm_port():
-    """LLM con cache de respuestas idénticas (TTL 60s).
-    Reduce inference repetidos en saludos y casos genéricos paralelos."""
+    """LLM con cache de respuestas idénticas (TTL 60s) y circuit breaker.
+    Capas (exterior → interior): OllamaCircuitBreaker → LLMCacheAdapter → OllamaAdapter.
+    El circuit breaker es la capa más externa: corta rápido ante fallos de Ollama
+    antes de intentar cache o llamada HTTP."""
     base = OllamaAdapter(host=settings.ollama_host, model=settings.ollama_model)
-    return LLMCacheAdapter(llm=base, cache=cache_port(), ttl_segundos=60)
+    cached = LLMCacheAdapter(llm=base, cache=cache_port(), ttl_segundos=60)
+    return OllamaCircuitBreaker(cached)
 
 
 @lru_cache()
@@ -255,6 +263,10 @@ def obtener_perfil_sesion_handler() -> ObtenerPerfilSesionHandler:
 
 def actualizar_perfil_sesion_handler() -> ActualizarPerfilSesionHandler:
     return ActualizarPerfilSesionHandler(uow_factory)
+
+
+def limpiar_perfil_sesion_handler() -> LimpiarPerfilSesionHandler:
+    return LimpiarPerfilSesionHandler(uow_factory)
 
 
 def registrar_feedback_orden_handler() -> RegistrarFeedbackOrdenHandler:
@@ -456,11 +468,12 @@ def procesar_chat_service() -> ProcesarChatService:
         ),
         responder_similares=ResponderProductosSimilares(
             uow_factory=uow_factory,
-            sugeridor=SugeridorProductosAlternativos(buscar=buscar_handler()),
+            buscar=buscar_handler(),
         ),
         auto_curar=auto_curar_conversacion_handler(),
         registrar_synonym=registrar_synonym_candidato_handler(),
         guardar_perfil_historico=guardar_perfil_historico_handler(),
         obtener_perfil_historico=obtener_perfil_historico_handler(),
         skill_registry=skill_registry_singleton(),
+        limpiar_perfil=limpiar_perfil_sesion_handler(),
     )

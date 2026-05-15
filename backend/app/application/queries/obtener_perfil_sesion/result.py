@@ -26,9 +26,12 @@ class ResultadoObtenerPerfilSesion:
     ram_gb_min: Optional[int] = None
     gpu_dedicada: Optional[bool] = None
     ssd_gb_min: Optional[int] = None
+    capacidad_litros_min: Optional[float] = None
     nombre_excluye_acum: Optional[str] = None  # comma-separated
     presupuesto_ideal: Optional[float] = None  # techo blando preferido del cliente
+    presupuesto_min_buscado: Optional[float] = None  # precio más bajo que el cliente ha considerado
     frustracion_count: Optional[int] = None  # contador acumulado de señales
+    ciudad_sesion: Optional[str] = None  # ciudad boliviana mencionada (solo contexto)
 
     def esta_vacio(self) -> bool:
         return not any(

@@ -55,7 +55,8 @@ class GeneradorCierreContextual:
         salida: list[str] = []
         if not getattr(perfil, "presupuesto_max", None):
             salida.append("presupuesto")
-        if not getattr(perfil, "uso_declarado", None):
+        uso = getattr(perfil, "uso_declarado", None)
+        if not uso or str(uso).strip().lower() in cls._USOS_OPACOS:
             salida.append("uso")
         if not getattr(perfil, "marca_preferida", None):
             salida.append("marca")
@@ -116,16 +117,23 @@ class GeneradorCierreContextual:
         )
         return tiene_presupuesto and tiene_hard_req and not tiene_uso
 
-    @staticmethod
-    def _resumen_filtros(perfil) -> str:
+    # Usos que no aportan información legible en el cierre ("familia"
+    # como uso_declarado produce "Ya tengo familia" que es confuso).
+    _USOS_OPACOS = frozenset({"familia", "regalo", "hogar", "casa"})
+
+    @classmethod
+    def _resumen_filtros(cls, perfil) -> str:
         """Resume los filtros declarados en frase humana corta."""
         partes: list[str] = []
         uso = getattr(perfil, "uso_declarado", None)
-        if uso:
+        if uso and str(uso).strip().lower() not in cls._USOS_OPACOS:
             partes.append(str(uso).strip().lower())
         cat = getattr(perfil, "categoria_foco", None)
         if cat:
             partes.append(str(cat).strip().lower())
+        litros = getattr(perfil, "capacidad_litros_min", None)
+        if litros:
+            partes.append(f"mínimo {int(litros)}L")
         ram = getattr(perfil, "ram_gb_min", None)
         if ram:
             partes.append(f"{ram}GB de RAM")

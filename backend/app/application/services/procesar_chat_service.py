@@ -90,11 +90,13 @@ from .extractor_perfil_mensaje import ExtractorPerfilMensaje
 from .gestor_feedback_post_orden import GestorFeedbackPostOrden
 from .gestor_follow_ups_contextuales import GestorFollowUpsContextuales
 from .ajustador_respuesta_formato import AjustadorRespuestaFormato
+from .bloque_capacidad_hard import BloqueCapacidadHard
 from .bloque_conclusion_riesgo import BloqueConclusionRiesgo
 from .bloque_fallback_marca import BloqueFallbackMarca
 from .bloque_formato_solicitado import BloqueFormatoSolicitado
 from .bloque_freedos_warning import BloqueFreedosWarning
 from .bloque_requisitos_nd import BloqueRequisitosND
+from .bloque_subcategoria_excluida import BloqueSubcategoriaExcluida
 from .bloque_tres_secciones_filtros import BloqueTresSeccionesFiltros
 from .detector_formato_solicitado import DetectorFormatoSolicitado
 from .filtros_duros_busqueda import FiltrosDurosBusqueda
@@ -130,6 +132,23 @@ from .detector_manipulacion import DetectorManipulacion
 from .detector_pregunta_repetida import DetectorPreguntaRepetida
 from .detector_saturacion_cognitiva import DetectorSaturacionCognitiva
 from .detector_urgencia import DetectorUrgencia
+from .detector_consulta_financiamiento import DetectorConsultaFinanciamiento
+from .detector_intencion_compra_inmediata import DetectorIntencionCompraInmediata
+from .detector_contexto_regalo import DetectorContextoRegalo
+from .detector_ya_decidido import DetectorYaDecidido
+from .detector_objecion_precio import DetectorObjecionPrecio
+from .detector_upgrade_intent import DetectorUpgradeIntent
+from .detector_ciudad_mencion import DetectorCiudadMencion
+from .detector_objecion_factura import DetectorObjecionFactura
+from .detector_objecion_devolucion import DetectorObjecionDevolucion
+from .detector_variante_solicitada import DetectorVarianteSolicitada
+from .detector_abandono_temporal import DetectorAbandonoTemporal
+from .detector_cliente_mayorista import DetectorClienteMayorista
+from .detector_cambio_tema import DetectorCambiaTema
+from .detector_presupuesto_flexible import DetectorPresupuestoFlexible
+from .detector_multiple_productos import DetectorMultipleProductos
+from .detector_yapa_negociacion import DetectorYapaNegociacion
+from .generador_bundle_regalo import GeneradorBundleRegalo
 from .evaluador_frustracion_acumulada import EvaluadorFrustracionAcumulada
 from .horario_atencion import HorarioAtencion
 from .responder_derivar_ventas import ResponderDerivarVentas
@@ -140,6 +159,12 @@ from .skills import ContextoSkill, SkillRegistry
 from .verificador_avance_turno import VerificadorAvanceTurno
 from .sanitizador_query_busqueda import SanitizadorQueryBusqueda
 from .tools_mark import ToolsMark
+from .anunciador_fallback_marca import AnunciadorFallbackMarca
+from .limpiador_emoji_spam import LimpiadorEmojiSpam
+from ..commands.limpiar_perfil_sesion import LimpiarPerfilSesionCommand, LimpiarPerfilSesionHandler
+from .generador_resumen_conversacion import GeneradorResumenConversacion
+from .validador_sku_resultado import ValidadorSkuResultado
+from .generador_link_sesion import GeneradorLinkSesion
 
 SKU_PATTERN = re.compile(
     r"\[(?:sku[:\s]+)?([A-ZÑ0-9][A-ZÑ0-9\-.#_/()]{2,60})\]",
@@ -190,6 +215,7 @@ class ProcesarChatService:
         guardar_perfil_historico: "GuardarPerfilHistoricoHandler | None" = None,
         obtener_perfil_historico: "ObtenerPerfilHistoricoHandler | None" = None,
         skill_registry: "SkillRegistry | None" = None,
+        limpiar_perfil: "LimpiarPerfilSesionHandler | None" = None,
     ) -> None:
         self._uow_factory = uow_factory
         self._crear_sesion = crear_sesion
@@ -222,6 +248,7 @@ class ProcesarChatService:
         self._guardar_perfil_historico = guardar_perfil_historico
         self._obtener_perfil_historico = obtener_perfil_historico
         self._skill_registry = skill_registry
+        self._limpiar_perfil = limpiar_perfil
 
     async def procesar(self, inp: ChatInput) -> ChatOutput:
         t0 = time.monotonic()
@@ -242,6 +269,9 @@ class ProcesarChatService:
         # detecta una señal pero NO se llega a derivar (que cortaria el flujo).
         # Esto alimenta a EvaluadorFrustracionAcumulada para el siguiente turno.
         self._incrementar_frustracion_si_aplica(sesion_id, inp.mensaje)
+
+        if DetectorCambiaTema.es_cambio_tema(inp.mensaje) and self._limpiar_perfil:
+            self._limpiar_perfil.ejecutar(LimpiarPerfilSesionCommand(sesion_id=sesion_id))
 
         self._actualizar_perfil.ejecutar(
             self._extractor_perfil.extraer(sesion_id, inp.mensaje)
@@ -432,6 +462,7 @@ class ProcesarChatService:
                 inp.mensaje, historial, trace, sesion_id
             )
 
+        respuesta = AnunciadorFallbackMarca.aplicar(respuesta, inp.mensaje, productos)
         respuesta = self._reemplazar_tabla_comparacion(respuesta, trace)
         respuesta = self._cross_sell.aplicar(respuesta, trace, productos)
         respuesta = self._recortar_cierres(respuesta, inp.mensaje, sesion_id, trace)
@@ -454,6 +485,9 @@ class ProcesarChatService:
 
         # Verificador de avance: detecta turnos circulares para metric / debug.
         avanzo = self._evaluar_avance_turno(respuesta, productos, sesion_id, trace)
+        busquedas_sin_resultado = not productos and any(
+            p.tool == "buscar_productos" for p in trace
+        )
 
         from ..chat.system_prompt import PROMPT_VERSION
         self._registrar_metrica.ejecutar(
@@ -468,6 +502,7 @@ class ProcesarChatService:
                 tiempo_ms=tiempo_ms,
                 prompt_version=PROMPT_VERSION,
                 variant_name=getattr(self._agente, "variante_actual", None),
+                busquedas_sin_resultado=busquedas_sin_resultado,
             )
         )
 
@@ -841,10 +876,29 @@ class ProcesarChatService:
         motivo = self._motivo_derivacion(inp.mensaje, sesion_id)
         if motivo is None:
             return None
+        # Construir resumen de conversación para el agente humano receptor.
+        try:
+            historial_raw = self._historial.ejecutar(
+                HistorialChatQuery(sesion_id=sesion_id, limite=MAX_HISTORIAL)
+            )
+            perfil_h = self._obtener_perfil.ejecutar(ObtenerPerfilSesionQuery(sesion_id=sesion_id))
+            perfil_txt = GeneradorResumenConversacion.resumen_perfil(
+                categoria=perfil_h.categoria_foco,
+                presupuesto=perfil_h.presupuesto_max,
+                marca=perfil_h.marca_preferida,
+                ciudad=getattr(perfil_h, "ciudad_sesion", None),
+            )
+            resumen = GeneradorResumenConversacion.resumir(
+                historial_user=[m.contenido for m in historial_raw if m.rol == RolMensaje.USER],
+                historial_assistant=[m.contenido for m in historial_raw if m.rol == RolMensaje.ASSISTANT],
+                perfil_resumen=perfil_txt,
+            )
+        except Exception:
+            resumen = None
         # Variante A/B + horario adaptativo. La variante asignada queda en
         # la métrica (`ruta=derivar_ventas_<motivo>_<variante>`) para análisis.
         texto = ResponderDerivarVentas.responder(
-            motivo="frustracion", sesion_id=sesion_id
+            motivo="frustracion", sesion_id=sesion_id, resumen_conversacion=resumen
         )
         variante = ResponderDerivarVentas.variante_asignada(sesion_id)
         self._registrar.ejecutar(
@@ -953,6 +1007,17 @@ class ProcesarChatService:
         ver_producto y formatea ficha completa — todo determinístico,
         sin LLM, para que NUNCA pierda el hilo entre turnos."""
         if not DetectorPedidoDetalle.es_pedido_detalle(inp.mensaje):
+            return None
+        # "cual me conviene X o Y" es comparación, no pedido de detalle de contexto.
+        if DetectorComparacionExplicita.detectar(inp.mensaje) is not None:
+            return None
+        # "comparame los anteriores", "más barato", "otra opción" son follow-ups
+        # de contexto — los maneja GestorFollowUps, no este short-circuit.
+        if DetectorConsultaRelativa.detectar(inp.mensaje) is not None:
+            return None
+        # Mensajes largos o multi-línea son búsquedas nuevas con requisitos,
+        # no pedidos de detalle de un producto previo ("más info", "sus specs").
+        if len(inp.mensaje) > 120 or "\n" in inp.mensaje:
             return None
         # Si ya hay SKU en el mensaje actual, lo maneja AtajoSkuDirecto.
         if DetectorSkuMensaje.extraer(inp.mensaje):
@@ -1336,7 +1401,8 @@ class ProcesarChatService:
         # Caps duros del formato pedido por el cliente — corre AL FINAL
         # para que tope la respuesta ya saneada (no las plantillas vacias).
         fmt = DetectorFormatoSolicitado.detectar(mensaje)
-        return AjustadorRespuestaFormato.ajustar(respuesta, fmt)
+        respuesta = AjustadorRespuestaFormato.ajustar(respuesta, fmt)
+        return LimpiadorEmojiSpam.limpiar(respuesta)
 
     def _contexto_del_turno(self, mensaje: str, sesion_id: UUID) -> str | None:
         bloques = [
@@ -1356,12 +1422,30 @@ class ProcesarChatService:
             BloqueFreedosWarning.renderizar(mensaje),
             BloqueFallbackMarca.renderizar(mensaje),
             BloqueConclusionRiesgo.renderizar(mensaje),
+            BloqueCapacidadHard.renderizar(mensaje),
+            BloqueSubcategoriaExcluida.renderizar(mensaje),
             BloqueTresSeccionesFiltros.renderizar(mensaje),
             self._bloque_no_humo(mensaje),
             # === Bloques de tono / decisión (no cortan flujo, ajustan al LLM) ===
             self._bloque_frustracion_baja(mensaje),
             self._bloque_indecision(mensaje),
             self._bloque_urgencia(mensaje),
+            self._bloque_financiamiento(mensaje),
+            self._bloque_compra_inmediata(mensaje),
+            self._bloque_regalo(mensaje),
+            self._bloque_ya_decidido(mensaje),
+            self._bloque_objecion_precio(mensaje),
+            self._bloque_upgrade_intent(mensaje),
+            self._bloque_ciudad(sesion_id),
+            self._bloque_objecion_factura(mensaje),
+            self._bloque_objecion_devolucion(mensaje),
+            self._bloque_variante_solicitada(mensaje),
+            self._bloque_abandono_temporal(mensaje, sesion_id),
+            self._bloque_cliente_mayorista(mensaje),
+            self._bloque_cambio_tema(mensaje),
+            self._bloque_presupuesto_flexible(mensaje),
+            self._bloque_multiple_productos(mensaje),
+            self._bloque_yapa(mensaje),
             self._bloque_despedida(mensaje, sesion_id),
             self._bloque_saturacion_cognitiva(sesion_id),
             self._bloque_pregunta_repetida(mensaje, sesion_id),
@@ -1401,7 +1485,7 @@ class ProcesarChatService:
             "REGLAS:\n"
             "- Elegí UN solo producto (no dos, no tres) de los que ya mostraste "
             "  o de la búsqueda actual.\n"
-            "- Justificá la elección en 1-2 líneas con specs concretas.\n"
+            "- Justificá la elección en 1-2 líneas con características concretas.\n"
             "- NO abras búsqueda nueva ni listes alternativas.\n"
             "- NO digas 'depende de tu uso' si ya tenés contexto del cliente.\n"
             "- Cerrá ofreciendo agregar al carrito."
@@ -1418,6 +1502,244 @@ class ProcesarChatService:
             "respuesta mencioná explícitamente disponibilidad y, si lo sabés, "
             "tiempos de entrega/retiro. Si no hay producto con stock, ofrecé "
             "el más cercano disponible y avisá del tiempo extra."
+        )
+
+    @staticmethod
+    def _bloque_financiamiento(mensaje: str) -> str | None:
+        if not DetectorConsultaFinanciamiento.es_consulta_financiamiento(mensaje):
+            return None
+        return (
+            "CONSULTA DE FINANCIAMIENTO: el cliente pregunta sobre formas de pago "
+            "(cuotas, QR, Tigo Money, tarjeta, transferencia, crédito). "
+            "Menciona las opciones disponibles en Dismac: pagos con QR (Tigo Money, "
+            "BCP), tarjetas Visa/Mastercard, transferencias bancarias. "
+            "Si hay planes de cuotas disponibles para el producto, inclúyelos. "
+            "Sé concreto con montos y condiciones. No inventes tasas de interés."
+        )
+
+    @staticmethod
+    def _bloque_compra_inmediata(mensaje: str) -> str | None:
+        if not DetectorIntencionCompraInmediata.es_compra_inmediata(mensaje):
+            return None
+        return (
+            "COMPRA INMEDIATA: el cliente ya decidió y quiere cerrar ahora "
+            "('lo llevo', 'de frente', 'de una', 'al tiro', 'jalo ese', etc.). "
+            "NO listes más alternativas. Acción prioritaria: (1) confirmá el SKU "
+            "elegido con agregar_al_carrito, (2) pedí datos de contacto mínimos "
+            "(nombre), (3) cerrá con confirmar_orden. Tono: breve y eficiente."
+        )
+
+    @staticmethod
+    def _bloque_regalo(mensaje: str) -> str | None:
+        if not DetectorContextoRegalo.es_regalo(mensaje):
+            return None
+        destinatario = DetectorContextoRegalo.destinatario(mensaje)
+        dest_txt = f" para {destinatario}" if destinatario else ""
+        base = (
+            f"CONTEXTO DE REGALO: el cliente busca un producto como regalo{dest_txt}. "
+            "Priorizá opciones con buena presentación, dentro de un rango de precio "
+            "moderado (salvo que pida premium). Si no está claro el destinatario ni su uso, "
+            "preguntá brevemente ('¿para quién es? ¿qué uso le dará?'). "
+            "Evitá modelos refurbished o con packaging deteriorado."
+        )
+        return base
+
+    @staticmethod
+    def _bloque_ya_decidido(mensaje: str) -> str | None:
+        if not DetectorYaDecidido.es_ya_decidido(mensaje):
+            return None
+        return (
+            "CLIENTE YA DECIDIDO: llegó con un producto específico en mente "
+            "(se lo recomendaron, lo vio en redes, ya eligió). "
+            "NO ofrezcas alternativas ni hagas exploración. Acción: "
+            "(1) confirmá disponibilidad del producto mencionado, "
+            "(2) informá precio y condiciones, "
+            "(3) guiá directo al carrito si hay stock."
+        )
+
+    @staticmethod
+    def _bloque_objecion_precio(mensaje: str) -> str | None:
+        if not DetectorObjecionPrecio.es_objecion_precio(mensaje):
+            return None
+        competidor = DetectorObjecionPrecio.menciona_competidor(mensaje)
+        comp_txt = f" (menciona {competidor})" if competidor else ""
+        return (
+            f"OBJECIÓN DE PRECIO detectada{comp_txt}: el cliente dice que está caro "
+            "o que lo vio más barato en otro lado. Respuesta correcta: "
+            "(1) reconocé la objeción sin ponerte defensivo, "
+            "(2) diferenciá con garantía oficial, servicio técnico propio, "
+            "financiamiento disponible, y respaldo post-venta de Dismac, "
+            "(3) si aplica, ofrecer una cuota accesible o un modelo similar con mejor precio. "
+            "NUNCA inventes precios de la competencia ni digas que no podés igualar."
+        )
+
+    @staticmethod
+    def _bloque_upgrade_intent(mensaje: str) -> str | None:
+        if not DetectorUpgradeIntent.es_upgrade(mensaje):
+            return None
+        producto_actual = DetectorUpgradeIntent.producto_actual(mensaje)
+        prod_txt = f" (tiene actualmente: {producto_actual})" if producto_actual else ""
+        return (
+            f"UPGRADE INTENT: el cliente quiere reemplazar un producto que ya tiene{prod_txt}. "
+            "Estrategia: (1) preguntá brevemente qué le faltó o falló en el actual "
+            "(si no está claro), (2) recomendá mejora concreta sobre ese punto, "
+            "(3) no des opciones entry-level si hay señal de que ya usó algo similar. "
+            "El cliente tiene experiencia con la categoría — tratalo como usuario intermedio."
+        )
+
+    @staticmethod
+    def _bloque_objecion_factura(mensaje: str) -> str | None:
+        tipo = DetectorObjecionFactura.tipo(mensaje)
+        if tipo is None:
+            return None
+        if tipo == "sin_factura":
+            return (
+                "CONSULTA SIN FACTURA: el cliente pregunta por precio sin factura. "
+                "Respuesta: la factura es obligatoria por ley en Bolivia y está incluida "
+                "en el precio. No hay precio diferente sin factura. Enfatizá los beneficios: "
+                "garantía oficial, reclamo ante defecto, deducción de impuestos si aplica."
+            )
+        if tipo == "con_factura":
+            return (
+                "CONSULTA CON FACTURA: el cliente quiere confirmar que incluye factura. "
+                "Confirmá que sí, que la factura está siempre incluida en el precio de Dismac."
+            )
+        return (
+            "FACTURA EMPRESARIAL: el cliente necesita factura a nombre de empresa/NIT. "
+            "Indicá que pueden emitir factura empresarial con NIT y razón social. "
+            "Pedirle que tenga a mano el NIT y razón social al momento de comprar."
+        )
+
+    @staticmethod
+    def _bloque_objecion_devolucion(mensaje: str) -> str | None:
+        if not DetectorObjecionDevolucion.es_consulta_devolucion(mensaje):
+            return None
+        return (
+            "CONSULTA DE DEVOLUCIÓN/GARANTÍA: el cliente pregunta por política de cambios. "
+            "Informá: (1) productos con defecto de fábrica tienen garantía oficial del fabricante "
+            "(varía por producto, típicamente 1 año), (2) Dismac gestiona el reclamo ante el "
+            "fabricante, (3) para cambio por no gustar, consultar política en tienda según el "
+            "producto. NO inventes plazos específicos que no conozcas."
+        )
+
+    @staticmethod
+    def _bloque_variante_solicitada(mensaje: str) -> str | None:
+        if not DetectorVarianteSolicitada.es_variante(mensaje):
+            return None
+        partes = ["VARIANTE SOLICITADA: el cliente busca una variante específica."]
+        color = DetectorVarianteSolicitada.color(mensaje)
+        if color:
+            partes.append(f"- Color pedido: {color}")
+        cap = DetectorVarianteSolicitada.capacidad_gb(mensaje)
+        if cap:
+            partes.append(f"- Capacidad pedida: {cap} GB")
+        partes.append(
+            "Al buscar productos, intentá filtrar o mencionar explícitamente si "
+            "hay disponibilidad de esa variante. Si no hay, indicá las disponibles."
+        )
+        return "\n".join(partes)
+
+    def _bloque_abandono_temporal(self, mensaje: str, sesion_id: UUID) -> str | None:
+        if not DetectorAbandonoTemporal.es_abandono_temporal(mensaje):
+            return None
+        link_txt = GeneradorLinkSesion.mensaje_retoma(sesion_id)
+        return (
+            "ABANDONO TEMPORAL: el cliente quiere pausar y volver después. "
+            "Respuesta ideal: (1) confirmá que su sesión queda guardada, "
+            f"(2) compartí el código de retoma: {link_txt}, "
+            "(3) ofrecé resumir los productos que vio para cuando vuelva, "
+            "(4) despedida cálida y breve. No insistas en cerrar la venta ahora."
+        )
+
+    @staticmethod
+    def _bloque_cliente_mayorista(mensaje: str) -> str | None:
+        if not DetectorClienteMayorista.es_mayorista(mensaje):
+            return None
+        cantidad = DetectorClienteMayorista.cantidad_aproximada(mensaje)
+        cant_txt = f" (menciona {cantidad} unidades)" if cantidad else ""
+        return (
+            f"CLIENTE MAYORISTA{cant_txt}: compra en cantidad para negocio/reventa. "
+            "Este cliente requiere atención especial: "
+            "(1) indicá que para pedidos mayoristas deben contactar al área comercial, "
+            "(2) preguntá qué producto y cantidad necesita para derivar correctamente, "
+            "(3) NO des precios unitarios como si fuera precio mayorista — el precio "
+            "publicado es para consumidor final."
+        )
+
+    @staticmethod
+    def _bloque_cambio_tema(mensaje: str) -> str | None:
+        if not DetectorCambiaTema.es_cambio_tema(mensaje):
+            return None
+        return (
+            "CAMBIO DE TEMA EXPLÍCITO: el cliente abandonó lo anterior y quiere buscar algo nuevo. "
+            "Ignorá completamente el contexto previo (productos mostrados, categoría anterior). "
+            "Tratá este mensaje como el inicio de una conversación nueva. "
+            "No menciones los productos anteriores."
+        )
+
+    @staticmethod
+    def _bloque_presupuesto_flexible(mensaje: str) -> str | None:
+        if DetectorPresupuestoFlexible.es_flexible(mensaje):
+            return (
+                "PRESUPUESTO FLEXIBLE: el cliente puede gastar más si la opción lo justifica. "
+                "Mostrá la opción en su presupuesto declarado Y una opción premium ligeramente "
+                "superior — explicá por qué vale la diferencia."
+            )
+        if DetectorPresupuestoFlexible.es_duro(mensaje):
+            return (
+                "PRESUPUESTO DURO: el cliente tiene un límite estricto que no puede superar. "
+                "NO mostrés opciones por encima del presupuesto declarado. "
+                "Si no hay nada en ese rango, decílo honestamente y ofrecé lo más cercano por debajo."
+            )
+        return None
+
+    @staticmethod
+    def _bloque_multiple_productos(mensaje: str) -> str | None:
+        if not DetectorMultipleProductos.es_busqueda_multiple(mensaje):
+            return None
+        productos = DetectorMultipleProductos.productos_mencionados(mensaje)
+        prod_txt = ", ".join(productos) if productos else "varios"
+        return (
+            f"BÚSQUEDA MÚLTIPLE: el cliente busca {prod_txt} en el mismo mensaje. "
+            "Estrategia: (1) confirmá que vas a ayudar con ambos/todos, "
+            "(2) atendé uno a la vez empezando por el que aparece primero, "
+            "(3) al terminar con el primero, preguntá si seguimos con el siguiente."
+        )
+
+    @staticmethod
+    def _bloque_yapa(mensaje: str) -> str | None:
+        if DetectorYapaNegociacion.pide_yapa(mensaje):
+            return (
+                "PIDE YAPA: el cliente espera un extra con la compra. "
+                "Respuesta: si el producto incluye accesorios en la caja, mencionálos. "
+                "Si hay promoción activa con regalo, informála. Si no hay nada extra, "
+                "explicá con amabilidad que el precio ya incluye todo."
+            )
+        if DetectorYapaNegociacion.pide_descuento(mensaje):
+            return (
+                "PIDE DESCUENTO/REBAJA: el cliente quiere negociar el precio. "
+                "Respuesta: el precio es fijo (no hay regateo), pero podés destacar "
+                "el valor diferencial: garantía, financiamiento, servicio técnico, "
+                "o si hay descuento activo mencionalo. No prometás descuentos que no existen."
+            )
+        if DetectorYapaNegociacion.pide_precio_especial(mensaje):
+            return (
+                "PIDE PRECIO AL CONTADO/EFECTIVO: en Dismac el precio es el mismo "
+                "independientemente del medio de pago. Informarlo con naturalidad "
+                "y resaltar que el precio publicado ya es competitivo."
+            )
+        return None
+
+    def _bloque_ciudad(self, sesion_id: UUID) -> str | None:
+        perfil = self._obtener_perfil.ejecutar(ObtenerPerfilSesionQuery(sesion_id=sesion_id))
+        ciudad = getattr(perfil, "ciudad_sesion", None)
+        if not ciudad:
+            return None
+        return (
+            f"CIUDAD DEL CLIENTE: {ciudad}. "
+            "Si hay diferencias de disponibilidad o tiempos de entrega entre "
+            "ciudades, mencionálo. No supongas que todo producto tiene stock "
+            "inmediato en esa ciudad — si no sabés confirmá antes de prometer."
         )
 
     def _bloque_despedida(self, mensaje: str, sesion_id: UUID) -> str | None:
@@ -1482,7 +1804,7 @@ class ProcesarChatService:
                 "- PROHIBIDO abrir buscar_productos (ya viste suficiente).\n"
                 "- PROHIBIDO listar productos nuevos.\n"
                 "- Elegí UN solo SKU de los ya mostrados con justificación de "
-                "  3-4 specs concretas.\n"
+                "  3-4 características concretas.\n"
                 "- Si el cliente pregunta cosas vagas, preguntá UNA concreta "
                 "  para destrabar (ej. '¿priorizás precio o cámara?').\n"
                 "- Cerrá ofreciendo agregar al carrito."
@@ -1851,6 +2173,9 @@ class ProcesarChatService:
             partes.append(f"- Tipo de panel: {perfil.tipo_panel}")
         if perfil.resolucion:
             partes.append(f"- Resolucion: {perfil.resolucion}")
+        ciudad = getattr(perfil, "ciudad_sesion", None)
+        if ciudad:
+            partes.append(f"- Ciudad: {ciudad}")
         partes.append(
             "Al llamar buscar_productos, usa estos campos como filtros implicitos "
             "SIEMPRE, aunque el mensaje actual no los repita. Si el cliente dice "
@@ -1904,7 +2229,7 @@ class ProcesarChatService:
         if DetectorPedidoDetalle.es_pedido_detalle(mensaje):
             partes.append(
                 "El cliente pidio DETALLES/ESPECIFICACIONES. Usa exclusivamente los datos "
-                "del CONTEXTO de arriba. Lista TODAS las specs disponibles: procesador, "
+                "del CONTEXTO de arriba. Lista TODAS las características disponibles: procesador, "
                 "RAM, almacenamiento, pantalla (tamanio + tipo + resolucion), GPU, bateria, "
                 "puertos, conectividad, peso, sistema operativo, garantia, color y cualquier "
                 "otro dato presente. No resumas en 3 bullets: si hay 10 datos, lista los 10. "
@@ -2304,6 +2629,70 @@ class ProcesarChatService:
         except Exception:
             pass
 
+    # Tipos de producto incompatibles con una búsqueda de refrigeradora.
+    # Si el LLM devuelve productos con estas palabras en el nombre cuando el
+    # cliente pedía una refrigeradora, es un mismatch de categoría.
+    _INCOMPAT_REFRI = frozenset({
+        "hermetico", "hermético", "tupper", "recipiente", "organizador",
+        "envase", "contenedor", "taper",
+    })
+
+    def _productos_violan_requisitos_duros(
+        self, trace: list[PasoAgente], mensaje: str
+    ) -> bool:
+        """True si algún producto devuelto por el LLM viola un requisito duro
+        del mensaje: exclusiones de nombre (celeron, pentium, chromebook),
+        RAM mínima, capacidad mínima o mismatch de categoría (hermético cuando
+        se buscó refrigeradora).
+
+        Cuando retorna True, _debe_forzar_busqueda lanzará _forzar_busqueda
+        con los filtros duros correctamente aplicados."""
+        productos_llm: list[dict] = []
+        for p in trace:
+            if p.tool == "buscar_productos" and not p.result.get("error"):
+                raw = p.result.get("productos") or []
+                if raw:
+                    productos_llm = list(raw)
+                    break
+        if not productos_llm:
+            return False
+
+        excluidos = [e.lower() for e in (DetectorExclusionesMensaje.detectar(mensaje) or [])]
+        ram_min = self._extraer_ram_gb_mensaje(mensaje)
+        kg_min = self._extraer_capacidad_kg_mensaje(mensaje)
+        norm_msg = NormalizadorTexto.normalizar(mensaje)
+        msg_tokens = set(norm_msg.split())
+        busca_refri = bool(
+            msg_tokens & {"refrigeradora", "refrigerador", "refri", "heladera"}
+        )
+
+        for prod in productos_llm:
+            nombre = (prod.get("nombre") or "").lower()
+            attrs: dict = prod.get("atributos") or {}
+
+            # Exclusiones explícitas de nombre (celeron, pentium, chromebook…)
+            for exc in excluidos:
+                if exc and exc in nombre:
+                    return True
+
+            # Mismatch categoría: buscaba refrigeradora pero llegó un hermético
+            if busca_refri and any(incompat in nombre for incompat in self._INCOMPAT_REFRI):
+                return True
+
+            # RAM mínima (atributo estructurado)
+            if ram_min:
+                ram_prod = attrs.get("ram_gb") or 0
+                if ram_prod and int(ram_prod) < ram_min:
+                    return True
+
+            # Capacidad kg mínima (lavadora)
+            if kg_min:
+                cap_kg = attrs.get("capacidad_kg") or 0
+                if cap_kg and float(cap_kg) < kg_min:
+                    return True
+
+        return False
+
     def _debe_forzar_busqueda(
         self, respuesta: str, trace: list[PasoAgente], mensaje: str
     ) -> bool:
@@ -2312,6 +2701,9 @@ class ProcesarChatService:
              con resultados (alucina productos).
           b) no llamo buscar_productos en absoluto y el mensaje menciona una
              categoria reconocida (sinonimo en BD).
+          c) el LLM busco con resultados pero los productos violan requisitos
+             duros del mensaje (celeron excluido, RAM insuficiente, mismatch
+             de categoria como hermeticos para una busqueda de refrigeradora).
 
         NO se fuerza si el mensaje tiene un SKU explicito: el LLM respondio
         usando el contexto de la ficha y no necesita buscar."""
@@ -2326,6 +2718,10 @@ class ProcesarChatService:
         if self._parece_listado_productos(respuesta) and not busco_con_resultados:
             return True
         if any(p.tool == "buscar_productos" for p in trace):
+            # Aunque el LLM ya buscó, si los productos violan requisitos duros
+            # del mensaje, forzamos una nueva búsqueda con filtros correctos.
+            if self._productos_violan_requisitos_duros(trace, mensaje):
+                return True
             return False
         cercana = self._resolvedor_categoria.resolver(mensaje)
         return cercana is not None and cercana.fuente == "sinonimo"
@@ -2554,6 +2950,8 @@ class ProcesarChatService:
             tipo_panel=perfil.tipo_panel,
             resolucion=perfil.resolucion,
             ram_gb_min=self._extraer_ram_gb_mensaje(mensaje) or perfil.ram_gb_min,
+            capacidad_kg_min=self._extraer_capacidad_kg_mensaje(mensaje),
+            capacidad_litros_min=self._extraer_capacidad_litros_mensaje(mensaje),
             gpu_dedicada=self._gpu_ef(mensaje, perfil.gpu_dedicada),
             limite=12,
             excluir_accesorios=not es_accesorio,
@@ -2604,6 +3002,36 @@ class ProcesarChatService:
             return val if val in (4, 8, 12, 16, 24, 32, 48, 64) else None
         return None
 
+    @staticmethod
+    def _extraer_capacidad_kg_mensaje(mensaje: str) -> float | None:
+        """Extrae capacidad_kg_min del mensaje: 'mínimo 18 kg', '18 kilos mínimo'."""
+        import re
+        m = re.search(
+            r'\bm[ií]nimo\s+(\d+)\s*(?:kg|kgs?|kilos?)\b'
+            r'|\b(\d+)\s*(?:kg|kgs?|kilos?)\s+(?:m[ií]nimo|como\s+m[ií]nimo)\b'
+            r'|\bal\s+menos\s+(\d+)\s*(?:kg|kgs?|kilos?)\b',
+            mensaje, re.IGNORECASE
+        )
+        if m:
+            val = float(next(g for g in m.groups() if g is not None))
+            return val if 5 <= val <= 100 else None
+        return None
+
+    @staticmethod
+    def _extraer_capacidad_litros_mensaje(mensaje: str) -> float | None:
+        """Extrae capacidad_litros_min del mensaje: 'mínimo 300 litros', '300 lts mínimo'."""
+        import re
+        m = re.search(
+            r'\bm[ií]nimo\s+(\d+)\s*(?:litros?|lts?)\b'
+            r'|\b(\d+)\s*(?:litros?|lts?)\s+(?:m[ií]nimo|como\s+m[ií]nimo)\b'
+            r'|\bal\s+menos\s+(\d+)\s*(?:litros?)\b',
+            mensaje, re.IGNORECASE
+        )
+        if m:
+            val = float(next(g for g in m.groups() if g is not None))
+            return val if 50 <= val <= 1000 else None
+        return None
+
     def _rango_precio_tier(self, perfil, subcat_ef: str | None) -> tuple:
         """Devuelve (precio_min, precio_max) ajustado por tier del perfil."""
         precio_foco = self._precio_del_foco(perfil.sku_foco)
@@ -2644,6 +3072,7 @@ class ProcesarChatService:
             productos = self._buscar.ejecutar(replace(query, tipo_panel=None))
         if not productos and query.refresh_hz_min:
             productos = self._buscar.ejecutar(replace(query, refresh_hz_min=None))
+        productos = ValidadorSkuResultado.filtrar(productos)
         return productos, genero_sin_resultados, aviso
 
     @staticmethod

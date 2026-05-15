@@ -50,6 +50,12 @@ class ParserPresupuesto:
         r"\b(\d{1,3})\s*(?:mil|k)\b(?!\s*(?:mah|hz|ghz|mhz|rpm|uhd|p\b))",
         re.IGNORECASE,
     )
+    _RX_PALO = re.compile(
+        r"\b(?:un?\s+)?medio\s+(?:palo|toco)\b"   # medio palo/toco = 500
+        r"|\b(?:un?\s+palo|un?\s+toco)\b"          # un palo/toco = 1000
+        r"|\b([\d]+(?:[.,]\d+)?)\s*(?:palos?|tocos?|lucas?)\b",  # N palos/tocos/lucas
+        re.IGNORECASE,
+    )
     _RX_CONTEXTO_BUDGET = re.compile(
         r"(?:pre[\s-]?supuesto|presu|tengo|gastar\w*|gasto|gastaria|"
         r"max(?:imo)?|hasta|por\s+solo|solo\s+\d|rango|costar|cuesta\w*|"
@@ -67,6 +73,9 @@ class ParserPresupuesto:
         if not texto:
             return None
         no_monetarios = cls._numeros_no_monetarios(texto)
+        valor_palo = cls._extraer_palo(texto)
+        if valor_palo is not None:
+            return valor_palo
         valor_mil = cls._extraer_mil(texto)
         if valor_mil is not None:
             return valor_mil
@@ -101,6 +110,28 @@ class ParserPresupuesto:
                 return ideal, techo
         unico = cls.extraer(texto)
         return None, unico
+
+    @classmethod
+    def _extraer_palo(cls, texto: str) -> float | None:
+        for match in cls._RX_PALO.finditer(texto):
+            inicio = max(0, match.start() - 35)
+            fin = min(len(texto), match.end() + 20)
+            contexto = texto[inicio:fin]
+            if not cls._RX_CONTEXTO_BUDGET.search(contexto):
+                continue
+            raw = match.group(0).lower()
+            if "medio" in raw:
+                return 500.0
+            if match.lastindex and match.group(match.lastindex):
+                try:
+                    valor = float(match.group(match.lastindex).replace(",", ".")) * 1000.0
+                except ValueError:
+                    continue
+            else:
+                valor = 1000.0
+            if cls._MIN <= valor <= cls._MAX:
+                return valor
+        return None
 
     @classmethod
     def _extraer_mil(cls, texto: str) -> float | None:

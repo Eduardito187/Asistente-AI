@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import random
 from urllib.parse import quote
 
 import time
@@ -153,7 +154,14 @@ def stream_chat(mensaje: str):
     El generador solo emite tokens de texto para st.write_stream; el dict con
     productos/pasos/sesion_id se llena por referencia mientras llega el SSE.
     """
-    meta: dict = {"respuesta": "", "productos": [], "sugeridos": [], "pasos": [], "sesion_id": None}
+    meta: dict = {
+        "respuesta": "",
+        "productos": [],
+        "sugeridos": [],
+        "pasos": [],
+        "sesion_id": None,
+        "ciudad_sesion": None,
+    }
     payload = {"mensaje": mensaje, "sesion_id": st.session_state.sesion_id}
 
     def generador():
@@ -169,6 +177,7 @@ def stream_chat(mensaje: str):
                     meta["sugeridos"] = data.get("productos_sugeridos", [])
                     meta["pasos"] = data.get("pasos", [])
                     meta["sesion_id"] = data.get("sesion_id")
+                    meta["ciudad_sesion"] = data.get("ciudad_sesion")
 
     return generador, meta
 
@@ -186,6 +195,21 @@ if "pending_input" not in st.session_state:
     st.session_state.pending_input = None
 if "mostrar_checkout" not in st.session_state:
     st.session_state.mostrar_checkout = False
+if "ciudad_sesion" not in st.session_state:
+    st.session_state.ciudad_sesion = None
+
+PLACEHOLDERS = [
+    "Ej: Busco un televisor 4K de 55 pulgadas hasta Bs 5500…",
+    "Ej: Necesito una laptop para estudiar, tengo 4 palos…",
+    "Ej: Quiero un celular para mi wawa, algo sencillo…",
+    "Ej: ¿Tienen washas automáticas? Necesito una económica…",
+    "Ej: Busco una laptop gaming, tengo GPU dedicada que sea…",
+    "Ej: ¿Cuál me conviene, Samsung o LG en televisores?",
+    "Ej: Necesito algo para regalo de cumpleaños, hasta Bs 1500…",
+    "Ej: ¿Tienen plasma de 50 pulgadas con smart TV?",
+]
+if "placeholder_idx" not in st.session_state:
+    st.session_state.placeholder_idx = random.randrange(len(PLACEHOLDERS))
 
 
 # ------------------------------------------------------------
@@ -261,6 +285,8 @@ with st.sidebar:
     st.divider()
     st.subheader("Sesión")
     st.caption(f"ID: `{st.session_state.sesion_id or '—'}`")
+    if st.session_state.get("ciudad_sesion"):
+        st.caption(f"📍 {st.session_state.ciudad_sesion}")
     if st.button("Nueva conversación", use_container_width=True):
         st.session_state.sesion_id = None
         st.session_state.mensajes = []
@@ -491,24 +517,75 @@ for idx, m in enumerate(st.session_state.mensajes):
 
 # Atajos contextuales
 if st.session_state.mensajes and st.session_state.mensajes[-1]["rol"] == "assistant":
-    ultimos_productos = st.session_state.mensajes[-1].get("productos") or []
+    ultimo_msg = st.session_state.mensajes[-1]
+    ultimos_productos = ultimo_msg.get("productos") or []
     if ultimos_productos:
         st.markdown(" ")
-        c1, c2, c3 = st.columns([1, 1, 2])
-        with c1:
-            if st.button("🙅 Ninguno me sirve"):
+        # Fila 1
+        r1c1, r1c2, r1c3, r1c4 = st.columns(4)
+        with r1c1:
+            if st.button("🙅 Ninguno me sirve", use_container_width=True):
                 st.session_state.pending_input = (
                     "Ninguno de estos me sirve. Contame qué otras opciones hay; "
                     "te puedo dar mi presupuesto, tamaño o marca si lo preferís."
                 )
                 st.rerun()
-        with c2:
-            if st.button("💸 Más baratos"):
+        with r1c2:
+            if st.button("💸 Más baratos", use_container_width=True):
                 st.session_state.pending_input = "Muéstrame opciones más económicas que las anteriores."
                 st.rerun()
-        with c3:
-            if st.button("🔎 Mostrar más opciones"):
+        with r1c3:
+            if st.button("💎 Uno mejor", use_container_width=True):
+                st.session_state.pending_input = (
+                    "Muéstrame una opción mejor, de mayor calidad o con mejores "
+                    "especificaciones que las anteriores."
+                )
+                st.rerun()
+        with r1c4:
+            if st.button("🔎 Más opciones", use_container_width=True):
                 st.session_state.pending_input = "Muéstrame otras opciones distintas a las que ya me diste."
+                st.rerun()
+        # Fila 2
+        r2c1, r2c2, r2c3, r2c4 = st.columns(4)
+        with r2c1:
+            if st.button("📋 Comparar estos", use_container_width=True):
+                st.session_state.pending_input = (
+                    "Compara los productos que me mostraste, cuál me conviene más y por qué."
+                )
+                st.rerun()
+        with r2c2:
+            if st.button("💳 ¿Cómo pagar?", use_container_width=True):
+                st.session_state.pending_input = (
+                    "¿Cuáles son las opciones de pago disponibles? ¿Aceptan QR, tarjeta, cuotas?"
+                )
+                st.rerun()
+        with r2c3:
+            if st.button("🎁 Es un regalo", use_container_width=True):
+                st.session_state.pending_input = (
+                    "Lo busco para regalo, ¿cuál me recomiendas para regalar "
+                    "y qué accesorios le van bien?"
+                )
+                st.rerun()
+        with r2c4:
+            if st.button("⚡ Quiero el más vendido", use_container_width=True):
+                st.session_state.pending_input = (
+                    "¿Cuál es la opción más vendida o mejor valorada de las que me mostraste?"
+                )
+                st.rerun()
+    elif ultimo_msg.get("contenido"):
+        # No hay productos pero sí respuesta de texto: chips de ayuda básica
+        st.markdown(" ")
+        h1, h2, h3 = st.columns(3)
+        with h1:
+            if st.button("🔄 Empezar de nuevo", use_container_width=True):
+                st.session_state.pending_input = "Quiero empezar de cero con una nueva búsqueda."
+                st.rerun()
+        with h2:
+            if st.button("💬 Aclarar mi consulta", use_container_width=True):
+                st.info("Escribe tu consulta en el cuadro de abajo.")
+        with h3:
+            if st.button("🏪 Ver todas las categorías", use_container_width=True):
+                st.session_state.pending_input = "¿Qué categorías de productos tienen disponibles?"
                 st.rerun()
 
 # Input de chat
@@ -516,7 +593,8 @@ if st.session_state.pending_input:
     pregunta = st.session_state.pending_input
     st.session_state.pending_input = None
 else:
-    pregunta = st.chat_input("Ej: Busco un televisor 4K de 55 pulgadas hasta Bs 5500…")
+    placeholder = PLACEHOLDERS[st.session_state.placeholder_idx]
+    pregunta = st.chat_input(placeholder)
 
 INDICADOR_PENSANDO = (
     "<span style='color:#888'>Dismi está escribiendo"
@@ -537,13 +615,18 @@ def render_turno_stream(pregunta: str):
         placeholder = st.empty()
         placeholder.markdown(INDICADOR_PENSANDO, unsafe_allow_html=True)
         generador, meta = stream_chat(pregunta)
+        t0 = time.time()
         texto = ""
         for tok in generador():
             texto += tok
             placeholder.markdown(texto + " ▌")
         placeholder.markdown(texto or meta.get("respuesta", ""))
+        elapsed = time.time() - t0
+        st.caption(f"⏱ {elapsed:.1f}s")
     if meta.get("sesion_id"):
         st.session_state.sesion_id = meta["sesion_id"]
+    if meta.get("ciudad_sesion"):
+        st.session_state.ciudad_sesion = meta["ciudad_sesion"]
     st.session_state.mensajes.append(
         {
             "rol": "assistant",

@@ -21,3 +21,4 @@ class RegistrarMetricaTurnoCommand:
     quality_score: Optional[int] = None
     reason_code: Optional[str] = None
     variant_name: Optional[str] = None
+    busquedas_sin_resultado: bool = False

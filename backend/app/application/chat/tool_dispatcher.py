@@ -585,7 +585,13 @@ class ToolDispatcher:
             "gpu_dedicada": ValueParser.a_bool(a.get("gpu_dedicada")) or perfil.gpu_dedicada or None,
             "capacidad_gb_min": ValueParser.a_int(a.get("capacidad_gb_min")) or perfil.ssd_gb_min or None,
             "ram_gb_min": ValueParser.a_int(a.get("ram_gb_min")) or perfil.ram_gb_min or None,
+            "capacidad_litros_min": (
+                ValueParser.a_float(a.get("capacidad_litros_min"))
+                or getattr(perfil, "capacidad_litros_min", None)
+                or None
+            ),
             "solo_con_stock": True,
+            "limite": min(max(ValueParser.a_int(a.get("limite")) or 3, 1), 6),
         }
         cls._aplicar_pasthrough(base, a)
         return base
@@ -603,10 +609,14 @@ class ToolDispatcher:
             if campo in filtros:
                 continue
             filtros[campo] = ValueParser.a_float(a.get(campo))
+        atributos_dict = a.get("atributos") or {}
         for campo in cls._todos_los_campos_bool():
             if campo in filtros:
                 continue
-            filtros[campo] = ValueParser.a_bool(a.get(campo))
+            val = a.get(campo)
+            if val is None:
+                val = atributos_dict.get(campo)
+            filtros[campo] = ValueParser.a_bool(val)
         for campo in cls._CAMPOS_TEXT:
             if campo in filtros:
                 continue

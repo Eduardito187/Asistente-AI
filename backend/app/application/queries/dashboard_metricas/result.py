@@ -17,3 +17,9 @@ class ResultadoDashboardMetricas:
     p50_ms: int
     p95_ms: int
     por_ruta: list[dict] = field(default_factory=list)
+    top_categorias: list = field(default_factory=list)
+    top_ciudades: list = field(default_factory=list)
+    pct_sin_resultado: float = 0.0
+    pct_derivacion: float = 0.0
+    alerta_sin_resultado: bool = False   # True si pct_sin_resultado > 30%
+    alerta_derivacion: bool = False      # True si pct_derivacion > 15%

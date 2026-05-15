@@ -38,15 +38,20 @@ class ResponderDerivarVentas:
         motivo: str = "frustracion",
         sesion_id: Optional[UUID] = None,
         ahora: Optional[datetime] = None,
+        resumen_conversacion: Optional[str] = None,
     ) -> str:
         """Genera el mensaje. `motivo` selecciona el tono base; `sesion_id`
         determina la variante A/B; `ahora` se usa para detectar si estamos
-        en horario laboral (default: ahora UTC)."""
+        en horario laboral (default: ahora UTC). `resumen_conversacion` se
+        añade al final del mensaje para que el asesor humano tenga contexto."""
         en_horario = HorarioAtencion.dentro_horario(ahora)
         variante = cls._elegir_variante(motivo, sesion_id)
         cuerpo = cls._cuerpo_segun_motivo(motivo, variante)
         contacto = cls._bloque_contacto(en_horario, ahora)
-        return f"{cuerpo}\n\n{contacto}"
+        texto = f"{cuerpo}\n\n{contacto}"
+        if resumen_conversacion:
+            texto += f"\n\n{resumen_conversacion}"
+        return texto
 
     @classmethod
     def variante_asignada(cls, sesion_id: Optional[UUID]) -> str:

@@ -5,7 +5,7 @@ from typing import Callable
 
 from ...domain.productos import Producto, SKU
 from ..ports import UnitOfWork
-from .sugeridor_productos_alternativos import SugeridorProductosAlternativos
+from ..queries.buscar_productos import BuscarProductosHandler, BuscarProductosQuery
 
 
 @dataclass(frozen=True)
@@ -29,10 +29,10 @@ class ResponderProductosSimilares:
     def __init__(
         self,
         uow_factory: Callable[[], UnitOfWork],
-        sugeridor: SugeridorProductosAlternativos,
+        buscar: BuscarProductosHandler,
     ) -> None:
         self._uow_factory = uow_factory
-        self._sugeridor = sugeridor
+        self._buscar = buscar
 
     def responder(self, sku: str) -> RespuestaSimilares | None:
         original = self._cargar_producto(sku)
@@ -63,15 +63,16 @@ class ResponderProductosSimilares:
         precio = original.precio.monto
         precio_min = precio * (1 - self._RANGO_PRECIO)
         precio_max = precio * (1 + self._RANGO_PRECIO)
-        resultados = self._sugeridor.sugerir(
-            categoria=original.categoria,
-            subcategoria=original.subcategoria,
-            marca=None,
-            nombre_canonico=None,
-            precio_min=precio_min,
-            precio_max=precio_max,
+        resultados = self._buscar.ejecutar(
+            BuscarProductosQuery(
+                categoria=original.categoria,
+                subcategoria=original.subcategoria,
+                precio_min=precio_min,
+                precio_max=precio_max,
+                limite=self._LIMITE + 1,
+                excluir_accesorios=True,
+            )
         )
-        # El sugeridor no excluye SKUs por default — filtramos aqui el original.
         return [p for p in resultados if str(p.sku) != str(original.sku)][: self._LIMITE]
 
     @staticmethod

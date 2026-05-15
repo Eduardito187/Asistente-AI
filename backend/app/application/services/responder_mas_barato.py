@@ -9,6 +9,7 @@ from ..queries.obtener_perfil_sesion import (
     ObtenerPerfilSesionQuery,
     ResultadoObtenerPerfilSesion,
 )
+from .detector_exclusiones_mensaje import DetectorExclusionesMensaje
 from .respuesta_follow_up import RespuestaFollowUp
 
 
@@ -43,6 +44,10 @@ class ResponderMasBarato:
 
         techo_nuevo = max(anchor - self._EPSILON, anchor * 0.99)
         excluidos = self._skus_mostrados(perfil)
+        nombre_excluye = tuple(perfil.exclusiones_acumuladas()) or None
+        tipo_producto_excluye = (
+            tuple(DetectorExclusionesMensaje.tipos_a_excluir(perfil.categoria_foco or "")) or None
+        )
 
         productos = self._buscar.ejecutar(
             BuscarProductosQuery(
@@ -54,6 +59,8 @@ class ResponderMasBarato:
                 precio_max=techo_nuevo,
                 limite=6,
                 excluir_accesorios=True,
+                nombre_excluye=nombre_excluye,
+                tipo_producto_excluye=tipo_producto_excluye,
             )
         )
         nuevos = [p for p in productos if str(p.sku) not in excluidos][:3]

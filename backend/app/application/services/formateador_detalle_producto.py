@@ -80,7 +80,7 @@ class FormateadorDetalleProducto:
         # Ensamblado final
         partes = [encabezado]
         if specs_lineas:
-            partes.append("\n**Specs principales:**\n" + "\n".join(specs_lineas))
+            partes.append("\n**Características principales:**\n" + "\n".join(specs_lineas))
         if extras:
             partes.append("\n" + " · ".join(extras))
         if bullets_extra:

@@ -19,13 +19,16 @@ class BloqueTresSeccionesFiltros:
 
     # Senales de requisito cuantitativo o exclusion categorica.
     _RX_REQUISITO_DURO = re.compile(
-        r"\bm[ií]nimo\s+\d+\s*(?:kg|gb|litros?|pulgadas|hz|mah|mp)\b"
-        r"|\bal\s+menos\s+\d+\s*(?:kg|gb|litros?|pulgadas|hz)\b"
+        r"\bm[ií]nimo\s+\d+\s*(?:kg|kgs|kilos?|gb|litros?|lts?|pulgadas|hz|mah|mp)\b"
+        r"|\b\d+\s*(?:kilos?|kg)\s+(?:m[ií]nimo|como\s+m[ií]nimo)\b"
+        r"|\bal\s+menos\s+\d+\s*(?:kg|kgs|kilos?|gb|litros?|pulgadas|hz)\b"
         r"|\bm[áa]s\s+de\s+\d+\s*(?:kg|gb|litros?|pulgadas|hz)\b"
         r"|\bno\s+m[áa]s\s+chic[oa]s?\b|\bno\s+pequen[ñ]as?\b"
         r"|\bfamilia\s+(?:grande|de\s+\d+|numerosa)\b"
+        r"|\bsomos\s+\d+\b|\bpara\s+\d+\s+personas?\b"
         r"|\b(?:no\s+(?:frigobar|exhibidor|freezer|mini)|"
-        r"sin\s+(?:frigobar|exhibidor|freezer|mini))\b",
+        r"sin\s+(?:frigobar|exhibidor|freezer|mini))\b"
+        r"|\bno\s+(?:celeron|pentium|chromebook|8\s*gb|semiautom)\b",
         re.IGNORECASE,
     )
 

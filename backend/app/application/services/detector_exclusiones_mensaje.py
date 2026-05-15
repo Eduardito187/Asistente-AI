@@ -37,6 +37,8 @@ class DetectorExclusionesMensaje:
         "consola", "monitor", "parlante", "accesorio", "accesorios",
         "tablet", "laptop", "televisor", "celular", "impresora",
         "secadora", "frigobar", "freezer",
+        # Electrodomésticos de refrigeración excluibles explícitamente
+        "conservadora", "minibar", "exhibidor", "vitrina",
         # Procesadores/componentes low-end — excluibles cuando el cliente los pide explícitamente
         "celeron", "pentium", "chromebook",
     )
@@ -90,6 +92,31 @@ class DetectorExclusionesMensaje:
         "solidworks": (("celeron", "pentium"), ("celeron", "pentium")),
         "render":     (("celeron", "pentium"), ("celeron", "pentium")),
         "renderizado": (("celeron", "pentium"), ("celeron", "pentium")),
+        # Refrigeradora doméstica → excluir herméticos/recipientes/enfriadores CPU.
+        # "cpu" excluye "Refrigerador de CPU Forza 85" que el DB agrupa bajo refrigeración.
+        # "conservadora"/"frigobar"/"freezer" excluyen por nombre cuando tipo_producto es NULL.
+        "refrigeradora": (
+            ("hermetico", "tupper", "recipiente", "cpu", "conservadora", "frigobar", "freezer", "minibar", "exhibidor"),
+            ("hermetico", "tupper", "recipiente", "cpu", "conservadora", "frigobar", "freezer", "minibar", "exhibidor", "comercial"),
+        ),
+        "refrigerador": (
+            ("hermetico", "tupper", "recipiente", "cpu", "conservadora", "frigobar", "freezer", "minibar", "exhibidor"),
+            ("hermetico", "tupper", "recipiente", "cpu", "conservadora", "frigobar", "freezer", "minibar", "exhibidor", "comercial"),
+        ),
+        "refri": (
+            ("hermetico", "tupper", "recipiente", "cpu", "conservadora", "frigobar", "freezer", "minibar", "exhibidor"),
+            ("hermetico", "tupper", "recipiente", "cpu", "conservadora", "frigobar", "freezer", "minibar", "exhibidor", "comercial"),
+        ),
+        "heladera": (
+            ("hermetico", "tupper", "recipiente", "cpu", "conservadora", "frigobar", "freezer", "minibar", "exhibidor"),
+            ("hermetico", "tupper", "recipiente", "cpu", "conservadora", "frigobar", "freezer", "minibar", "exhibidor", "comercial"),
+        ),
+        # Nombre de categoria BD — para follow-ups sin mensaje original.
+        # Incluye "pote"/"tarro" y "cpu" para excluir tarros y enfriadores de CPU.
+        "refrigeracion": (
+            ("hermetico", "tupper", "recipiente", "pote", "tarro", "cpu", "conservadora", "frigobar", "freezer", "minibar", "exhibidor"),
+            ("hermetico", "tupper", "recipiente", "pote", "tarro", "cpu", "conservadora", "frigobar", "freezer", "minibar", "exhibidor", "comercial"),
+        ),
     }
 
     # Cuando el campo tipo_producto de la BD está poblado, este mapa indica
@@ -107,26 +134,45 @@ class DetectorExclusionesMensaje:
         # excluimos exhibidores comerciales, freezers horizontales, frigobars
         # y minibars salvo que el cliente los pida explicitamente.
         "refri": (
-            ("frigobar", "minibar", "freezer", "exhibidor", "vitrina"),
-            ("frigobar", "minibar", "freezer", "exhibidor", "vitrina", "comercial", "negocio", "tienda"),
+            ("frigobar", "minibar", "freezer", "exhibidor", "vitrina", "conservadora"),
+            ("frigobar", "minibar", "freezer", "exhibidor", "vitrina", "conservadora", "comercial", "negocio", "tienda"),
         ),
         "refrigerador": (
-            ("frigobar", "minibar", "freezer", "exhibidor", "vitrina"),
-            ("frigobar", "minibar", "freezer", "exhibidor", "vitrina", "comercial", "negocio", "tienda"),
+            ("frigobar", "minibar", "freezer", "exhibidor", "vitrina", "conservadora"),
+            ("frigobar", "minibar", "freezer", "exhibidor", "vitrina", "conservadora", "comercial", "negocio", "tienda"),
         ),
         "refrigeradora": (
-            ("frigobar", "minibar", "freezer", "exhibidor", "vitrina"),
-            ("frigobar", "minibar", "freezer", "exhibidor", "vitrina", "comercial", "negocio", "tienda"),
+            ("frigobar", "minibar", "freezer", "exhibidor", "vitrina", "conservadora"),
+            ("frigobar", "minibar", "freezer", "exhibidor", "vitrina", "conservadora", "comercial", "negocio", "tienda"),
         ),
         "heladera": (
-            ("frigobar", "minibar", "freezer", "exhibidor", "vitrina"),
-            ("frigobar", "minibar", "freezer", "exhibidor", "vitrina", "comercial", "negocio", "tienda"),
+            ("frigobar", "minibar", "freezer", "exhibidor", "vitrina", "conservadora"),
+            ("frigobar", "minibar", "freezer", "exhibidor", "vitrina", "conservadora", "comercial", "negocio", "tienda"),
         ),
         # 'lavadora' por default = principal de hogar; excluimos secadoras
         # solas y centros de lavado mini.
         "lavadora": (
             ("secadora", "centro_lavado_mini"),
             ("secadora", "secado", "centro", "compacta"),
+        ),
+        # Variantes con nombre de categoria BD (ej: categoria_foco en perfil).
+        # Permiten que follow-ups (otra opcion, mas barato) apliquen los mismos
+        # filtros sin tener el mensaje original — basta con perfil.categoria_foco.
+        "refrigeracion": (
+            ("frigobar", "minibar", "freezer", "exhibidor", "vitrina", "conservadora"),
+            ("frigobar", "minibar", "freezer", "exhibidor", "vitrina", "conservadora", "comercial", "negocio", "tienda"),
+        ),
+        "lavado": (
+            ("secadora", "centro_lavado_mini"),
+            ("secadora", "secado", "centro", "compacta"),
+        ),
+        "relojeria": (
+            ("pared", "despertador", "decorativo"),
+            ("pared", "despertador", "decorativo"),
+        ),
+        "impresion": (
+            ("impresora_termica",),
+            ("termica", "termicas", "pos", "recibos", "etiquetas", "etiqueta"),
         ),
     }
 
@@ -197,11 +243,20 @@ class DetectorExclusionesMensaje:
     @classmethod
     def _negaciones_explicitas(cls, norm: str) -> list[str]:
         salida: list[str] = []
+        # Captura 1: una palabra por trigger ("no quiero X", "sin X")
         for m in cls._RX_NEGACION.finditer(norm):
-            palabra = m.group(1)
-            corregido = cls._corregir_typo(palabra)
-            if corregido:
+            corregido = cls._corregir_typo(m.group(1))
+            if corregido and corregido not in salida:
                 salida.append(corregido)
+        # Captura 2: bloque completo tras trigger — cubre "no me muestres: -
+        # frigobar - minibar - freezer" y listas con colon/guiones que el
+        # regex puntual no detecta. Escanea cada palabra del bloque contra
+        # el diccionario tolerante.
+        for m in cls._RX_NEGACION_BLOQUE.finditer(norm):
+            for palabra in re.findall(r"[a-zñáéíóúü]{4,}", m.group(1)):
+                corregido = cls._corregir_typo(palabra)
+                if corregido and corregido not in salida:
+                    salida.append(corregido)
         return salida
 
     @classmethod

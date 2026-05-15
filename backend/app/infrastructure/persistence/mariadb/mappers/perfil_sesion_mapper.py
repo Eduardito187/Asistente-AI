@@ -17,7 +17,9 @@ class PerfilSesionMapper:
         ram = r.get("ram_gb_min")
         gpu = r.get("gpu_dedicada")
         ssd = r.get("ssd_gb_min")
+        litros_min = r.get("capacidad_litros_min")
         pideal = r.get("presupuesto_ideal")
+        pmin_buscado = r.get("presupuesto_min_buscado")
         frust = r.get("frustracion_count")
         return PerfilSesion(
             sesion_id=UUID(r["sesion_id"]),
@@ -40,7 +42,10 @@ class PerfilSesionMapper:
             ram_gb_min=int(ram) if ram is not None else None,
             gpu_dedicada=bool(gpu) if gpu is not None else None,
             ssd_gb_min=int(ssd) if ssd is not None else None,
+            capacidad_litros_min=float(litros_min) if litros_min is not None else None,
             nombre_excluye_acum=r.get("nombre_excluye_acum"),
             presupuesto_ideal=float(pideal) if pideal is not None else None,
+            presupuesto_min_buscado=float(pmin_buscado) if pmin_buscado is not None else None,
             frustracion_count=int(frust) if frust is not None else None,
+            ciudad_sesion=r.get("ciudad_sesion"),
         )

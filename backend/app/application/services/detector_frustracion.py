@@ -84,6 +84,10 @@ class DetectorFrustracion:
         r"|\bpara\s+(?:que|qu[ée])\s+sirves\b"
         r"|\bno\s+haces\s+nada\s+bien\b"
         r"|\bno\s+entendiste\s+nada\b"
+        r"|\bno\s+jala\b"                # Bolivian "no funciona"
+        r"|\bno\s+da\b"                  # Bolivian "no sirve/funciona"
+        r"|\bno\s+pega\b"                # Bolivian "no conecta/funciona"
+        r"|\bno\s+anda\b"                # no funciona
         r")",
         re.IGNORECASE,
     )
@@ -130,6 +134,10 @@ class DetectorFrustracion:
         r"|\bllevo\s+(?:m[áa]s\s+de\s+)?(?:una\s+|media\s+)?(?:hora|horas|rato|"
         r"un\s+rato|d[íi]as?)\s+(?:tratando|intentando|peleando|chateando)"
         r"|\bhace\s+rato\s+(?:que\s+)?(?:te|estoy)"
+        r"|\bllevo\s+rato\b"             # llevo rato pe = llevo tiempo
+        r"|\bllevo\s+rato\s+pe\b"
+        r"|\bya\s+pues\s+(?:che|pe)?\b"  # impaciencia boliviana
+        r"|\bhace\s+rato\s+pe\b"
         r")",
         re.IGNORECASE,
     )
@@ -143,6 +151,17 @@ class DetectorFrustracion:
         r"|\bqu[ée]\s+(?:fastidio|frustracion|frustraci[óo]n|paciencia|barbaridad)"
         r"|\bme\s+(?:est[áa]s\s+)?frustrand[oa]"
         r"|\bes(?:t[oa]y)?\s+desespera\w+\b"
+        r")",
+        re.IGNORECASE,
+    )
+
+    _RX_DECEPCION_BO = re.compile(
+        r"(?:"
+        r"\bqu[ée]\s+tonter[ií]a\b"
+        r"|\bno\s+(?:sab[eé]s?|sabe)\s+nada\b"
+        r"|\bsin[ée]\s+vergüenza\b"
+        r"|\beso\s+nomas?\s+(?:sab[eé]s?|sabe|hac[eé]s?|hace)\b"
+        r"|\bqu[ée]\s+(?:mal[oa]|p[eé]sim[oa])\s+(?:eres|sos|es)\b"
         r")",
         re.IGNORECASE,
     )
@@ -214,5 +233,6 @@ class DetectorFrustracion:
                 cls._RX_HARTO,
                 cls._RX_SHOUTING,
                 cls._RX_MULTI_PUNTUACION,
+                cls._RX_DECEPCION_BO,
             ) if rx.search(mensaje)
         )

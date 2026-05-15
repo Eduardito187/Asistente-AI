@@ -136,8 +136,10 @@ class ResponderRecomendacionShown:
     def _justificacion(cls, p: Producto) -> str:
         partes: list[str] = []
         panel_up = (p.tipo_panel or "").upper()
-        if panel_up in ("OLED", "QLED", "MINILED"):
-            partes.append(f"panel {panel_up} (tope de gama)")
+        if panel_up == "OLED":
+            partes.append("panel OLED (tope de gama)")
+        elif panel_up in ("QLED", "MINILED"):
+            partes.append(f"panel {panel_up}")
         elif panel_up:
             partes.append(f"panel {panel_up}")
         if (p.resolucion or "").upper() in ("4K", "8K"):
@@ -181,7 +183,7 @@ class ResponderRecomendacionShown:
             )
         lineas.append(
             f"- Si buscás la mejor relación calidad/precio, elegiría el **{medio.nombre}** — "
-            f"es la recomendación principal por su balance de specs y precio."
+            f"es la recomendación principal por su balance de características y precio."
         )
         if caro.sku != medio.sku:
             diff = caro.precio.monto - barato.precio.monto

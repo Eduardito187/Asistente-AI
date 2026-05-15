@@ -12,6 +12,7 @@ from ..queries.obtener_perfil_sesion import (
     ObtenerPerfilSesionQuery,
     ResultadoObtenerPerfilSesion,
 )
+from .detector_exclusiones_mensaje import DetectorExclusionesMensaje
 from .refinamiento_shown import RefinamientoShown
 from .respuesta_follow_up import RespuestaFollowUp
 
@@ -99,6 +100,10 @@ class ResponderRefinamientoShown:
         refinamiento: RefinamientoShown,
         productos_mostrados,
     ) -> RespuestaFollowUp:
+        nombre_excluye = tuple(perfil.exclusiones_acumuladas()) or None
+        tipo_producto_excluye = (
+            tuple(DetectorExclusionesMensaje.tipos_a_excluir(perfil.categoria_foco or "")) or None
+        )
         ampliados = self._buscar.ejecutar(
             BuscarProductosQuery(
                 categoria=perfil.categoria_efectiva(),
@@ -112,6 +117,8 @@ class ResponderRefinamientoShown:
                 es_electrico=refinamiento.es_electrico,
                 limite=6,
                 excluir_accesorios=True,
+                nombre_excluye=nombre_excluye,
+                tipo_producto_excluye=tipo_producto_excluye,
             )
         )
         ya_mostrados = {str(p.sku) for p in productos_mostrados}

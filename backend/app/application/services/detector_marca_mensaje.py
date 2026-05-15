@@ -20,7 +20,8 @@ class DetectorMarcaMensaje:
         "kernig", "targus", "ugreen", "jbl", "oakley", "brother", "epson",
         "kyocera", "hitech", "mueller", "enxuta", "lemyr", "iffalcon", "flux",
         "tramontina", "toshiba", "nintendo", "playstation", "xbox", "garmin",
-        "fitbit", "sat", "zkteco",
+        "fitbit", "sat", "zkteco", "sharp", "cougar", "coolermaster", "deepcool",
+        "nzxt", "corsair", "viewsonic", "aoc", "benq", "gigabyte",
     )
 
     _RX = re.compile(

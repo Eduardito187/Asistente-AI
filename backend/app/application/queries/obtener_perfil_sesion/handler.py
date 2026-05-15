@@ -37,7 +37,10 @@ class ObtenerPerfilSesionHandler:
             ram_gb_min=perfil.ram_gb_min,
             gpu_dedicada=perfil.gpu_dedicada,
             ssd_gb_min=perfil.ssd_gb_min,
+            capacidad_litros_min=perfil.capacidad_litros_min,
             nombre_excluye_acum=perfil.nombre_excluye_acum,
             presupuesto_ideal=perfil.presupuesto_ideal,
+            presupuesto_min_buscado=perfil.presupuesto_min_buscado,
             frustracion_count=perfil.frustracion_count,
+            ciudad_sesion=perfil.ciudad_sesion,
         )
