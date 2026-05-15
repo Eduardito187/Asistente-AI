@@ -72,6 +72,40 @@ class SilenciadorPreguntasRedundantes:
             ),
             "pulgadas",
         ),
+        (
+            re.compile(
+                r"[¿\?]?\s*(?:para\s+qu[eé]\s+(?:vas|v[aá]s|lo)\s+a?\s*usar|"
+                r"qu[eé]\s+uso\s+le\s+vas\s+a\s+dar|"
+                r"qu[eé]\s+uso\s+le\s+(?:dar[ií]as|das)|"
+                r"es\s+para\s+(?:trabajo|estudio|gaming|jugar|la\s+u|la\s+facu|la\s+escuela)|"
+                r"(?:para\s+qu[eé]|qu[eé]\s+uso)\s+(?:la|lo|la\s+vas|lo\s+vas)\s+(?:a\s+usar|usar[ií]as))"
+                r"[^\.\?\!\n]*[\.\?\!]*",
+                re.IGNORECASE,
+            ),
+            "uso_declarado",
+        ),
+        (
+            re.compile(
+                r"[¿\?]?\s*(?:qu[eé]\s+tipo\s+de\s+"
+                r"(?:lavadora|secadora|refrigerador|refri|cocina|microondas|aire\s+acondicionado|"
+                r"tv|tele|televisi[oó]n|monitor|laptop|celular|tel[eé]fono)"
+                r"\s+(?:prefer[ií]s|buscas|quer[eé]s|te\s+interesa|ten[eé]s\s+en\s+mente)|"
+                r"qu[eé]\s+tipo\s+(?:prefer[ií]s|buscas|quer[eé]s|te\s+interesa))"
+                r"[^\.\?\!\n]*[\.\?\!]*",
+                re.IGNORECASE,
+            ),
+            "subcategoria_foco",
+        ),
+        (
+            re.compile(
+                r"[¿\?]?\s*(?:de\s+qu[eé]\s+ciudad\s+(?:sos|eres|est[aá]s|venís)|"
+                r"en\s+qu[eé]\s+ciudad\s+(?:est[aá]s|sos|viv[ií]s|vives|te\s+encontr[aá]s)|"
+                r"(?:cu[aá]l\s+es\s+tu\s+ciudad|de\s+d[oó]nde\s+sos|de\s+d[oó]nde\s+eres))"
+                r"[^\.\?\!\n]*[\.\?\!]*",
+                re.IGNORECASE,
+            ),
+            "ciudad_sesion",
+        ),
     )
 
     @classmethod

@@ -1,0 +1,72 @@
+[
+  {
+    "nombre": "C1_sku_exacto_tope_de_gama",
+    "descripcion": "SKU exacto de gama flagship (S26 Ultra) — el asistente debe buscar y mostrar ese modelo sin mezclar gamas inferiores.",
+    "turnos": [
+      {
+        "mensaje": "quiero un s26 ultra",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener": ["S26", "Ultra"],
+        "no_debe_contener": ["H-120", "ELA-LX3", "Huavi"]
+      }
+    ]
+  },
+  {
+    "nombre": "C2_presupuesto_tier_flagship",
+    "descripcion": "Presupuesto alto (25000 Bs) mas declaracion de tope de gama → resultados premium; confirmacion mantiene foco en el SKU elegido.",
+    "turnos": [
+      {
+        "mensaje": "mi presupuesto es 25000bs quiero un celular tope de gama",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener_cualquiera": ["tope", "flagship", "premium", "Ultra"],
+        "no_debe_contener": ["Huavi", "Honor", "H-120"]
+      },
+      {
+        "mensaje": "me quedo con el s26 ultra",
+        "debe_contener_cualquiera": ["perfecto", "excelente", "llevo", "confirmado"]
+      }
+    ]
+  },
+  {
+    "nombre": "C3_disponibilidad_comparada_premium",
+    "descripcion": "Consulta doble de disponibilidad entre dos flagships — no debe contaminar con modelos de gama baja.",
+    "turnos": [
+      {
+        "mensaje": "tienes s26 ultra o s25 ultra?",
+        "tools_requeridas_cualquiera": ["comparar_productos", "consulta_disponibilidad", "buscar_productos"],
+        "no_debe_contener": ["H-120", "Huavi", "Honor", "ELA"]
+      }
+    ]
+  },
+  {
+    "nombre": "C4_follow_up_mantiene_gama_premium",
+    "descripcion": "Follow-up 'otra opcion' tras elegir flagship debe mantenerse en gama premium, no derivar a gamas inferiores.",
+    "turnos": [
+      {
+        "mensaje": "quiero el s26 ultra",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener": ["S26"]
+      },
+      {
+        "mensaje": "muestrame otra opcion distinta",
+        "no_debe_contener": ["H-120", "Huavi", "Honor"],
+        "debe_contener_cualquiera": ["Samsung", "premium", "Ultra", "Pro"]
+      }
+    ]
+  },
+  {
+    "nombre": "C5_pivot_budget_activa_low_end",
+    "descripcion": "Pivot explicito a 'mas barato' tras flagship — el sistema debe buscar nueva gama economica y comunicarlo con precio.",
+    "turnos": [
+      {
+        "mensaje": "quiero el s26 ultra",
+        "tools_requeridas": ["buscar_productos"]
+      },
+      {
+        "mensaje": "quiero algo mas barato",
+        "tools_requeridas": ["buscar_productos"],
+        "debe_contener_cualquiera": ["barato", "econom", "accesible", "Bs", "precio"]
+      }
+    ]
+  }
+]
