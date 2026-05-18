@@ -60,6 +60,7 @@ class ResponderConsultaDisponibilidad:
         cercana: CategoriaCercana,
         genero: Optional[str] = None,
         marca: Optional[str] = None,
+        capacidad_litros_min: Optional[float] = None,
     ) -> tuple[list, bool]:
         """Pool amplio filtrado por keyword+categoria, re-ranked por cabecera:
         asi 'Telefono celular honor' gana a 'Estuche para celular'. Si el
@@ -70,10 +71,10 @@ class ResponderConsultaDisponibilidad:
             exacto = self._obtener_y_complementar(cercana, genero)
             if exacto:
                 return (exacto, False)
-        pool = self._buscar_por_keyword_y_categoria(cercana, genero, marca)
+        pool = self._buscar_por_keyword_y_categoria(cercana, genero, marca, capacidad_litros_min)
         sin_metadata_genero = bool(genero) and not pool
         if sin_metadata_genero:
-            pool = self._buscar_por_keyword_y_categoria(cercana, None, marca)
+            pool = self._buscar_por_keyword_y_categoria(cercana, None, marca, capacidad_litros_min)
         if pool:
             return (
                 self._priorizar_nombre_empieza_con(pool, cercana.palabra_clave)[: self.LIMITE],
@@ -85,6 +86,7 @@ class ResponderConsultaDisponibilidad:
                     categoria=cercana.categoria,
                     subcategoria=cercana.subcategoria,
                     marca=marca,
+                    capacidad_litros_min=capacidad_litros_min,
                     excluir_accesorios=True,
                     limite=self.LIMITE,
                 )
@@ -128,6 +130,7 @@ class ResponderConsultaDisponibilidad:
         cercana: CategoriaCercana,
         genero: Optional[str] = None,
         marca: Optional[str] = None,
+        capacidad_litros_min: Optional[float] = None,
     ):
         """Primer intento: usar la palabra clave del sinonimo como query para
         que el FULLTEXT priorice productos cuyo nombre realmente coincide
@@ -141,6 +144,7 @@ class ResponderConsultaDisponibilidad:
                 categoria=cercana.categoria,
                 subcategoria=cercana.subcategoria,
                 marca=marca,
+                capacidad_litros_min=capacidad_litros_min,
                 excluir_accesorios=True,
                 limite=self.POOL,
                 genero=genero,
@@ -153,8 +157,11 @@ class ResponderConsultaDisponibilidad:
         etiqueta_foco: Optional[str] = None,
         genero: Optional[str] = None,
         marca: Optional[str] = None,
+        capacidad_litros_min: Optional[float] = None,
     ) -> RespuestaFollowUp | None:
-        productos, sin_metadata_genero = self._seleccionar_productos(cercana, genero, marca)
+        productos, sin_metadata_genero = self._seleccionar_productos(
+            cercana, genero, marca, capacidad_litros_min
+        )
         if not productos:
             return None
         if marca:

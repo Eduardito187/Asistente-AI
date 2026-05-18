@@ -1,0 +1,83 @@
+services:
+  # ============================================================
+  # Cloud deployment — sin Ollama ni bases de datos locales.
+  # Requiere .env con DATABASE_URL, REDIS_URL y LLM_PROVIDER=groq|anthropic.
+  # Uso: docker compose -f docker-compose.cloud.yml up -d
+  # ============================================================
+
+  db-migrate:
+    build: ./backend
+    container_name: asistente_db_migrate
+    env_file: .env
+    command: >
+      sh -c "
+        python -c \"
+import time, pymysql, os
+from urllib.parse import urlparse
+
+url = os.getenv('DATABASE_URL', '')
+db_host = os.getenv('DB_HOST', 'localhost')
+db_port = int(os.getenv('DB_PORT', 3306))
+db_user = os.getenv('DB_USER', 'asistente')
+db_pass = os.getenv('DB_PASS', '')
+db_name = os.getenv('DB_NAME', 'asistente_db')
+
+if url and url.startswith('mysql'):
+    p = urlparse(url)
+    db_host = p.hostname or db_host
+    db_port = p.port or db_port
+    db_user = p.username or db_user
+    db_pass = p.password or db_pass
+    db_name = (p.path or '').lstrip('/') or db_name
+
+for i in range(30):
+    try:
+        pymysql.connect(
+            host=db_host, port=db_port,
+            user=db_user, password=db_pass,
+            database=db_name,
+        ).close()
+        break
+    except Exception as e:
+        print(f'DB no lista ({e}), reintentando...')
+        time.sleep(3)
+        if i == 29: raise
+\" &&
+        alembic upgrade head
+      "
+    restart: "no"
+
+  redis:
+    image: redis:7-alpine
+    container_name: asistente_redis
+    command: ["redis-server", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru", "--save", ""]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  backend:
+    build: ./backend
+    container_name: asistente_backend
+    env_file: .env
+    environment:
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+    depends_on:
+      db-migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    ports:
+      - "${PORT:-8000}:8000"
+    restart: unless-stopped
+
+  web:
+    build: ./frontend-web
+    container_name: asistente_web
+    depends_on:
+      - backend
+    ports:
+      - "3000:80"
+    restart: unless-stopped

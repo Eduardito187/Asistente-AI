@@ -43,6 +43,21 @@ class ActualizarPerfilSesionHandler:
             presupuesto_min_buscado=cmd.presupuesto_min_buscado,
             frustracion_count=cmd.frustracion_delta,
             ciudad_sesion=cmd.ciudad_sesion,
+            notas_usuario=cmd.nota_nueva,
+            refresh_hz_min=cmd.refresh_hz_min,
+            bateria_mah_min=cmd.bateria_mah_min,
+            camara_mp_min=cmd.camara_mp_min,
+            soporta_5g=cmd.soporta_5g,
+            sistema_operativo=cmd.sistema_operativo,
+            capacidad_kg_min=cmd.capacidad_kg_min,
+            potencia_w_min=cmd.potencia_w_min,
+            inverter=cmd.inverter,
+            no_frost=cmd.no_frost,
+            smart_tv=cmd.smart_tv,
+            bluetooth_incluido=cmd.bluetooth_incluido,
+            nfc=cmd.nfc,
+            usb_c=cmd.usb_c,
+            hdmi_2_1=cmd.hdmi_2_1,
         )
         try:
             with self._uow_factory() as uow:

@@ -1067,6 +1067,32 @@ _PROPS_BUSCAR_PRODUCTOS: dict = {
 }
 
 
+def generar_param_desde_catalogo(nombre: str) -> dict | None:
+    """Genera el bloque JSON Schema de un parámetro a partir del catálogo.
+    Devuelve None si el catálogo no tiene ese atributo.
+    Uso: para nuevos atributos antes de escribir la descripción manual."""
+    from ...domain.shared.catalogo_atributos.catalogo_atributos_producto import (
+        CatalogoAtributosProducto,
+    )
+    defn = CatalogoAtributosProducto.por_nombre(nombre)
+    if defn is None:
+        return None
+    tipo_map = {"int": "integer", "float": "number", "bool": "boolean", "str": "string"}
+    return {"type": tipo_map[defn.tipo], "description": defn.descripcion_llm}
+
+
+def verificar_params_sticky_en_tool() -> list[str]:
+    """Devuelve campos sticky del catálogo que NO están en _PROPS_BUSCAR_PRODUCTOS.
+    Lista vacía = todo sincronizado. Usar en tests de contrato."""
+    from ...domain.shared.catalogo_atributos.catalogo_atributos_producto import (
+        CatalogoAtributosProducto,
+    )
+    return [
+        a.nombre for a in CatalogoAtributosProducto.sticky()
+        if a.nombre not in _PROPS_BUSCAR_PRODUCTOS
+    ]
+
+
 TOOLS_SPEC: list[dict] = [
     _tool(
         "buscar_productos",

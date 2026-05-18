@@ -14,6 +14,7 @@ from .presentation.api.routers import (
     carritos_admin,
     chat,
     chat_stream,
+    cobertura_admin,
     conversaciones_curadas_admin,
     embeddings_admin,
     health,
@@ -53,3 +54,4 @@ app.include_router(conversaciones_curadas_admin.router)
 app.include_router(metricas.router)
 app.include_router(embeddings_admin.router)
 app.include_router(aprendizaje_admin.router)
+app.include_router(cobertura_admin.router)

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Optional
 
@@ -16,20 +17,37 @@ class OllamaAdapter(LLMPort):
     Optimizaciones de concurrencia:
     - Cliente httpx singleton lazy: reutiliza pool de conexiones TCP entre
       requests. Sin esto cada chat() abría/cerraba conexión (overhead 50-150ms).
-    - Connection limits altos: hasta 20 conexiones simultáneas al daemon.
-      Combinado con OLLAMA_NUM_PARALLEL=4 en docker-compose, soporta 4
-      generaciones paralelas con margen para warmup/health.
-    - Timeout extendido: 180s (era OK pero ahora es explícito) — tool calls
-      con LLM pueden tardar 30-90s en concurrencia, no queremos cortar."""
+    - asyncio.Semaphore(max_parallel): backpressure en Python antes de llegar
+      a Ollama. Sin esto 50 usuarios simultáneos abren 50 conexiones pero
+      Ollama solo procesa max_parallel a la vez; los 44 restantes cuelgan
+      consumiendo memoria hasta timeout. Con el semáforo quedan en la cola
+      de asyncio (cero RAM de conexión) y se atienden ordenadamente.
+    - num_ctx=6144 en lugar de 8192: el asistente envía max 10 mensajes de
+      historial + system prompt (~2000 tokens) + bloques de contexto (~400).
+      6144 cubre el peor caso con margen y ahorra ~180MB de KV-cache VRAM
+      por slot, permitiendo subir max_parallel a 6 en la RTX 5090.
+    - Timeout extendido: 180s — tool calls con LLM pueden tardar 30-90s en
+      concurrencia, no queremos cortar."""
 
     KEEP_ALIVE = "24h"
-    NUM_CTX = 8192
+    # 6144 = system(~2k) + historial×10(~2k) + bloques+contexto(~400) + output(~1500).
+    # Reducido de 8192: ahorra ~180MB KV-VRAM/slot → permite NUM_PARALLEL=6 en RTX 5090.
+    NUM_CTX = 6144
 
-    def __init__(self, host: str, model: str, timeout: float = 180.0) -> None:
+    def __init__(
+        self,
+        host: str,
+        model: str,
+        timeout: float = 180.0,
+        max_parallel: int = 6,
+    ) -> None:
         self._host = host
         self._model = model
         self._timeout = timeout
         self._cliente: Optional[httpx.AsyncClient] = None
+        # Backpressure: cola en Python en lugar de saturar Ollama.
+        # max_parallel debe coincidir con OLLAMA_NUM_PARALLEL en docker-compose.
+        self._semaphore = asyncio.Semaphore(max_parallel)
 
     def _client(self) -> httpx.AsyncClient:
         """Cliente singleton con connection pool. Se crea lazy en el primer
@@ -62,8 +80,9 @@ class OllamaAdapter(LLMPort):
             "keep_alive": self.KEEP_ALIVE,
             "options": {"temperature": 0.2, "num_ctx": self.NUM_CTX},
         }
-        client = self._client()
-        r = await client.post(f"{self._host}/api/chat", json=payload)
+        async with self._semaphore:
+            client = self._client()
+            r = await client.post(f"{self._host}/api/chat", json=payload)
         r.raise_for_status()
         data = r.json()
         msg = data.get("message") or {}
@@ -83,8 +102,9 @@ class OllamaAdapter(LLMPort):
             "options": {"num_ctx": self.NUM_CTX},
         }
         try:
-            client = self._client()
-            r = await client.post(f"{self._host}/api/chat", json=payload)
+            async with self._semaphore:
+                client = self._client()
+                r = await client.post(f"{self._host}/api/chat", json=payload)
             r.raise_for_status()
             log.info("ollama warmup ok: model=%s", self._model)
         except Exception as exc:

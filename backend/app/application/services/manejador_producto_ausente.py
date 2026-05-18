@@ -95,6 +95,7 @@ class ManejadorProductoAusente:
         razon_falaz = self._razon_promete_marca(cercana) and not self._alguna_alternativa_es_de_marca(
             alternativas, cercana
         )
+        marca_descartada = self._marca_fue_descartada(alternativas, marca_preferida)
         texto = self._armar_texto_con_alternativas(
             nombre_pedido=self._nombre_pedido_legible(
                 validacion=validacion,
@@ -107,6 +108,8 @@ class ManejadorProductoAusente:
             razon_falaz=razon_falaz,
             contexto_activo=bool(categoria_activa and cercana is None and validacion is None),
             refinamiento=refinamiento,
+            marca_descartada=marca_descartada,
+            marca_preferida=marca_preferida,
         )
         return RespuestaProductoAusente(
             texto=texto,
@@ -200,6 +203,15 @@ class ManejadorProductoAusente:
         return None, None, marca_preferida, None
 
     @staticmethod
+    def _marca_fue_descartada(alternativas: list, marca_preferida: str | None) -> bool:
+        """True cuando hay resultados pero ninguno es de la marca preferida del perfil.
+        Indica que el cascade descartó la marca por falta de stock con esos filtros."""
+        if not marca_preferida or not alternativas:
+            return False
+        objetivo = marca_preferida.strip().lower()
+        return all((getattr(p, "marca", "") or "").strip().lower() != objetivo for p in alternativas)
+
+    @staticmethod
     def _alguna_alternativa_es_de_marca(alternativas, cercana: CategoriaCercana | None) -> bool:
         if cercana is None or not cercana.marca:
             return True
@@ -266,6 +278,8 @@ class ManejadorProductoAusente:
         razon_falaz: bool = False,
         contexto_activo: bool = False,
         refinamiento: RefinamientoShown | None = None,
+        marca_descartada: bool = False,
+        marca_preferida: str | None = None,
     ) -> str:
         encabezado = cls._encabezado(
             nombre_pedido=nombre_pedido,
@@ -274,6 +288,8 @@ class ManejadorProductoAusente:
             razon_falaz=razon_falaz,
             contexto_activo=contexto_activo,
             refinamiento=refinamiento,
+            marca_descartada=marca_descartada,
+            marca_preferida=marca_preferida,
         )
         return "\n".join([encabezado, *cls._lineas_alternativas(alternativas_resumen)])
 
@@ -286,11 +302,15 @@ class ManejadorProductoAusente:
         razon_falaz: bool,
         contexto_activo: bool,
         refinamiento: RefinamientoShown | None,
+        marca_descartada: bool = False,
+        marca_preferida: str | None = None,
     ) -> str:
         if cercana is not None:
             return cls._encabezado_cercana(nombre_pedido, cercana, razon_falaz)
         if contexto_activo:
-            return cls._encabezado_contexto_activo(refinamiento)
+            return cls._encabezado_contexto_activo(
+                refinamiento, marca_descartada=marca_descartada, marca=marca_preferida
+            )
         if es_producto_real and nombre_pedido:
             return (
                 f'Uy, "{nombre_pedido}" ahorita no lo tenemos en el catalogo — '
@@ -328,7 +348,16 @@ class ManejadorProductoAusente:
         )
 
     @staticmethod
-    def _encabezado_contexto_activo(refinamiento: RefinamientoShown | None) -> str:
+    def _encabezado_contexto_activo(
+        refinamiento: RefinamientoShown | None,
+        marca_descartada: bool = False,
+        marca: str | None = None,
+    ) -> str:
+        if marca_descartada and marca:
+            return (
+                f"No tengo {marca.capitalize()} con esas características en stock, "
+                "pero encontré estas opciones que sí coinciden:"
+            )
         if refinamiento is not None and not refinamiento.vacio():
             return f"Dentro de esa linea, estas son las {refinamiento.descripcion_humana()}:"
         return (

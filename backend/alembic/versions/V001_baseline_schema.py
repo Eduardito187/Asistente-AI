@@ -1,0 +1,390 @@
+"""V001 — Baseline schema completo.
+
+Crea todas las tablas del dominio en su estado inicial:
+productos, sesiones, mensajes, carrito, ordenes, sugerencias,
+conversaciones_curadas, metricas_turno, perfiles_sesion (columnas base),
+feedback_ordenes, embeddings, sinonimos, keywords, ingestas_log, vista.
+
+Revision ID: V001
+Revises: (ninguna — primera migracion)
+"""
+from __future__ import annotations
+
+from alembic import op
+from sqlalchemy import text
+
+revision = "V001"
+down_revision = None
+branch_labels = None
+depends_on = None
+
+
+def upgrade() -> None:
+    op.execute(text("SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci"))
+
+    op.execute(text("""
+    CREATE TABLE IF NOT EXISTS productos (
+        sku                     VARCHAR(64)   NOT NULL PRIMARY KEY,
+        nombre                  VARCHAR(500)  NOT NULL,
+        descripcion             TEXT          NULL,
+        categoria               VARCHAR(120)  NULL,
+        subcategoria            VARCHAR(120)  NULL,
+        marca                   VARCHAR(120)  NULL,
+        precio_bob              DECIMAL(12,2) NOT NULL,
+        precio_anterior_bob     DECIMAL(12,2) NULL,
+        stock                   INT           NOT NULL DEFAULT 0,
+        imagen_url              TEXT          NULL,
+        url_producto            TEXT          NULL,
+        activo                  TINYINT(1)    NOT NULL DEFAULT 1,
+        origen                  VARCHAR(60)   NULL,
+        nombre_norm             VARCHAR(500)  NULL,
+        descripcion_norm        TEXT          NULL,
+        marca_norm              VARCHAR(120)  NULL,
+        categoria_norm          VARCHAR(120)  NULL,
+        pulgadas                DECIMAL(5,1)  NULL,
+        capacidad_gb            INT           NULL,
+        ram_gb                  INT           NULL,
+        capacidad_litros        DECIMAL(7,2)  NULL,
+        capacidad_kg            DECIMAL(5,1)  NULL,
+        potencia_w              INT           NULL,
+        procesador              VARCHAR(50)   NULL,
+        color                   VARCHAR(40)   NULL,
+        tipo_panel              VARCHAR(20)   NULL,
+        resolucion              VARCHAR(10)   NULL,
+        es_electrico            TINYINT(1)    NULL,
+        bateria_mah             INT           NULL,
+        camara_mp               SMALLINT      NULL,
+        camara_frontal_mp       SMALLINT      NULL,
+        soporta_5g              TINYINT(1)    NULL,
+        sistema_operativo       VARCHAR(30)   NULL,
+        refresh_hz              SMALLINT      NULL,
+        gpu                     VARCHAR(60)   NULL,
+        es_accesorio            TINYINT(1)    NOT NULL DEFAULT 0,
+        es_descontinuado        TINYINT(1)    NOT NULL DEFAULT 0,
+        genero                  ENUM('masculino','femenino','unisex','infantil') NULL,
+        tipo_producto           VARCHAR(40)   NULL,
+        es_vestible             TINYINT(1)    NULL,
+        modelo                  VARCHAR(120)  NULL,
+        meses_garantia          SMALLINT      NULL,
+        descripcion_extendida   TEXT          NULL,
+        caracteristicas         TEXT          NULL,
+        atributos               JSON          NULL,
+        atributos_texto         TEXT          NULL,
+        created_at              DATETIME(6)   NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+        updated_at              DATETIME(6)   NOT NULL DEFAULT CURRENT_TIMESTAMP(6)
+                                    ON UPDATE CURRENT_TIMESTAMP(6),
+        INDEX ix_productos_categoria  (categoria),
+        INDEX ix_productos_marca      (marca),
+        INDEX ix_productos_precio     (precio_bob),
+        INDEX ix_productos_activo     (activo, stock),
+        INDEX ix_productos_pulgadas   (pulgadas),
+        INDEX ix_productos_capacidad  (capacidad_gb),
+        INDEX ix_productos_es_accesorio (es_accesorio, categoria, subcategoria),
+        INDEX ix_productos_genero     (genero, categoria, subcategoria),
+        INDEX ix_productos_tipo_producto (tipo_producto, categoria),
+        INDEX ix_productos_es_vestible (es_vestible, categoria),
+        INDEX ix_productos_modelo     (modelo),
+        FULLTEXT INDEX ft_productos_busqueda (nombre_norm, descripcion_norm, marca_norm, categoria_norm, atributos_texto),
+        FULLTEXT INDEX ft_productos_nombre   (nombre_norm, marca_norm, categoria_norm)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    """))
+
+    op.execute(text("""
+    CREATE TABLE IF NOT EXISTS catalogo_atributos (
+        id              INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        categoria       VARCHAR(120) NOT NULL,
+        subcategoria    VARCHAR(120) NULL,
+        nombre          VARCHAR(200) NOT NULL,
+        tipo_valor      ENUM('texto','numero','booleano','lista') NOT NULL DEFAULT 'texto',
+        unidad          VARCHAR(20)  NULL,
+        conteo_productos INT         NOT NULL DEFAULT 0,
+        created_at      DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+        updated_at      DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6)
+                            ON UPDATE CURRENT_TIMESTAMP(6),
+        UNIQUE INDEX uq_atributo_cat (categoria, subcategoria, nombre),
+        INDEX ix_atributo_categoria (categoria),
+        INDEX ix_atributo_conteo    (conteo_productos DESC)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    """))
+
+    op.execute(text("""
+    CREATE TABLE IF NOT EXISTS sesiones (
+        id                  CHAR(36)  NOT NULL PRIMARY KEY,
+        carrito_estado      ENUM('activo','abandonado','convertido') NOT NULL DEFAULT 'activo',
+        cliente_nombre      VARCHAR(200) NULL,
+        cliente_email       VARCHAR(200) NULL,
+        cliente_telefono    VARCHAR(40)  NULL,
+        ultima_actividad_at DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+        created_at          DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+        INDEX ix_sesiones_estado (carrito_estado, ultima_actividad_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    """))
+
+    op.execute(text("""
+    CREATE TABLE IF NOT EXISTS mensajes (
+        id          BIGINT   NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        sesion_id   CHAR(36) NOT NULL,
+        rol         ENUM('user','assistant','tool','system') NOT NULL,
+        contenido   MEDIUMTEXT NOT NULL,
+        created_at  DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+        INDEX ix_mensajes_sesion (sesion_id, created_at),
+        CONSTRAINT fk_mensajes_sesion FOREIGN KEY (sesion_id) REFERENCES sesiones(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    """))
+
+    op.execute(text("""
+    CREATE TABLE IF NOT EXISTS carrito_items (
+        sesion_id   CHAR(36)     NOT NULL,
+        sku         VARCHAR(64)  NOT NULL,
+        cantidad    INT          NOT NULL DEFAULT 1,
+        created_at  DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+        updated_at  DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+        PRIMARY KEY (sesion_id, sku),
+        INDEX ix_carrito_sesion (sesion_id),
+        CONSTRAINT fk_carrito_sesion   FOREIGN KEY (sesion_id) REFERENCES sesiones(id)  ON DELETE CASCADE,
+        CONSTRAINT fk_carrito_producto FOREIGN KEY (sku)       REFERENCES productos(sku) ON UPDATE CASCADE ON DELETE RESTRICT
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    """))
+
+    op.execute(text("""
+    CREATE SEQUENCE IF NOT EXISTS ordenes_numero_seq
+        START WITH 100001 MINVALUE 100001 INCREMENT BY 1 NOCACHE
+    """))
+
+    op.execute(text("""
+    CREATE TABLE IF NOT EXISTS ordenes (
+        id              CHAR(36)     NOT NULL PRIMARY KEY,
+        numero_orden    VARCHAR(20)  NOT NULL UNIQUE
+                            DEFAULT (CONCAT('DSM-', NEXTVAL(ordenes_numero_seq))),
+        sesion_id       CHAR(36)     NOT NULL,
+        cliente_nombre  VARCHAR(200) NOT NULL,
+        cliente_email   VARCHAR(200) NULL,
+        cliente_telefono VARCHAR(40) NULL,
+        cliente_ciudad  VARCHAR(120) NULL DEFAULT 'Santa Cruz',
+        total_bob       DECIMAL(12,2) NOT NULL,
+        items_cantidad  INT          NOT NULL,
+        estado          ENUM('confirmada','enviada','entregada','cancelada') NOT NULL DEFAULT 'confirmada',
+        notas           TEXT         NULL,
+        created_at      DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+        INDEX ix_ordenes_sesion (sesion_id),
+        INDEX ix_ordenes_estado (estado, created_at),
+        CONSTRAINT fk_ordenes_sesion FOREIGN KEY (sesion_id) REFERENCES sesiones(id) ON DELETE RESTRICT
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    """))
+
+    op.execute(text("""
+    CREATE TABLE IF NOT EXISTS orden_items (
+        id                  BIGINT       NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        orden_id            CHAR(36)     NOT NULL,
+        sku                 VARCHAR(64)  NOT NULL,
+        nombre              VARCHAR(500) NOT NULL,
+        marca               VARCHAR(120) NULL,
+        cantidad            INT          NOT NULL,
+        precio_unitario_bob DECIMAL(12,2) NOT NULL,
+        subtotal_bob        DECIMAL(12,2) NOT NULL,
+        INDEX ix_orden_items_orden (orden_id),
+        CONSTRAINT fk_orden_items_orden FOREIGN KEY (orden_id) REFERENCES ordenes(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    """))
+
+    op.execute(text("""
+    CREATE TABLE IF NOT EXISTS sugerencias_catalogo (
+        id                   BIGINT       NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        nombre               VARCHAR(300) NOT NULL,
+        nombre_norm          VARCHAR(300) NOT NULL,
+        categoria_estimada   VARCHAR(120) NULL,
+        marca_estimada       VARCHAR(120) NULL,
+        veces_solicitado     INT          NOT NULL DEFAULT 1,
+        primer_contexto_cliente TEXT      NULL,
+        primera_fecha        DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+        ultima_fecha         DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+        UNIQUE KEY uk_sugerencias_nombre_norm (nombre_norm),
+        INDEX ix_sugerencias_ultima_fecha (ultima_fecha),
+        INDEX ix_sugerencias_veces (veces_solicitado)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    """))
+
+    op.execute(text("""
+    CREATE TABLE IF NOT EXISTS conversaciones_curadas (
+        id              BIGINT    NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        sesion_id       CHAR(36)  NULL,
+        etiqueta        VARCHAR(120) NULL,
+        cliente_texto   MEDIUMTEXT NOT NULL,
+        asistente_texto MEDIUMTEXT NOT NULL,
+        score           INT       NOT NULL DEFAULT 0,
+        turnos          INT       NOT NULL DEFAULT 0,
+        llevo_a_orden   TINYINT(1) NOT NULL DEFAULT 0,
+        activa          TINYINT(1) NOT NULL DEFAULT 1,
+        created_at      DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+        updated_at      DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+        UNIQUE KEY uk_conv_curada_sesion (sesion_id),
+        INDEX ix_conv_curada_activa_score (activa, score)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    """))
+
+    op.execute(text("""
+    CREATE TABLE IF NOT EXISTS metricas_turno (
+        id                  BIGINT    NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        sesion_id           CHAR(36)  NOT NULL,
+        mensaje_usuario_len INT       NOT NULL DEFAULT 0,
+        respuesta_len       INT       NOT NULL DEFAULT 0,
+        tool_calls          INT       NOT NULL DEFAULT 0,
+        mentiras_detectadas INT       NOT NULL DEFAULT 0,
+        productos_citados   INT       NOT NULL DEFAULT 0,
+        ruta                VARCHAR(40) NOT NULL DEFAULT 'agente',
+        tiempo_ms           INT       NOT NULL DEFAULT 0,
+        created_at          DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+        INDEX ix_metricas_sesion (sesion_id, created_at),
+        INDEX ix_metricas_ruta   (ruta, created_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    """))
+
+    op.execute(text("""
+    CREATE TABLE IF NOT EXISTS perfiles_sesion (
+        sesion_id               CHAR(36)      NOT NULL PRIMARY KEY,
+        presupuesto_max         DECIMAL(12,2) NULL,
+        marca_preferida         VARCHAR(120)  NULL,
+        categoria_foco          VARCHAR(120)  NULL,
+        subcategoria_foco       VARCHAR(120)  NULL,
+        sku_foco                VARCHAR(64)   NULL,
+        genero_declarado        VARCHAR(20)   NULL,
+        desired_tier            VARCHAR(20)   NULL,
+        uso_declarado           VARCHAR(200)  NULL,
+        pulgadas                DECIMAL(4,1)  NULL,
+        tipo_panel              VARCHAR(32)   NULL,
+        resolucion              VARCHAR(16)   NULL,
+        ram_gb_min              INT           NULL,
+        gpu_dedicada            TINYINT(1)    NULL,
+        ssd_gb_min              INT           NULL,
+        capacidad_litros_min    DECIMAL(7,2)  NULL,
+        nombre_excluye_acum     TEXT          NULL,
+        presupuesto_ideal       DECIMAL(12,2) NULL,
+        presupuesto_min_buscado DECIMAL(10,2) NULL,
+        ciudad_sesion           VARCHAR(50)   NULL,
+        frustracion_count       INT           NULL DEFAULT 0,
+        ultimos_skus_mostrados  TEXT          NULL,
+        precio_min_mostrado     DECIMAL(12,2) NULL,
+        precio_max_mostrado     DECIMAL(12,2) NULL,
+        alternativa_ofrecida    VARCHAR(240)  NULL,
+        updated_at              DATETIME(6)   NOT NULL DEFAULT CURRENT_TIMESTAMP(6)
+                                    ON UPDATE CURRENT_TIMESTAMP(6),
+        CONSTRAINT fk_perfil_sesion FOREIGN KEY (sesion_id) REFERENCES sesiones(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    """))
+
+    op.execute(text("""
+    CREATE TABLE IF NOT EXISTS feedback_ordenes (
+        id          BIGINT    NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        orden_id    CHAR(36)  NOT NULL,
+        sesion_id   CHAR(36)  NOT NULL,
+        rating      TINYINT   NULL,
+        comentario  TEXT      NULL,
+        created_at  DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+        UNIQUE KEY uk_feedback_orden (orden_id),
+        INDEX ix_feedback_sesion (sesion_id),
+        CONSTRAINT fk_feedback_orden  FOREIGN KEY (orden_id)  REFERENCES ordenes(id)  ON DELETE CASCADE,
+        CONSTRAINT fk_feedback_sesion FOREIGN KEY (sesion_id) REFERENCES sesiones(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    """))
+
+    op.execute(text("""
+    CREATE TABLE IF NOT EXISTS productos_embeddings (
+        sku        VARCHAR(64) NOT NULL PRIMARY KEY,
+        modelo     VARCHAR(80) NOT NULL,
+        `vector`   BLOB        NOT NULL,
+        updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+        CONSTRAINT fk_emb_producto FOREIGN KEY (sku) REFERENCES productos(sku) ON UPDATE CASCADE ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    """))
+
+    op.execute(text("""
+    CREATE TABLE IF NOT EXISTS categorias_sinonimos (
+        id                  INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        palabra_clave       VARCHAR(80)  NOT NULL,
+        palabra_clave_norm  VARCHAR(80)  NOT NULL,
+        categoria           VARCHAR(120) NOT NULL,
+        subcategoria        VARCHAR(120) NULL,
+        sku_especifico      VARCHAR(64)  NULL,
+        confianza           DECIMAL(3,2) NOT NULL DEFAULT 1.00,
+        UNIQUE KEY uq_palabra_norm (palabra_clave_norm),
+        INDEX ix_cat_sinonimos_categoria (categoria),
+        INDEX ix_sinonimos_sku           (sku_especifico)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    """))
+
+    op.execute(text("""
+    CREATE TABLE IF NOT EXISTS categorias_relacionadas (
+        categoria_origen    VARCHAR(120) NOT NULL,
+        categoria_sugerida  VARCHAR(120) NOT NULL,
+        subcategoria_sugerida VARCHAR(120) NULL,
+        razon               VARCHAR(200) NOT NULL,
+        prioridad           INT          NOT NULL DEFAULT 100,
+        PRIMARY KEY (categoria_origen, categoria_sugerida)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    """))
+
+    op.execute(text("""
+    CREATE TABLE IF NOT EXISTS producto_keywords (
+        sku          VARCHAR(64) NOT NULL,
+        keyword      VARCHAR(80) NOT NULL,
+        keyword_norm VARCHAR(80) NOT NULL,
+        fuente       VARCHAR(40) NOT NULL DEFAULT 'ingestor',
+        PRIMARY KEY (sku, keyword_norm),
+        INDEX ix_kw (keyword_norm),
+        CONSTRAINT fk_kw_producto FOREIGN KEY (sku) REFERENCES productos(sku)
+            ON UPDATE CASCADE ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    """))
+
+    op.execute(text("""
+    CREATE TABLE IF NOT EXISTS ingestas_log (
+        id                   BIGINT    NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        origen               VARCHAR(60) NOT NULL,
+        inicio               DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+        fin                  DATETIME(6) NULL,
+        estado               ENUM('en_curso','ok','error') NOT NULL DEFAULT 'en_curso',
+        productos_procesados INT       NOT NULL DEFAULT 0,
+        error                TEXT      NULL,
+        INDEX ix_ingestas_origen (origen, inicio)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    """))
+
+    op.execute(text("""
+    CREATE OR REPLACE VIEW vista_carritos AS
+    SELECT
+        s.id                            AS sesion_id,
+        s.carrito_estado                AS estado,
+        s.cliente_nombre,
+        s.cliente_email,
+        s.cliente_telefono,
+        s.ultima_actividad_at,
+        COUNT(ci.sku)                   AS items,
+        COALESCE(SUM(ci.cantidad * p.precio_bob), 0) AS total_bob
+    FROM sesiones s
+    LEFT JOIN carrito_items ci ON ci.sesion_id = s.id
+    LEFT JOIN productos p      ON p.sku = ci.sku
+    GROUP BY s.id, s.carrito_estado, s.cliente_nombre, s.cliente_email,
+             s.cliente_telefono, s.ultima_actividad_at
+    """))
+
+
+def downgrade() -> None:
+    op.execute(text("DROP VIEW IF EXISTS vista_carritos"))
+    op.execute(text("DROP TABLE IF EXISTS ingestas_log"))
+    op.execute(text("DROP TABLE IF EXISTS producto_keywords"))
+    op.execute(text("DROP TABLE IF EXISTS categorias_relacionadas"))
+    op.execute(text("DROP TABLE IF EXISTS categorias_sinonimos"))
+    op.execute(text("DROP TABLE IF EXISTS productos_embeddings"))
+    op.execute(text("DROP TABLE IF EXISTS feedback_ordenes"))
+    op.execute(text("DROP TABLE IF EXISTS perfiles_sesion"))
+    op.execute(text("DROP TABLE IF EXISTS metricas_turno"))
+    op.execute(text("DROP TABLE IF EXISTS conversaciones_curadas"))
+    op.execute(text("DROP TABLE IF EXISTS sugerencias_catalogo"))
+    op.execute(text("DROP TABLE IF EXISTS orden_items"))
+    op.execute(text("DROP TABLE IF EXISTS ordenes"))
+    op.execute(text("DROP SEQUENCE IF EXISTS ordenes_numero_seq"))
+    op.execute(text("DROP TABLE IF EXISTS carrito_items"))
+    op.execute(text("DROP TABLE IF EXISTS mensajes"))
+    op.execute(text("DROP TABLE IF EXISTS sesiones"))
+    op.execute(text("DROP TABLE IF EXISTS catalogo_atributos"))
+    op.execute(text("DROP TABLE IF EXISTS productos"))

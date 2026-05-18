@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from .clasificador_categoria_specs import ClasificadorCategoriaSpecs
+
 
 class GeneradorCierreContextual:
     """SRP: produce la oracion de cierre que sigue a la lista de productos
@@ -95,53 +97,74 @@ class GeneradorCierreContextual:
         return None
 
     @staticmethod
-    def _cliente_dio_suficiente_contexto(perfil) -> bool:
+    def _hard_reqs_para_categoria(perfil) -> bool:
+        """Devuelve True si el perfil tiene algun hard req relevante para
+        la categoria activa. Evita que specs de dominio digital (SSD, RAM)
+        cuenten como hard req al buscar en linea_blanca o TV."""
+        cat = getattr(perfil, "categoria_foco", None) or ""
+        es_comp = ClasificadorCategoriaSpecs.es_computacion(cat)
+        tiene_pantalla = ClasificadorCategoriaSpecs.tiene_pantalla(cat)
+        if es_comp:
+            attrs = ("ram_gb_min", "ssd_gb_min", "gpu_dedicada", "pulgadas")
+        elif tiene_pantalla:
+            attrs = ("pulgadas", "resolucion", "tipo_panel")
+        else:
+            attrs = ("capacidad_litros_min", "capacidad_kg_min", "potencia_w_min",
+                     "no_frost", "inverter")
+        return any(getattr(perfil, a, None) for a in attrs)
+
+    @classmethod
+    def _cliente_dio_suficiente_contexto(cls, perfil) -> bool:
         """True cuando el cliente declaro presupuesto + (marca o uso) + algun
-        hard req tecnico. Repreguntar slots seria friccion innecesaria."""
+        hard req tecnico relevante para la categoria actual."""
         tiene_presupuesto = bool(getattr(perfil, "presupuesto_max", None))
         tiene_marca = bool(getattr(perfil, "marca_preferida", None))
         tiene_uso = bool(getattr(perfil, "uso_declarado", None))
-        tiene_hard_req = any(
-            getattr(perfil, attr, None)
-            for attr in ("ram_gb_min", "ssd_gb_min", "gpu_dedicada", "pulgadas")
-        )
+        tiene_hard_req = cls._hard_reqs_para_categoria(perfil)
         return tiene_presupuesto and (tiene_marca or tiene_uso) and tiene_hard_req
 
-    @staticmethod
-    def _solo_falta_uso(perfil) -> bool:
+    @classmethod
+    def _solo_falta_uso(cls, perfil) -> bool:
         tiene_presupuesto = bool(getattr(perfil, "presupuesto_max", None))
         tiene_uso = bool(getattr(perfil, "uso_declarado", None))
-        tiene_hard_req = any(
-            getattr(perfil, attr, None)
-            for attr in ("ram_gb_min", "ssd_gb_min", "gpu_dedicada", "pulgadas")
-        )
+        tiene_hard_req = cls._hard_reqs_para_categoria(perfil)
         return tiene_presupuesto and tiene_hard_req and not tiene_uso
 
     # Usos que no aportan información legible en el cierre ("familia"
     # como uso_declarado produce "Ya tengo familia" que es confuso).
     _USOS_OPACOS = frozenset({"familia", "regalo", "hogar", "casa"})
 
+    @staticmethod
+    def _specs_computacion(perfil) -> list[str]:
+        partes = []
+        if getattr(perfil, "ram_gb_min", None):
+            partes.append(f"{perfil.ram_gb_min}GB de RAM")
+        if getattr(perfil, "ssd_gb_min", None):
+            partes.append(f"SSD {perfil.ssd_gb_min}GB")
+        if getattr(perfil, "gpu_dedicada", None):
+            partes.append("GPU dedicada")
+        return partes
+
     @classmethod
     def _resumen_filtros(cls, perfil) -> str:
-        """Resume los filtros declarados en frase humana corta."""
+        """Resume los filtros declarados en frase humana corta.
+        Solo incluye specs relevantes para la categoria activa."""
         partes: list[str] = []
+        cat = getattr(perfil, "categoria_foco", None) or ""
+        es_comp = ClasificadorCategoriaSpecs.es_computacion(cat)
+        tiene_pantalla = ClasificadorCategoriaSpecs.tiene_pantalla(cat)
         uso = getattr(perfil, "uso_declarado", None)
         if uso and str(uso).strip().lower() not in cls._USOS_OPACOS:
             partes.append(str(uso).strip().lower())
-        cat = getattr(perfil, "categoria_foco", None)
         if cat:
-            partes.append(str(cat).strip().lower())
+            partes.append(cat.strip().lower())
         litros = getattr(perfil, "capacidad_litros_min", None)
         if litros:
             partes.append(f"mínimo {int(litros)}L")
-        ram = getattr(perfil, "ram_gb_min", None)
-        if ram:
-            partes.append(f"{ram}GB de RAM")
-        ssd = getattr(perfil, "ssd_gb_min", None)
-        if ssd:
-            partes.append(f"SSD {ssd}GB")
-        if getattr(perfil, "gpu_dedicada", None):
-            partes.append("GPU dedicada")
+        if es_comp:
+            partes.extend(cls._specs_computacion(perfil))
+        if tiene_pantalla and getattr(perfil, "pulgadas", None):
+            partes.append(f'{perfil.pulgadas:g}"')
         marca = getattr(perfil, "marca_preferida", None)
         if marca:
             partes.append(f"marca {marca}")

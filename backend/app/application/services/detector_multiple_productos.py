@@ -21,10 +21,10 @@ class DetectorMultipleProductos:
         "licuadora", "licuadoras",
         "monitor", "monitores",
         "parlante", "parlantes", "bocina", "bocinas",
-        "disco\s+duro", "ssd",
-        "memoria\s+ram", "ram",
+        r"disco\s+duro", "ssd",
+        r"memoria\s+ram", "ram",
         "procesador", "procesadores",
-        "tarjeta\s+gráfica", "tarjeta\s+grafica", "gpu",
+        r"tarjeta\s+gráfica", r"tarjeta\s+grafica", "gpu",
     ]
 
     _PATRON_CATEGORIAS = re.compile(

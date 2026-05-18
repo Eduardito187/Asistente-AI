@@ -321,9 +321,8 @@ CREATE TABLE IF NOT EXISTS perfiles_sesion (
     capacidad_litros_min    DECIMAL(7,2) NULL,
     nombre_excluye_acum     TEXT         NULL,
     presupuesto_ideal       DECIMAL(12,2) NULL,
-    -- Contador acumulado de señales de frustración detectadas en la sesión.
-    -- Se suma 1 por cada señal (alto/medio/bajo) al final del turno cuando
-    -- NO se derivó. Sirve para escalar derivación en sesiones largas.
+    presupuesto_min_buscado DECIMAL(10,2) NULL,
+    ciudad_sesion           VARCHAR(50)  NULL,
     frustracion_count       INT          NULL DEFAULT 0,
     ultimos_skus_mostrados  TEXT         NULL,
     precio_min_mostrado     DECIMAL(12,2) NULL,
@@ -349,6 +348,21 @@ CREATE TABLE IF NOT EXISTS perfiles_sesion (
 -- ALTER TABLE perfiles_sesion ADD COLUMN presupuesto_ideal DECIMAL(12,2) NULL;
 ALTER TABLE perfiles_sesion ADD COLUMN IF NOT EXISTS ciudad_sesion VARCHAR(50) DEFAULT NULL;
 ALTER TABLE perfiles_sesion ADD COLUMN IF NOT EXISTS presupuesto_min_buscado DECIMAL(10,2) DEFAULT NULL;
+-- Fase 1 — atributos técnicos sticky
+ALTER TABLE perfiles_sesion ADD COLUMN IF NOT EXISTS refresh_hz_min     SMALLINT     NULL;
+ALTER TABLE perfiles_sesion ADD COLUMN IF NOT EXISTS bateria_mah_min    INT          NULL;
+ALTER TABLE perfiles_sesion ADD COLUMN IF NOT EXISTS camara_mp_min      SMALLINT     NULL;
+ALTER TABLE perfiles_sesion ADD COLUMN IF NOT EXISTS soporta_5g         TINYINT(1)   NULL;
+ALTER TABLE perfiles_sesion ADD COLUMN IF NOT EXISTS sistema_operativo  VARCHAR(30)  NULL;
+ALTER TABLE perfiles_sesion ADD COLUMN IF NOT EXISTS capacidad_kg_min   DECIMAL(5,1) NULL;
+ALTER TABLE perfiles_sesion ADD COLUMN IF NOT EXISTS potencia_w_min     INT          NULL;
+ALTER TABLE perfiles_sesion ADD COLUMN IF NOT EXISTS inverter           TINYINT(1)   NULL;
+ALTER TABLE perfiles_sesion ADD COLUMN IF NOT EXISTS no_frost           TINYINT(1)   NULL;
+ALTER TABLE perfiles_sesion ADD COLUMN IF NOT EXISTS smart_tv           TINYINT(1)   NULL;
+ALTER TABLE perfiles_sesion ADD COLUMN IF NOT EXISTS bluetooth_incluido TINYINT(1)   NULL;
+ALTER TABLE perfiles_sesion ADD COLUMN IF NOT EXISTS nfc                TINYINT(1)   NULL;
+ALTER TABLE perfiles_sesion ADD COLUMN IF NOT EXISTS usb_c              TINYINT(1)   NULL;
+ALTER TABLE perfiles_sesion ADD COLUMN IF NOT EXISTS hdmi_2_1           TINYINT(1)   NULL;
 
 -- Auto-ALTER metricas_turno: añade columnas y columnas de metricas adicionales.
 ALTER TABLE metricas_turno ADD COLUMN IF NOT EXISTS prompt_version VARCHAR(40) NULL;

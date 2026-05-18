@@ -32,6 +32,20 @@ class ResultadoObtenerPerfilSesion:
     presupuesto_min_buscado: Optional[float] = None  # precio más bajo que el cliente ha considerado
     frustracion_count: Optional[int] = None  # contador acumulado de señales
     ciudad_sesion: Optional[str] = None  # ciudad boliviana mencionada (solo contexto)
+    refresh_hz_min: Optional[int] = None
+    bateria_mah_min: Optional[int] = None
+    camara_mp_min: Optional[int] = None
+    capacidad_kg_min: Optional[float] = None
+    potencia_w_min: Optional[int] = None
+    soporta_5g: Optional[bool] = None
+    sistema_operativo: Optional[str] = None
+    inverter: Optional[bool] = None
+    no_frost: Optional[bool] = None
+    smart_tv: Optional[bool] = None
+    bluetooth_incluido: Optional[bool] = None
+    nfc: Optional[bool] = None
+    usb_c: Optional[bool] = None
+    hdmi_2_1: Optional[bool] = None
 
     def esta_vacio(self) -> bool:
         return not any(

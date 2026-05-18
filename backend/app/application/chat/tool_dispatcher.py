@@ -30,6 +30,7 @@ from ..services.enriquecedor_atributos_ficha import EnriquecedorAtributosFichaIn
 from ..services.detector_consulta_accesorio import DetectorConsultaAccesorio
 from ..services.detector_exclusiones_mensaje import DetectorExclusionesMensaje
 from ..services.detector_marca_excluida import DetectorMarcaExcluida
+from ..services.detector_cambio_dominio import DetectorCambioDominio
 from ..services.excluidor_juguetes_default import ExcluidorJuguetesDefault
 from ..services.generador_justificacion import GeneradorJustificacion
 from ..services.reranker_por_perfil import ReRankerPorPerfil
@@ -583,8 +584,8 @@ class ToolDispatcher:
             "color": cls._texto(a, "color", transform=str.lower),
             "genero": cls._texto(a, "genero", transform=str.lower) or perfil.genero_declarado or None,
             "gpu_dedicada": ValueParser.a_bool(a.get("gpu_dedicada")) or perfil.gpu_dedicada or None,
-            "capacidad_gb_min": ValueParser.a_int(a.get("capacidad_gb_min")) or perfil.ssd_gb_min or None,
-            "ram_gb_min": ValueParser.a_int(a.get("ram_gb_min")) or perfil.ram_gb_min or None,
+            "capacidad_gb_min": cls._max_int(a.get("capacidad_gb_min"), perfil.ssd_gb_min),
+            "ram_gb_min": cls._max_int(a.get("ram_gb_min"), perfil.ram_gb_min),
             "capacidad_litros_min": (
                 ValueParser.a_float(a.get("capacidad_litros_min"))
                 or getattr(perfil, "capacidad_litros_min", None)
@@ -592,9 +593,65 @@ class ToolDispatcher:
             ),
             "solo_con_stock": True,
             "limite": min(max(ValueParser.a_int(a.get("limite")) or 3, 1), 6),
+            **cls._filtros_sticky_perfil(a, perfil),
         }
         cls._aplicar_pasthrough(base, a)
+        cls._limpiar_specs_incompatibles(base)
         return base
+
+    @classmethod
+    def _limpiar_specs_incompatibles(cls, filtros: dict) -> None:
+        """Anula specs de computación (SSD/RAM/GPU/pulgadas) cuando la
+        categoría buscada es electrodomésticos, refrigeración, etc.
+        Previene que un perfil 'laptop Samsung 512GB' bloquee búsquedas
+        de heladeras o lavadoras con filtros imposibles."""
+        from ..services.clasificador_categoria_specs import ClasificadorCategoriaSpecs
+        cat = (filtros.get("categoria") or "").strip()
+        if not cat:
+            return
+        if not ClasificadorCategoriaSpecs.es_computacion(cat):
+            filtros["capacidad_gb_min"] = None
+            filtros["ram_gb_min"] = None
+            filtros["gpu_dedicada"] = None
+            filtros["sistema_operativo"] = None
+            filtros["refresh_hz_min"] = None
+        if not ClasificadorCategoriaSpecs.tiene_pantalla(cat):
+            filtros["pulgadas"] = None
+            filtros.pop("pulgadas_min", None)
+            filtros.pop("pulgadas_max", None)
+
+    @staticmethod
+    def _max_int(llm_val, perfil_val) -> int | None:
+        """Toma el mayor de los dos enteros (LLM arg vs perfil). Usado para
+        storage/RAM donde el perfil recién actualizado puede estar por encima
+        del valor que el LLM extrajo del historial de contexto anterior."""
+        a = ValueParser.a_int(llm_val) or 0
+        b = int(perfil_val) if perfil_val else 0
+        return max(a, b) or None
+
+    @staticmethod
+    def _filtros_sticky_perfil(a: dict, perfil) -> dict:
+        """Fusión LLM-arg → PerfilSesion → None para los 14 atributos técnicos
+        sticky que el LLM puede omitir pero el perfil recuerda entre turnos."""
+        vpi = ValueParser.a_int
+        vpf = ValueParser.a_float
+        vpb = ValueParser.a_bool
+        return {
+            "refresh_hz_min": vpi(a.get("refresh_hz_min")) or perfil.refresh_hz_min or None,
+            "bateria_mah_min": vpi(a.get("bateria_mah_min")) or perfil.bateria_mah_min or None,
+            "camara_mp_min": vpi(a.get("camara_mp_min")) or perfil.camara_mp_min or None,
+            "capacidad_kg_min": vpf(a.get("capacidad_kg_min")) or perfil.capacidad_kg_min or None,
+            "potencia_w_min": vpi(a.get("potencia_w_min")) or perfil.potencia_w_min or None,
+            "soporta_5g": vpb(a.get("soporta_5g")) or perfil.soporta_5g or None,
+            "sistema_operativo": (a.get("sistema_operativo") or "").strip() or perfil.sistema_operativo or None,
+            "inverter": vpb(a.get("inverter")) or perfil.inverter or None,
+            "no_frost": vpb(a.get("no_frost")) or perfil.no_frost or None,
+            "smart_tv": vpb(a.get("smart_tv")) or perfil.smart_tv or None,
+            "bluetooth_incluido": vpb(a.get("bluetooth_incluido")) or perfil.bluetooth_incluido or None,
+            "nfc": vpb(a.get("nfc")) or perfil.nfc or None,
+            "usb_c": vpb(a.get("usb_c")) or perfil.usb_c or None,
+            "hdmi_2_1": vpb(a.get("hdmi_2_1")) or perfil.hdmi_2_1 or None,
+        }
 
     @classmethod
     def _aplicar_pasthrough(cls, filtros: dict, a: dict) -> None:
@@ -639,6 +696,9 @@ class ToolDispatcher:
         if prefix_len >= 5 and cat_llm.lower().startswith(cat_perfil.lower()[:prefix_len]):
             return cat_perfil
         if DetectorCambioCategoria.hay_cambio(mensaje_usuario):
+            return cat_llm
+        if DetectorCambioDominio.dominios_distintos(cat_perfil, cat_llm):
+            log.info("cross_domain_unlock perfil=%s llm=%s -> %s", cat_perfil, cat_llm, cat_llm)
             return cat_llm
         log.info("category_lock perfil=%s llm=%s -> %s", cat_perfil, cat_llm, cat_perfil)
         return cat_perfil

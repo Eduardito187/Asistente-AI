@@ -11,10 +11,11 @@ services:
       - ollama_data:/root/.ollama
     environment:
       - OLLAMA_KEEP_ALIVE=24h
-      # Concurrencia: 4 requests paralelas. Qwen 2.5 7B Q4_K_M ocupa ~5.3GB
-      # de VRAM; con la RTX 5090 (32GB) hay margen para 4 contextos paralelos
-      # antes de saturar. Si se sube a 14B/32B reducir a 2.
-      - OLLAMA_NUM_PARALLEL=4
+      # Concurrencia: 6 requests paralelas. Qwen 2.5 7B Q4_K_M ocupa ~5.3GB
+      # de VRAM; con num_ctx=6144 y q8_0 el KV-cache por slot es ~180MB →
+      # 6 slots usan ~1.1GB + 5.3GB modelo = ~6.4GB. RTX 5090 (32GB) tiene
+      # margen amplio. Si se sube a 14B/32B reducir a 2-3.
+      - OLLAMA_NUM_PARALLEL=6
       # No descargar modelo entre requests (ya tenemos KEEP_ALIVE 24h pero
       # esto refuerza). Mantiene el modelo siempre caliente en VRAM.
       - OLLAMA_MAX_LOADED_MODELS=2
@@ -155,6 +156,23 @@ services:
       retries: 5
     restart: unless-stopped
 
+  # ============================================================
+  # Migraciones (Alembic) — corre antes del backend.
+  # En cloud: reemplazar db por DATABASE_URL del servicio gestionado.
+  # ============================================================
+  db-migrate:
+    build: ./backend
+    container_name: asistente_db_migrate
+    env_file: .env
+    environment:
+      - DB_HOST=db
+      - DB_PORT=3306
+    command: ["sh", "-c", "alembic upgrade head"]
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
   backend:
     build: ./backend
     container_name: asistente_backend
@@ -162,8 +180,8 @@ services:
     environment:
       - REDIS_URL=redis://redis:6379/0
     depends_on:
-      db:
-        condition: service_healthy
+      db-migrate:
+        condition: service_completed_successfully
       ollama:
         condition: service_healthy
       redis:
@@ -171,15 +189,6 @@ services:
     ports:
       - "8000:8000"
     restart: unless-stopped
-
-  frontend:
-    build: ./frontend
-    container_name: asistente_frontend
-    env_file: .env
-    depends_on:
-      - backend
-    ports:
-      - "8501:8501"
 
   web:
     build: ./frontend-web

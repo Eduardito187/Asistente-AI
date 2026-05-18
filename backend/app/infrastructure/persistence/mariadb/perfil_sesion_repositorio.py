@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from typing import Optional
 from uuid import UUID
 
@@ -50,6 +51,21 @@ class MariaDbPerfilSesionRepository(PerfilSesionRepository):
                 "pmin_buscado": perfil.presupuesto_min_buscado,
                 "frust": perfil.frustracion_count,
                 "ciudad": perfil.ciudad_sesion,
+                "notas": perfil.notas_usuario,
+                "hz_min": perfil.refresh_hz_min,
+                "bat_min": perfil.bateria_mah_min,
+                "cam_min": perfil.camara_mp_min,
+                "s5g": 1 if perfil.soporta_5g else None,
+                "so": perfil.sistema_operativo,
+                "kg_min": perfil.capacidad_kg_min,
+                "pw_min": perfil.potencia_w_min,
+                "inverter": 1 if perfil.inverter else None,
+                "no_frost": 1 if perfil.no_frost else None,
+                "smart_tv": 1 if perfil.smart_tv else None,
+                "bluetooth": 1 if perfil.bluetooth_incluido else None,
+                "nfc": 1 if perfil.nfc else None,
+                "usb_c": 1 if perfil.usb_c else None,
+                "hdmi_2_1": 1 if perfil.hdmi_2_1 else None,
             },
         )
 
@@ -57,6 +73,46 @@ class MariaDbPerfilSesionRepository(PerfilSesionRepository):
         """Limpia campos de búsqueda: categoria, marca, SKU, uso, specs.
         Preserva presupuesto, ciudad, frustracion_count."""
         self._s.execute(text(PerfilSesionSql.LIMPIAR_BUSQUEDA), {"sid": str(sesion_id)})
+
+    _SQL_DOMINIO = {
+        "digital":       PerfilSesionSql.LIMPIAR_DOMINIO_DIGITAL,
+        "linea_blanca":  PerfilSesionSql.LIMPIAR_DOMINIO_LINEA_BLANCA,
+        "tv":            PerfilSesionSql.LIMPIAR_DOMINIO_TV,
+    }
+
+    def limpiar_dominio(self, sesion_id: UUID, dominio: str) -> None:
+        """Limpia atributos del dominio saliente al cambiar de macro-dominio."""
+        sql = self._SQL_DOMINIO.get(dominio)
+        if sql:
+            self._s.execute(text(sql), {"sid": str(sesion_id)})
+
+    def limpiar_presupuesto_y_marca(self, sesion_id: UUID) -> None:
+        """Limpia presupuesto y marca huérfanos cuando el dominio anterior es
+        desconocido (categoria_foco era NULL) pero hay contaminación potencial."""
+        self._s.execute(
+            text(PerfilSesionSql.LIMPIAR_PRESUPUESTO_Y_MARCA), {"sid": str(sesion_id)}
+        )
+
+    def obtener_contexto_dominio(self, sesion_id: UUID) -> dict:
+        row = (
+            self._s.execute(
+                text(PerfilSesionSql.OBTENER_CONTEXTO_DOMINIO), {"sid": str(sesion_id)}
+            )
+            .mappings()
+            .first()
+        )
+        if not row or not row.get("dominio_contexto"):
+            return {}
+        try:
+            return json.loads(row["dominio_contexto"])
+        except Exception:
+            return {}
+
+    def guardar_contexto_dominio(self, sesion_id: UUID, contexto: dict) -> None:
+        self._s.execute(
+            text(PerfilSesionSql.GUARDAR_CONTEXTO_DOMINIO),
+            {"sid": str(sesion_id), "ctx": json.dumps(contexto, default=str)},
+        )
 
     def registrar_turno(
         self,

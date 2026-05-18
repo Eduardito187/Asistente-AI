@@ -11,14 +11,15 @@ class DetectorConsultaDisponibilidad:
     matcheo la palabra a una categoria real del catalogo, tiene mas sentido
     responder con una busqueda deterministica que dejar al LLM alucinar."""
 
-    MAX_LEN = 60
+    MAX_LEN = 90
 
     _RX = re.compile(
         r"^\s*(?:"
         r"(?:hay|tien(?:es|en)|vend(?:es|en)|cuentan\s+con|manejan|ofrec(?:es|en)|"
         r"dispon(?:es|en)|consigo|consigue)\s+"
         r"(?:algun(?:a|os|as)?\s+|algun\s+|unos?\s+|unas?\s+|el|la|los|las)?"
-        r"[\w\sÁÉÍÓÚÜÑáéíóúüñ]{2,40}\??"
+        r"[\w\sÁÉÍÓÚÜÑáéíóúüñ]{2,60}\??"
+        r"(?:\s+y\s+de\s+que\s+marcas?|\s+de\s+que\s+marcas?|\s+y\s+marcas?)?"
         r"|[\w]{3,40}\??"
         r")\s*$",
         re.IGNORECASE,

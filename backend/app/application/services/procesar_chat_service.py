@@ -72,6 +72,7 @@ from .detector_tier_deseado import DetectorTierDeseado
 from .detector_consulta_disponibilidad import DetectorConsultaDisponibilidad
 from .detector_consulta_oferta import DetectorConsultaOferta
 from .detector_exclusiones_mensaje import DetectorExclusionesMensaje
+from .clasificador_categoria_specs import ClasificadorCategoriaSpecs
 from .clasificador_etapa_conversacional import ClasificadorEtapaConversacional
 from .recortador_cierres_comerciales import RecortadorCierresComerciales
 from .renderizador_tabla_comparacion import RenderizadorTablaComparacion
@@ -86,6 +87,7 @@ from .detector_mentiras import DetectorMentiras
 from .detector_pedido_detalle import DetectorPedidoDetalle
 from .detector_refinamiento_shown import DetectorRefinamientoShown
 from .detector_sku_mensaje import DetectorSkuMensaje
+from .extractor_atributos_mensaje import ExtractorAtributosMensaje
 from .extractor_perfil_mensaje import ExtractorPerfilMensaje
 from .gestor_feedback_post_orden import GestorFeedbackPostOrden
 from .gestor_follow_ups_contextuales import GestorFollowUpsContextuales
@@ -107,6 +109,7 @@ from .parser_productos_pegados import ParserProductosPegados
 from .renderizador_formato_forzado import RenderizadorFormatoForzado
 from .renderizador_productos_pegados import RenderizadorProductosPegados
 from .normalizador_moneda import NormalizadorMoneda
+from .detector_declaracion_preferencias import DetectorDeclaracionPreferencias
 from .resolvedor_categoria_cercana import ResolvedorCategoriaCercana
 from .detector_marca_mensaje import DetectorMarcaMensaje
 from .detector_solicitud_similares import DetectorSolicitudSimilares
@@ -144,7 +147,9 @@ from .detector_objecion_devolucion import DetectorObjecionDevolucion
 from .detector_variante_solicitada import DetectorVarianteSolicitada
 from .detector_abandono_temporal import DetectorAbandonoTemporal
 from .detector_cliente_mayorista import DetectorClienteMayorista
+from .detector_cambio_dominio import DetectorCambioDominio
 from .detector_cambio_tema import DetectorCambiaTema
+from .detector_memoria_mensaje import DetectorMemoriaMensaje
 from .detector_presupuesto_flexible import DetectorPresupuestoFlexible
 from .detector_multiple_productos import DetectorMultipleProductos
 from .detector_yapa_negociacion import DetectorYapaNegociacion
@@ -161,6 +166,8 @@ from .sanitizador_query_busqueda import SanitizadorQueryBusqueda
 from .tools_mark import ToolsMark
 from .anunciador_fallback_marca import AnunciadorFallbackMarca
 from .limpiador_emoji_spam import LimpiadorEmojiSpam
+from .filtro_vocabulario_controlado import FiltroVocabularioControlado
+from .gestor_correcciones import GestorCorrecciones
 from ..commands.limpiar_perfil_sesion import LimpiarPerfilSesionCommand, LimpiarPerfilSesionHandler
 from .generador_resumen_conversacion import GeneradorResumenConversacion
 from .validador_sku_resultado import ValidadorSkuResultado
@@ -216,6 +223,7 @@ class ProcesarChatService:
         obtener_perfil_historico: "ObtenerPerfilHistoricoHandler | None" = None,
         skill_registry: "SkillRegistry | None" = None,
         limpiar_perfil: "LimpiarPerfilSesionHandler | None" = None,
+        gestor_correcciones: "GestorCorrecciones | None" = None,
     ) -> None:
         self._uow_factory = uow_factory
         self._crear_sesion = crear_sesion
@@ -249,6 +257,7 @@ class ProcesarChatService:
         self._obtener_perfil_historico = obtener_perfil_historico
         self._skill_registry = skill_registry
         self._limpiar_perfil = limpiar_perfil
+        self._gestor_correcciones = gestor_correcciones
 
     async def procesar(self, inp: ChatInput) -> ChatOutput:
         t0 = time.monotonic()
@@ -273,9 +282,20 @@ class ProcesarChatService:
         if DetectorCambiaTema.es_cambio_tema(inp.mensaje) and self._limpiar_perfil:
             self._limpiar_perfil.ejecutar(LimpiarPerfilSesionCommand(sesion_id=sesion_id))
 
-        self._actualizar_perfil.ejecutar(
-            self._extractor_perfil.extraer(sesion_id, inp.mensaje)
+        memoria = DetectorMemoriaMensaje.detectar(inp.mensaje)
+        if memoria is not None:
+            return self._responder_memoria(sesion_id, inp.mensaje, memoria, t0)
+
+        nuevo_cmd = self._extractor_perfil.extraer(sesion_id, inp.mensaje)
+        # Fallback: si el extractor no detectó categoria, buscar keywords en el mensaje
+        # para que el cambio de dominio se dispare igual (ej. "tienes heladeras?" sin
+        # que el LLM extractor haya puesto categoria_foco="heladeras").
+        cat_para_dominio = (
+            nuevo_cmd.categoria_foco
+            or DetectorCambioDominio.categoria_mensaje(inp.mensaje)
         )
+        self._limpiar_dominio_si_cambia(sesion_id, cat_para_dominio)
+        self._actualizar_perfil.ejecutar(nuevo_cmd)
 
         cierre_feedback = self._gestor_feedback.intentar_registrar_respuesta(
             inp.mensaje, sesion_id
@@ -385,15 +405,19 @@ class ProcesarChatService:
         if follow_up is not None:
             return self._responder_follow_up(sesion_id, inp.mensaje, follow_up, t0)
 
+        if self._gestor_correcciones:
+            corregido = self._gestor_correcciones.aplicar_si_hay(inp.mensaje, sesion_id)
+            if corregido:
+                return self._short_circuit_correccion(inp=inp, sesion_id=sesion_id, t0=t0)
+
+        sc_pref = self._short_circuit_declaracion_preferencias(inp=inp, sesion_id=sesion_id, t0=t0)
+        if sc_pref is not None:
+            return sc_pref
+
         if DetectorIntentionVaga.es_vaga(inp.mensaje):
             return self._responder_intencion_vaga(sesion_id, inp, t0)
 
-        historial = [
-            {"role": m.rol.value, "content": m.contenido}
-            for m in self._historial.ejecutar(
-                HistorialChatQuery(sesion_id=sesion_id, limite=MAX_HISTORIAL)
-            )
-        ]
+        historial = self._historial_limpio(sesion_id)
         comparacion_explicita = self._short_circuit_comparacion_explicita(
             inp=inp, sesion_id=sesion_id, t0=t0
         )
@@ -749,6 +773,87 @@ class ProcesarChatService:
         )
         return ChatOutput(sesion_id=sesion_id, respuesta=texto)
 
+    def _short_circuit_declaracion_preferencias(
+        self,
+        inp: ChatInput,
+        sesion_id: UUID,
+        t0: float,
+    ) -> ChatOutput | None:
+        """Cuando el mensaje es solo declaracion de filtros ('marca samsung,
+        presupuesto 6000bs') sin verbo de pedido, el LLM confunde el mensaje
+        como solicitud de detalle del producto previo en lugar de nueva busqueda.
+
+        Si hay una categoria activa en el perfil, forzamos buscar_productos
+        directamente con los filtros ya actualizados por ExtractorPerfilMensaje
+        (que corre antes de este short-circuit) en lugar de delegarlo al LLM."""
+        if not DetectorDeclaracionPreferencias.es_solo_declaracion(inp.mensaje):
+            return None
+        perfil = self._obtener_perfil.ejecutar(ObtenerPerfilSesionQuery(sesion_id=sesion_id))
+        if not perfil.categoria_efectiva():
+            return None
+        respuesta, trace, skus_tool = self._forzar_busqueda(inp.mensaje, sesion_id, trace=[])
+        respuesta = NormalizadorMoneda.normalizar(respuesta)
+        respuesta, productos = self._sanear_skus_y_enriquecer(respuesta, skus_tool)
+        productos = self._separar_sugeridos_citados(productos, trace)
+        respuesta = self._recortar_cierres(respuesta, inp.mensaje, sesion_id, trace)
+        self._persistir_turno_mostrado(sesion_id, productos)
+        self._registrar_respuesta(sesion_id, respuesta, trace)
+        n_prods = sum(1 for p in trace if p.tool == "buscar_productos" and not p.result.get("error"))
+        self._registrar_metrica.ejecutar(
+            RegistrarMetricaTurnoCommand(
+                sesion_id=sesion_id,
+                mensaje_usuario_len=len(inp.mensaje),
+                respuesta_len=len(respuesta),
+                tool_calls=n_prods,
+                mentiras_detectadas=0,
+                productos_citados=len(productos),
+                ruta="declaracion_preferencias_forzada",
+                tiempo_ms=int((time.monotonic() - t0) * 1000),
+            )
+        )
+        return ChatOutput(
+            sesion_id=sesion_id,
+            respuesta=respuesta,
+            productos_citados=productos,
+            pasos=[{"tool": p.tool, "args": p.args} for p in trace],
+        )
+
+    def _short_circuit_correccion(
+        self,
+        inp: ChatInput,
+        sesion_id: UUID,
+        t0: float,
+    ) -> ChatOutput:
+        """Cuando GestorCorrecciones aplica una corrección de atributo ('era 256gb'),
+        forzamos búsqueda inmediata con el perfil ya actualizado, sin pasar el
+        mensaje al LLM (que lo interpretaría como query inválida y daría error)."""
+        respuesta, trace, skus_tool = self._forzar_busqueda(inp.mensaje, sesion_id, trace=[])
+        respuesta = NormalizadorMoneda.normalizar(respuesta)
+        respuesta, productos = self._sanear_skus_y_enriquecer(respuesta, skus_tool)
+        productos = self._separar_sugeridos_citados(productos, trace)
+        respuesta = self._recortar_cierres(respuesta, inp.mensaje, sesion_id, trace)
+        self._persistir_turno_mostrado(sesion_id, productos)
+        self._registrar_respuesta(sesion_id, respuesta, trace)
+        n_prods = sum(1 for p in trace if p.tool == "buscar_productos" and not p.result.get("error"))
+        self._registrar_metrica.ejecutar(
+            RegistrarMetricaTurnoCommand(
+                sesion_id=sesion_id,
+                mensaje_usuario_len=len(inp.mensaje),
+                respuesta_len=len(respuesta),
+                tool_calls=n_prods,
+                mentiras_detectadas=0,
+                productos_citados=len(productos),
+                ruta="correccion_atributo_forzada",
+                tiempo_ms=int((time.monotonic() - t0) * 1000),
+            )
+        )
+        return ChatOutput(
+            sesion_id=sesion_id,
+            respuesta=respuesta,
+            productos_citados=productos,
+            pasos=[{"tool": p.tool, "args": p.args} for p in trace],
+        )
+
     def _short_circuit_comparacion_explicita(
         self,
         inp: ChatInput,
@@ -1008,6 +1113,11 @@ class ProcesarChatService:
         sin LLM, para que NUNCA pierda el hilo entre turnos."""
         if not DetectorPedidoDetalle.es_pedido_detalle(inp.mensaje):
             return None
+        # Declaraciones de preferencia ("marca samsung, presupuesto 6000bs") no son
+        # pedidos de detalle — son nuevos filtros de búsqueda. El detector de
+        # DetectorPedidoDetalle tiene falso positivo con "\bmarca\b" standalone.
+        if DetectorDeclaracionPreferencias.es_solo_declaracion(inp.mensaje):
+            return None
         # "cual me conviene X o Y" es comparación, no pedido de detalle de contexto.
         if DetectorComparacionExplicita.detectar(inp.mensaje) is not None:
             return None
@@ -1030,6 +1140,14 @@ class ProcesarChatService:
             historial_user = self._historial_solo_user(sesion_id)
         except Exception:
             return None
+        # "tienes heladeras de 600 litros? y de qué marcas" matchea el detector
+        # por "de que marcas", pero es una búsqueda nueva de otra categoría —
+        # no un pedido de detalle del producto anterior.
+        cercana = self._resolvedor_categoria.resolver(inp.mensaje)
+        if cercana is not None:
+            cat_ef = perfil.categoria_efectiva()
+            if cat_ef and cercana.categoria and cercana.categoria.lower() != cat_ef.lower().split("/")[0].lower():
+                return None
         sku = ResolvedorSkuContextual.resolver(
             perfil,
             historial_assistant=historial_assistant,
@@ -1064,6 +1182,30 @@ class ProcesarChatService:
             respuesta=texto,
             productos_citados=[ficha],
         )
+
+    _MARKER_CAMBIO_DOMINIO = "[Cambio de categoría detectado:"
+
+    def _historial_limpio(self, sesion_id: UUID) -> list[dict]:
+        """Carga el historial y lo trunca al último cambio de dominio detectado.
+
+        Cuando el cliente cambia de celulares a heladeras (por ejemplo) se inyecta
+        un mensaje de reset. Todo lo anterior queda "antes del reset" y el LLM NO
+        debe verlo — si lo ve, recicla specs de la categoría anterior aunque el
+        perfil esté limpio en la BD."""
+        mensajes = self._historial.ejecutar(
+            HistorialChatQuery(sesion_id=sesion_id, limite=MAX_HISTORIAL)
+        )
+        historial = [{"role": m.rol.value, "content": m.contenido} for m in mensajes]
+        ultimo_reset = -1
+        for i, msg in enumerate(historial):
+            if (
+                msg.get("role") == "assistant"
+                and msg.get("content", "").startswith(self._MARKER_CAMBIO_DOMINIO)
+            ):
+                ultimo_reset = i
+        if ultimo_reset >= 0:
+            return historial[ultimo_reset:]
+        return historial
 
     def _historial_solo_assistant(self, sesion_id: UUID) -> list[str]:
         """Helper: extrae solo los mensajes del assistant del historial,
@@ -1277,8 +1419,10 @@ class ProcesarChatService:
         ):
             genero = DetectorGeneroMencion.detectar(inp.mensaje)
             marca = DetectorMarcaMensaje.extraer(inp.mensaje)
+            capacidad_litros_min = ExtractorAtributosMensaje.extraer(inp.mensaje).capacidad_litros_min
             respuesta_disp = self._responder_consulta_disp.responder(
-                cercana, genero=genero, marca=marca
+                cercana, genero=genero, marca=marca,
+                capacidad_litros_min=capacidad_litros_min,
             )
             if respuesta_disp is not None:
                 return self._responder_follow_up(
@@ -1402,7 +1546,8 @@ class ProcesarChatService:
         # para que tope la respuesta ya saneada (no las plantillas vacias).
         fmt = DetectorFormatoSolicitado.detectar(mensaje)
         respuesta = AjustadorRespuestaFormato.ajustar(respuesta, fmt)
-        return LimpiadorEmojiSpam.limpiar(respuesta)
+        respuesta = LimpiadorEmojiSpam.limpiar(respuesta)
+        return FiltroVocabularioControlado.aplicar(respuesta)
 
     def _contexto_del_turno(self, mensaje: str, sesion_id: UUID) -> str | None:
         bloques = [
@@ -2149,6 +2294,12 @@ class ProcesarChatService:
 
     @staticmethod
     def _formatear_perfil(perfil: ResultadoObtenerPerfilSesion) -> str:
+        cat_ef = perfil.categoria_efectiva() or ""
+        dominio = DetectorCambioDominio.dominio(cat_ef) if cat_ef else None
+        _libre = dominio is None
+        _es_digital = _libre or dominio == "digital"
+        _es_comp = _libre or ClasificadorCategoriaSpecs.es_computacion(cat_ef)
+        _tiene_pantalla = _libre or ClasificadorCategoriaSpecs.tiene_pantalla(cat_ef)
         partes = ["PERFIL DECLARADO POR EL CLIENTE (no vuelvas a preguntarle esto):"]
         if perfil.presupuesto_max:
             partes.append(f"- Presupuesto maximo: Bs {perfil.presupuesto_max:.0f}")
@@ -2163,25 +2314,34 @@ class ProcesarChatService:
             )
         if perfil.uso_declarado:
             partes.append(f"- Uso declarado: {perfil.uso_declarado}")
-        if perfil.ram_gb_min:
+        if _es_comp and perfil.ram_gb_min:
             partes.append(f"- RAM mínima requerida: {perfil.ram_gb_min} GB")
-        if perfil.gpu_dedicada:
+        if _es_comp and perfil.gpu_dedicada:
             partes.append("- GPU dedicada requerida: SÍ (solo mostrar laptops con GPU confirmada en ficha)")
-        if perfil.pulgadas:
+        if _tiene_pantalla and perfil.pulgadas:
             partes.append(f"- Pulgadas: {perfil.pulgadas:g}\"")
-        if perfil.tipo_panel:
+        if _tiene_pantalla and perfil.tipo_panel:
             partes.append(f"- Tipo de panel: {perfil.tipo_panel}")
-        if perfil.resolucion:
+        if _tiene_pantalla and perfil.resolucion:
             partes.append(f"- Resolucion: {perfil.resolucion}")
         ciudad = getattr(perfil, "ciudad_sesion", None)
         if ciudad:
             partes.append(f"- Ciudad: {ciudad}")
+        notas = getattr(perfil, "notas_usuario", None)
+        if notas:
+            partes.append(
+                "- HECHOS QUE EL CLIENTE PIDIÓ RECORDAR (máxima prioridad, "
+                "no volver a preguntar):\n" +
+                "\n".join(f"  • {n.strip()}" for n in notas.splitlines() if n.strip())
+            )
         partes.append(
             "Al llamar buscar_productos, usa estos campos como filtros implicitos "
             "SIEMPRE, aunque el mensaje actual no los repita. Si el cliente dice "
             "'mas barato', 'otra opcion', 'cual me conviene' o cualquier follow-up "
             "sin categoria nueva, MANTENE estos filtros y solo ajusta precio_max u "
-            "ordena distinto — NO vuelvas a preguntar categoria ni tamanio."
+            "ordena distinto — NO vuelvas a preguntar categoria ni tamanio. "
+            "ESTE PERFIL es la unica fuente de verdad: NO uses specs ni precios de "
+            "otras categorias mencionadas en turnos anteriores del historial."
         )
         return "\n".join(partes)
 
@@ -2415,6 +2575,186 @@ class ProcesarChatService:
             mentiras_detectadas=mentiras_detectadas,
             llevo_a_orden=llevo_a_orden,
         )
+
+    def _responder_memoria(
+        self,
+        sesion_id: UUID,
+        mensaje_usuario: str,
+        memoria,  # MemoriaMensaje
+        t0: float,
+    ):
+        """Short-circuit: el cliente pidió recordar u olvidar algo.
+
+        Si es un hecho a recordar: persiste la nota y también intenta extraer
+        atributos estructurados (presupuesto, marca, etc.) del texto.
+        Si es un olvido: limpia el perfil sin responder con detalles.
+        Responde con una confirmación breve y cálida sin volver a preguntar nada."""
+        from ..commands.actualizar_perfil_sesion import ActualizarPerfilSesionCommand
+
+        if memoria.es_olvido:
+            if self._limpiar_perfil:
+                self._limpiar_perfil.ejecutar(LimpiarPerfilSesionCommand(sesion_id=sesion_id))
+            respuesta = "Listo, borré el contexto anterior. ¿En qué te ayudo ahora?"
+        else:
+            nota = memoria.texto_recordar
+            # Intentar extraer atributos estructurados del texto recordado
+            cmd_estructurado = self._extractor_perfil.extraer(sesion_id, nota)
+            # Agregar la nota cruda al perfil (siempre, aunque haya extracción)
+            cmd_con_nota = ActualizarPerfilSesionCommand(
+                sesion_id=sesion_id,
+                nota_nueva=nota,
+                # propagar lo que el extractor estructuró
+                presupuesto_max=cmd_estructurado.presupuesto_max,
+                presupuesto_ideal=cmd_estructurado.presupuesto_ideal,
+                marca_preferida=cmd_estructurado.marca_preferida,
+                categoria_foco=cmd_estructurado.categoria_foco,
+                uso_declarado=cmd_estructurado.uso_declarado,
+                ram_gb_min=cmd_estructurado.ram_gb_min,
+                ssd_gb_min=cmd_estructurado.ssd_gb_min,
+                capacidad_litros_min=cmd_estructurado.capacidad_litros_min,
+                ciudad_sesion=cmd_estructurado.ciudad_sesion,
+                refresh_hz_min=cmd_estructurado.refresh_hz_min,
+                bateria_mah_min=cmd_estructurado.bateria_mah_min,
+                camara_mp_min=cmd_estructurado.camara_mp_min,
+                soporta_5g=cmd_estructurado.soporta_5g,
+                sistema_operativo=cmd_estructurado.sistema_operativo,
+            )
+            self._actualizar_perfil.ejecutar(cmd_con_nota)
+            respuesta = f"Anotado ✓ — recordaré que {nota}."
+
+        self._registrar.ejecutar(
+            RegistrarMensajeCommand(
+                sesion_id=sesion_id, rol=RolMensaje.ASSISTANT, contenido=respuesta
+            )
+        )
+        self._registrar_metrica.ejecutar(
+            RegistrarMetricaTurnoCommand(
+                sesion_id=sesion_id,
+                mensaje_usuario_len=len(mensaje_usuario),
+                respuesta_len=len(respuesta),
+                tool_calls=0,
+                latencia_ms=int((time.perf_counter() - t0) * 1000),
+            )
+        )
+        return ChatOutput(
+            sesion_id=sesion_id,
+            respuesta=respuesta,
+            pasos=[],
+            productos_citados=[],
+            productos_sugeridos=[],
+        )
+
+    def _limpiar_dominio_si_cambia(
+        self, sesion_id: UUID, nueva_categoria: str | None
+    ) -> None:
+        """Switching dinámico de dominio con snapshot save/restore.
+
+        Al cambiar de macro-dominio (ej. celulares → heladeras):
+          1. Guarda el contexto del dominio saliente (samsung, ssd=512, Bs399…) en JSON.
+          2. Restaura el contexto del dominio entrante si existe (permite volver).
+          3. NULLea los attrs del dominio saliente para que no contaminen la nueva búsqueda.
+
+        Al volver al dominio original el paso 2 restaura el contexto previo automáticamente.
+        """
+        if not nueva_categoria:
+            return
+        dominio_nuevo = DetectorCambioDominio.dominio(nueva_categoria)
+        if not dominio_nuevo:
+            return
+        perfil_actual = self._obtener_perfil.ejecutar(
+            ObtenerPerfilSesionQuery(sesion_id=sesion_id)
+        )
+        dominio_viejo = DetectorCambioDominio.dominio(perfil_actual.categoria_foco)
+        cambio_detectado = dominio_viejo and dominio_viejo != dominio_nuevo
+        huerfano = (
+            not dominio_viejo
+            and (perfil_actual.presupuesto_max or perfil_actual.marca_preferida)
+        )
+        if not (cambio_detectado or huerfano):
+            return
+        try:
+            with self._uow_factory() as uow:
+                if cambio_detectado:
+                    # 1. Guardar snapshot del dominio saliente
+                    snap_viejo = DetectorCambioDominio.snapshot_perfil(
+                        dominio_viejo, perfil_actual
+                    )
+                    contexto = uow.perfiles_sesion.obtener_contexto_dominio(sesion_id)
+                    if snap_viejo:
+                        contexto[dominio_viejo] = snap_viejo
+                        uow.perfiles_sesion.guardar_contexto_dominio(sesion_id, contexto)
+
+                    # 2. Restaurar snapshot del dominio entrante si hay uno guardado
+                    snap_nuevo = contexto.get(dominio_nuevo, {})
+
+                    # 3. NULL del dominio saliente
+                    uow.perfiles_sesion.limpiar_dominio(sesion_id, dominio_viejo)
+                else:
+                    uow.perfiles_sesion.limpiar_presupuesto_y_marca(sesion_id)
+                    snap_nuevo = {}
+                uow.commit()
+
+            # 4. Si hay contexto guardado para el dominio entrante, restaurarlo
+            if snap_nuevo:
+                from ..commands.actualizar_perfil_sesion import ActualizarPerfilSesionCommand
+                cmd_restaurar = ActualizarPerfilSesionCommand(
+                    sesion_id=sesion_id,
+                    presupuesto_max=snap_nuevo.get("presupuesto_max"),
+                    marca_preferida=snap_nuevo.get("marca_preferida"),
+                    desired_tier=snap_nuevo.get("desired_tier"),
+                    uso_declarado=snap_nuevo.get("uso_declarado"),
+                    pulgadas=snap_nuevo.get("pulgadas"),
+                    tipo_panel=snap_nuevo.get("tipo_panel"),
+                    resolucion=snap_nuevo.get("resolucion"),
+                    ram_gb_min=snap_nuevo.get("ram_gb_min"),
+                    ssd_gb_min=snap_nuevo.get("ssd_gb_min"),
+                    gpu_dedicada=snap_nuevo.get("gpu_dedicada"),
+                    refresh_hz_min=snap_nuevo.get("refresh_hz_min"),
+                    bateria_mah_min=snap_nuevo.get("bateria_mah_min"),
+                    camara_mp_min=snap_nuevo.get("camara_mp_min"),
+                    soporta_5g=snap_nuevo.get("soporta_5g"),
+                    sistema_operativo=snap_nuevo.get("sistema_operativo"),
+                    nfc=snap_nuevo.get("nfc"),
+                    usb_c=snap_nuevo.get("usb_c"),
+                    bluetooth_incluido=snap_nuevo.get("bluetooth_incluido"),
+                    hdmi_2_1=snap_nuevo.get("hdmi_2_1"),
+                    capacidad_litros_min=snap_nuevo.get("capacidad_litros_min"),
+                    capacidad_kg_min=snap_nuevo.get("capacidad_kg_min"),
+                    potencia_w_min=snap_nuevo.get("potencia_w_min"),
+                    inverter=snap_nuevo.get("inverter"),
+                    no_frost=snap_nuevo.get("no_frost"),
+                    smart_tv=snap_nuevo.get("smart_tv"),
+                    presupuesto_ideal=snap_nuevo.get("presupuesto_ideal"),
+                    presupuesto_min_buscado=snap_nuevo.get("presupuesto_min_buscado"),
+                )
+                self._actualizar_perfil.ejecutar(cmd_restaurar)
+        except Exception as exc:  # noqa: BLE001
+            import logging
+            logging.getLogger("procesar_chat").warning(
+                "limpiar_dominio fallo (no critico): %s", exc
+            )
+            return
+
+        if cambio_detectado:
+            cat_vieja = perfil_actual.categoria_foco or dominio_viejo
+            contexto_txt = (
+                f" (contexto de {dominio_nuevo} restaurado)" if snap_nuevo else ""
+            )
+            try:
+                self._registrar.ejecutar(
+                    RegistrarMensajeCommand(
+                        sesion_id=sesion_id,
+                        rol=RolMensaje.ASSISTANT,
+                        contenido=(
+                            f"[Cambio de categoría detectado: {cat_vieja} → {nueva_categoria}{contexto_txt}. "
+                            "Las especificaciones técnicas, marca y presupuesto de la búsqueda anterior "
+                            "quedan guardados y se restauran automáticamente si el cliente vuelve a esa categoría. "
+                            "A partir de aquí SOLO aplica el perfil actual — ignorar todo lo anterior.]"
+                        ),
+                    )
+                )
+            except Exception:  # noqa: BLE001
+                pass
 
     def _hidratar_perfil_historico_si_aplica(self, sesion_id: UUID, mensaje: str) -> None:
         """Si el cliente menciona email o telefono y existe perfil historico,
@@ -2788,16 +3128,17 @@ class ProcesarChatService:
         nombre_excluye = self._unir_exclusiones(nombre_excluye, perfil.nombre_excluye_acum)
         tipo_producto_excluye = tuple(DetectorExclusionesMensaje.tipos_a_excluir(mensaje)) or None
         marca_excluye = tuple(DetectorMarcaExcluida.detectar(mensaje)) or None
+        cat_ef = perfil.categoria_efectiva() or ""
         duros = FiltrosDurosBusqueda(
             precio_max=precio_max_efectivo,
             precio_min=piso_tier,
             nombre_excluye=nombre_excluye,
             tipo_producto_excluye=tipo_producto_excluye,
             marca_excluye=marca_excluye,
-            pulgadas=perfil.pulgadas or None,
-            ram_gb_min=perfil.ram_gb_min or None,
-            capacidad_gb_min=perfil.ssd_gb_min or None,
-            gpu_dedicada=perfil.gpu_dedicada or None,
+            pulgadas=perfil.pulgadas or None if ClasificadorCategoriaSpecs.tiene_pantalla(cat_ef) else None,
+            ram_gb_min=perfil.ram_gb_min or None if ClasificadorCategoriaSpecs.es_computacion(cat_ef) else None,
+            capacidad_gb_min=perfil.ssd_gb_min or None if ClasificadorCategoriaSpecs.es_computacion(cat_ef) else None,
+            gpu_dedicada=perfil.gpu_dedicada or None if ClasificadorCategoriaSpecs.es_computacion(cat_ef) else None,
         )
         res = await self._manejador_ausente.manejar(
             mensaje,
@@ -2939,6 +3280,20 @@ class ProcesarChatService:
             None if pref_blanda else
             (perfil.marca_preferida or DetectorMarcaMensaje.extraer(mensaje) or None)
         )
+        # Extrae TODOS los atributos tecnicos del mensaje en una sola pasada.
+        # Los que tienen respaldo en PerfilSesion usan el perfil como fallback
+        # (sticky entre turnos); los que no estan en el perfil solo aplican
+        # si el cliente los menciono en el turno actual.
+        atrs = ExtractorAtributosMensaje.extraer(mensaje)
+        # Domain guards: profile sticky attrs solo aplican dentro de su dominio.
+        # Los atrs del turno actual (mensaje) siempre pasan — el usuario los dijo ahora.
+        dominio_ef = DetectorCambioDominio.dominio(cat_ef) if cat_ef else None
+        _libre = dominio_ef is None  # dominio desconocido → permisivo
+        _es_digital = _libre or dominio_ef == "digital"
+        _es_comp = _libre or ClasificadorCategoriaSpecs.es_computacion(cat_ef or "")
+        _es_lb = _libre or dominio_ef == "linea_blanca"
+        _es_tv = _libre or dominio_ef == "tv"
+        _tiene_pantalla = _libre or ClasificadorCategoriaSpecs.tiene_pantalla(cat_ef or "")
         query = BuscarProductosQuery(
             query=mensaje_limpio if tiene_terminos else None,
             categoria=cat_ef,
@@ -2946,13 +3301,29 @@ class ProcesarChatService:
             marca=marca_query,
             precio_min=precio_min,
             precio_max=precio_max_final,
-            pulgadas=perfil.pulgadas,
-            tipo_panel=perfil.tipo_panel,
-            resolucion=perfil.resolucion,
-            ram_gb_min=self._extraer_ram_gb_mensaje(mensaje) or perfil.ram_gb_min,
-            capacidad_kg_min=self._extraer_capacidad_kg_mensaje(mensaje),
-            capacidad_litros_min=self._extraer_capacidad_litros_mensaje(mensaje),
-            gpu_dedicada=self._gpu_ef(mensaje, perfil.gpu_dedicada),
+            # Atributos con respaldo en PerfilSesion (sticky dentro del mismo dominio)
+            pulgadas=atrs.pulgadas or (perfil.pulgadas if _tiene_pantalla else None),
+            tipo_panel=atrs.tipo_panel or (perfil.tipo_panel if _tiene_pantalla else None),
+            resolucion=atrs.resolucion or (perfil.resolucion if _tiene_pantalla else None),
+            ram_gb_min=atrs.ram_gb_min or (perfil.ram_gb_min if _es_comp else None),
+            capacidad_gb_min=atrs.ssd_gb_min or (perfil.ssd_gb_min if _es_comp else None),
+            capacidad_litros_min=atrs.capacidad_litros_min or (perfil.capacidad_litros_min if _es_lb else None),
+            gpu_dedicada=self._gpu_ef(mensaje, perfil.gpu_dedicada if _es_comp else None),
+            # Atributos técnicos sticky solo dentro del dominio correcto
+            capacidad_kg_min=atrs.capacidad_kg_min or (perfil.capacidad_kg_min if _es_lb else None),
+            potencia_w_min=atrs.potencia_w_min or (perfil.potencia_w_min if _es_lb else None),
+            inverter=atrs.inverter or (perfil.inverter if _es_lb else None),
+            no_frost=atrs.no_frost or (perfil.no_frost if _es_lb else None),
+            refresh_hz_min=atrs.refresh_hz_min or (perfil.refresh_hz_min if _es_digital else None),
+            bateria_mah_min=atrs.bateria_mah_min or (perfil.bateria_mah_min if _es_digital else None),
+            camara_mp_min=atrs.camara_mp_min or (perfil.camara_mp_min if _es_digital else None),
+            soporta_5g=atrs.soporta_5g or (perfil.soporta_5g if _es_digital else None),
+            sistema_operativo=atrs.sistema_operativo or (perfil.sistema_operativo if _es_digital else None),
+            bluetooth_incluido=atrs.bluetooth_incluido or (perfil.bluetooth_incluido if _es_digital else None),
+            nfc=atrs.nfc or (perfil.nfc if _es_digital else None),
+            usb_c=atrs.usb_c or (perfil.usb_c if _es_digital else None),
+            smart_tv=atrs.smart_tv or (perfil.smart_tv if _es_tv else None),
+            hdmi_2_1=atrs.hdmi_2_1 or (perfil.hdmi_2_1 if _es_tv or _es_digital else None),
             limite=12,
             excluir_accesorios=not es_accesorio,
             genero=perfil.genero_declarado or None,
@@ -3001,6 +3372,11 @@ class ProcesarChatService:
             val = int(m.group(1) or m.group(2))
             return val if val in (4, 8, 12, 16, 24, 32, 48, 64) else None
         return None
+
+    @staticmethod
+    def _extraer_ssd_gb_mensaje(mensaje: str) -> int | None:
+        """Extrae capacidad_gb_min del mensaje via ExtractorAtributosMensaje."""
+        return ExtractorAtributosMensaje.extraer(mensaje).ssd_gb_min
 
     @staticmethod
     def _extraer_capacidad_kg_mensaje(mensaje: str) -> float | None:

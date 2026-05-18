@@ -154,12 +154,252 @@
       </div>`;
   }
 
-  // Plantillas de mensaje para acciones que van al chat (info, similares).
-  // "agregar" NO va al chat — se maneja directamente contra la API del carrito.
+  // Plantillas de mensaje para acciones que van al chat.
+  // "agregar" e "info" NO van al chat — se manejan localmente.
   const MENSAJE_ACCION = {
-    info:      (sku, nombre) => `Contame más del ${nombre} [${sku}] — características clave.`,
     similares: (sku, nombre) => `Mostrame opciones similares al ${nombre} [${sku}], distintas a esa.`,
   };
+
+  // ═══════════════════════════════════════════════════════
+  //  POPUP DETALLE DE PRODUCTO
+  // ═══════════════════════════════════════════════════════
+  const pdpOverlay   = document.getElementById("pdp-overlay");
+  const pdpClose     = document.getElementById("pdp-close");
+  const pdpBtnCart   = document.getElementById("pdp-btn-cart");
+  const pdpBtnSim    = document.getElementById("pdp-btn-similares");
+  const pdpCartLbl   = document.getElementById("pdp-btn-cart-lbl");
+  let   pdpSkuActual = null;
+
+  // ── Mapa de atributos → {label, icon, sufijo} ──────────────────────────
+  const SPEC_MAP = [
+    { key: "pantalla_pulgadas",  label: "Pantalla",       icon: "📐", suf: '"' },
+    { key: "pulgadas",           label: "Pantalla",       icon: "📐", suf: '"' },
+    { key: "refresh_hz",         label: "Refresh",        icon: "🔄", suf: " Hz" },
+    { key: "procesador",         label: "Procesador",     icon: "⚡", suf: "" },
+    { key: "ram_gb",             label: "RAM",            icon: "🧠", suf: " GB" },
+    { key: "almacenamiento_gb",  label: "Almacenamiento", icon: "💾", suf: " GB" },
+    { key: "bateria_mah",        label: "Batería",        icon: "🔋", suf: " mAh", fmt: "num" },
+    { key: "camara_mp",          label: "Cámara",         icon: "📷", suf: " MP" },
+    { key: "camara_frontal_mp",  label: "Cam. frontal",   icon: "🤳", suf: " MP" },
+    { key: "sistema_operativo",  label: "Sistema",        icon: "📱", suf: "" },
+    { key: "resolucion",         label: "Resolución",     icon: "🖥️", suf: "" },
+    { key: "capacidad_litros",   label: "Capacidad",      icon: "📦", suf: " L" },
+    { key: "capacidad_kg",       label: "Carga",          icon: "⚖️", suf: " kg" },
+    { key: "potencia_w",         label: "Potencia",       icon: "⚡", suf: " W" },
+    { key: "tipo_panel",         label: "Panel",          icon: "🖥️", suf: "" },
+    { key: "conectividad",       label: "Conectividad",   icon: "📶", suf: "" },
+    { key: "color",              label: "Color",          icon: "🎨", suf: "" },
+    { key: "peso_g",             label: "Peso",           icon: "⚖️", suf: " g" },
+  ];
+
+  const _VACIO = new Set(["", "N/D", "—", "n/d", "nd"]);
+
+  function _formatSpecVal(entry, rawVal) {
+    const v = entry.fmt === "num"
+      ? Number(rawVal).toLocaleString("es-BO")
+      : String(rawVal);
+    return v + entry.suf;
+  }
+
+  function buildSpecs(p) {
+    const usadas = new Set();
+    const specs  = [];
+    for (const s of SPEC_MAP) {
+      const raw = p[s.key];
+      if (raw == null || _VACIO.has(String(raw))) continue;
+      if (usadas.has(s.label)) continue;
+      usadas.add(s.label);
+      specs.push({ label: s.label, icon: s.icon, val: _formatSpecVal(s, raw) });
+    }
+    return specs;
+  }
+
+  // ── Sub-renderers (mantienen pdpAbrir dentro del límite de complejidad) ─
+  function _pdpHero(p) {
+    document.getElementById("pdp-badge").textContent  = p.subcategoria || p.categoria || "Producto";
+    document.getElementById("pdp-nombre").textContent = p.nombre || "—";
+    document.getElementById("pdp-precio").textContent = p.precio_bob ? formatoMoneda(p.precio_bob) : "—";
+
+    const viejoEl = document.getElementById("pdp-precio-old");
+    const descEl  = document.getElementById("pdp-descuento");
+    const tieneAnterior = p.precio_anterior_bob && p.precio_anterior_bob > p.precio_bob;
+    viejoEl.hidden = !tieneAnterior;
+    descEl.hidden  = !tieneAnterior;
+    if (tieneAnterior) {
+      viejoEl.textContent = formatoMoneda(p.precio_anterior_bob);
+      descEl.textContent  = `-${Math.round((1 - p.precio_bob / p.precio_anterior_bob) * 100)}%`;
+    }
+
+    const imgWrap = document.getElementById("pdp-img-wrap");
+    imgWrap.innerHTML = "";
+    const fallbackSp = () => {
+      const sp = document.createElement("span");
+      sp.style.fontSize = "52px";
+      sp.textContent = emojiPorCategoria(p.subcategoria || p.categoria);
+      imgWrap.appendChild(sp);
+    };
+    if (p.imagen_url?.startsWith("http") && !p.imagen_url.includes("example")) {
+      const img = document.createElement("img");
+      img.src = p.imagen_url;
+      img.alt = p.nombre || "";
+      img.onerror = fallbackSp;
+      imgWrap.appendChild(img);
+    } else {
+      fallbackSp();
+    }
+  }
+
+  function _pdpSpecs(p) {
+    const specsEl = document.getElementById("pdp-specs");
+    const specs   = buildSpecs(p);
+    specsEl.innerHTML = specs.length
+      ? specs.map(s =>
+          `<div class="pdp-spec">
+            <span class="pdp-spec-icon">${s.icon}</span>
+            <div class="pdp-spec-detail">
+              <div class="pdp-spec-label">${escapeHtml(s.label)}</div>
+              <div class="pdp-spec-val">${escapeHtml(s.val)}</div>
+            </div>
+          </div>`).join("")
+      : `<div class="pdp-spec" style="grid-column:1/-1">
+           <span class="pdp-spec-icon">📋</span>
+           <div class="pdp-spec-detail">
+             <div class="pdp-spec-label">Descripción</div>
+             <div class="pdp-spec-val" style="white-space:normal">${escapeHtml(p.descripcion || p.nombre || "—")}</div>
+           </div>
+         </div>`;
+  }
+
+  function _pdpTags(p) {
+    const tagsWrap = document.getElementById("pdp-tags-wrap");
+    const tagsEl   = document.getElementById("pdp-tags");
+    const tags = [
+      p.marca    && { icon: "🏷️", txt: p.marca },
+      p.modelo   && { icon: "🔢", txt: p.modelo },
+      p.garantia && { icon: "🛡️", txt: p.garantia },
+      p.sku      && { icon: "📌", txt: `SKU: ${p.sku}` },
+    ].filter(Boolean);
+    tagsEl.innerHTML = tags.map(t =>
+      `<span class="pdp-tag"><span class="ticon">${t.icon}</span>${escapeHtml(t.txt)}</span>`
+    ).join("");
+    tagsWrap.hidden = !tags.length;
+  }
+
+  function _aiHtml(texto) {
+    const lineas = texto.split(/\n/);
+    let html = "";
+    let enLista = false;
+    for (const l of lineas) {
+      const m = l.match(/^\s*[-•*]\s+(.+)$/);
+      if (m) {
+        if (!enLista) { html += "<ul>"; enLista = true; }
+        html += `<li>${escapeHtml(m[1])}</li>`;
+      } else {
+        if (enLista) { html += "</ul>"; enLista = false; }
+        if (l.trim()) html += `<p>${escapeHtml(l)}</p>`;
+      }
+    }
+    return enLista ? html + "</ul>" : html;
+  }
+
+  function _pdpAi(aiTexto) {
+    const aiWrap  = document.getElementById("pdp-ai-wrap");
+    if (!aiTexto) { aiWrap.hidden = true; return; }
+    const aiBlock = document.getElementById("pdp-ai-block");
+    const esWarn  = /contra|desventaja|cuidado|sin embargo|limitac/i.test(aiTexto);
+    aiBlock.className = "pdp-ai-block" + (esWarn ? " pdp-ai-warn" : "");
+    document.getElementById("pdp-ai-chip").textContent =
+      esWarn ? "Puntos a considerar" : "Beneficios destacados";
+    document.getElementById("pdp-ai-text").innerHTML = _aiHtml(aiTexto);
+    aiWrap.hidden = false;
+  }
+
+  // Extrae párrafos relevantes del último mensaje bot que mencione el SKU.
+  function _aiTextoParaSku(sku) {
+    const skuLow = String(sku).toLowerCase();
+    for (let i = historia.length - 1; i >= 0; i--) {
+      const m = historia[i];
+      if (m.tipo !== "bot" || !m.texto) continue;
+      const tLow = m.texto.toLowerCase();
+      if (!tLow.includes(skuLow) && !tLow.includes("[" + skuLow + "]")) continue;
+      const parrafos = m.texto.split(/\n{2,}/).filter(p =>
+        p.trim() &&
+        !p.includes("[" + sku + "]") &&
+        (p.includes("✅") || p.includes("•") ||
+         /beneficio|ventaja|ideal|perfecto|recomend|contra|límite|pero/i.test(p))
+      );
+      if (parrafos.length) return parrafos.join("\n");
+    }
+    return null;
+  }
+
+  function pdpAbrir(p) {
+    if (!pdpOverlay) return;
+    pdpSkuActual = p.sku;
+    _pdpHero(p);
+    _pdpSpecs(p);
+    _pdpTags(p);
+    _pdpAi(_aiTextoParaSku(p.sku));
+    pdpBtnCart.classList.remove("pdp-added");
+    pdpCartLbl.textContent = "Agregar al carrito";
+    pdpBtnCart.disabled = false;
+    pdpOverlay.showModal();
+    requestAnimationFrame(() => pdpOverlay.classList.add("pdp-visible"));
+  }
+
+  function pdpCerrar() {
+    pdpOverlay.classList.remove("pdp-visible");
+    setTimeout(() => pdpOverlay.close(), 220);
+  }
+
+  pdpClose?.addEventListener("click", pdpCerrar);
+  pdpOverlay?.addEventListener("click", e => { if (e.target === pdpOverlay) pdpCerrar(); });
+  document.addEventListener("keydown", e => { if (e.key === "Escape" && pdpOverlay?.open) pdpCerrar(); });
+
+  pdpBtnCart?.addEventListener("click", async () => {
+    if (!pdpSkuActual || !sesionId) return;
+    pdpBtnCart.disabled = true;
+    pdpCartLbl.textContent = "...";
+    try {
+      const r = await fetch(`${API_BASE}/carrito/${sesionId}/agregar`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sku: pdpSkuActual }),
+      });
+      if (r.ok) {
+        pdpBtnCart.classList.add("pdp-added");
+        pdpCartLbl.textContent = "Agregado ✓";
+        setTimeout(() => {
+          pdpBtnCart.classList.remove("pdp-added");
+          pdpCartLbl.textContent = "Agregar al carrito";
+          pdpBtnCart.disabled = false;
+        }, 2000);
+      } else {
+        pdpCartLbl.textContent = "Agregar al carrito";
+        pdpBtnCart.disabled = false;
+      }
+    } catch {
+      pdpCartLbl.textContent = "Agregar al carrito";
+      pdpBtnCart.disabled = false;
+    }
+  });
+
+  pdpBtnSim?.addEventListener("click", () => {
+    if (!pdpSkuActual) return;
+    const nombre = nombrePorSku(pdpSkuActual);
+    pdpCerrar();
+    setTimeout(() => enviarMensaje(MENSAJE_ACCION.similares(pdpSkuActual, nombre)), 250);
+  });
+
+  // Devuelve el objeto producto completo desde la historia por SKU.
+  function productoPorSku(sku) {
+    for (let i = historia.length - 1; i >= 0; i--) {
+      const m = historia[i];
+      const match = (m.productos || []).concat(m.sugeridos || []).find(p => p.sku === sku);
+      if (match) return match;
+    }
+    return null;
+  }
 
   async function agregarAlCarrito(btn, sku) {
     if (!sesionId) return;
@@ -436,6 +676,10 @@
           if (data.sesion_id) sesionId = data.sesion_id;
           productos = data.productos_citados || [];
           sugeridos = data.productos_sugeridos || [];
+          const hayOrden = (data.pasos || []).some(
+            p => p.tool === "confirmar_orden" && !p.result?.error
+          );
+          if (hayOrden) setTimeout(mostrarFeedbackPopup, 1500);
         }
       };
 
@@ -507,13 +751,21 @@
     widget.classList.contains("open") ? cerrarChat() : abrirChat();
   });
   closeBtn.addEventListener("click", cerrarChat);
-  const confirmOverlay = document.getElementById("chat-confirm-overlay");
-  const confirmOkBtn   = document.getElementById("chat-confirm-ok");
+  const confirmOverlay   = document.getElementById("chat-confirm-overlay");
+  const confirmOkBtn     = document.getElementById("chat-confirm-ok");
   const confirmCancelBtn = document.getElementById("chat-confirm-cancel");
 
   function mostrarConfirm() {
-    confirmOverlay.removeAttribute("aria-hidden");
-    confirmOkBtn.focus();
+    // Si hubo conversación real, mostrar feedback antes de confirmar cierre
+    if (historia.length > 1) {
+      mostrarFeedbackPopup(() => {
+        confirmOverlay.removeAttribute("aria-hidden");
+        confirmOkBtn.focus();
+      });
+    } else {
+      confirmOverlay.removeAttribute("aria-hidden");
+      confirmOkBtn.focus();
+    }
   }
   function ocultarConfirm() {
     confirmOverlay.setAttribute("aria-hidden", "true");
@@ -525,6 +777,74 @@
   confirmCancelBtn.addEventListener("click", ocultarConfirm);
 
   endBtn?.addEventListener("click", mostrarConfirm);
+
+  // ── Feedback popup ──────────────────────────────────────────────────────
+  const fbOverlay   = document.getElementById("chat-feedback-overlay");
+  const fbSendBtn   = document.getElementById("chat-feedback-send");
+  const fbSkipBtn   = document.getElementById("chat-feedback-skip");
+  const fbStarsCont = document.getElementById("chat-feedback-stars");
+  const starBtns    = fbStarsCont ? [...fbStarsCont.querySelectorAll(".star-btn")] : [];
+
+  let fbStarSelected  = 0;
+  let fbVisible       = false;
+  let fbAfterClose    = null;
+
+  function mostrarFeedbackPopup(afterClose = null) {
+    if (!fbOverlay || fbVisible) return;
+    fbVisible    = true;
+    fbAfterClose = afterClose;
+    fbStarSelected = 0;
+    starBtns.forEach(b => b.classList.remove("lit"));
+    fbSendBtn?.setAttribute("disabled", "");
+    fbSendBtn && (fbSendBtn.textContent = "Enviar calificación");
+    fbSendBtn?.classList.remove("fb-sent");
+    fbOverlay.removeAttribute("aria-hidden");
+  }
+
+  function ocultarFeedbackPopup() {
+    fbOverlay?.setAttribute("aria-hidden", "true");
+    fbVisible = false;
+    const cb  = fbAfterClose;
+    fbAfterClose = null;
+    if (cb) cb();
+  }
+
+  starBtns.forEach((btn, i) => {
+    btn.addEventListener("mouseenter", () => {
+      starBtns.forEach((b, j) => b.classList.toggle("lit", j <= i));
+    });
+    btn.addEventListener("mouseleave", () => {
+      starBtns.forEach((b, j) => b.classList.toggle("lit", j < fbStarSelected));
+    });
+    btn.addEventListener("click", () => {
+      fbStarSelected = i + 1;
+      starBtns.forEach((b, j) => b.classList.toggle("lit", j < fbStarSelected));
+      fbSendBtn?.removeAttribute("disabled");
+    });
+  });
+
+  fbSendBtn?.addEventListener("click", async () => {
+    if (!fbStarSelected) { ocultarFeedbackPopup(); return; }
+    const sidSnap = sesionId;
+    const voto    = fbStarSelected >= 4 ? "up" : "down";
+    try {
+      await fetch(`${API_BASE}/admin/aprendizaje/feedback`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sesion_id:       sidSnap,
+          turno_index:     historia.length,
+          voto,
+          respuesta_agente: historia.findLast(h => h.tipo === "bot")?.texto || "",
+        }),
+      });
+    } catch { /* silencioso */ }
+    fbSendBtn.textContent = "¡Gracias! 🎉";
+    fbSendBtn.classList.add("fb-sent");
+    setTimeout(ocultarFeedbackPopup, 1500);
+  });
+
+  fbSkipBtn?.addEventListener("click", ocultarFeedbackPopup);
 
   form.addEventListener("submit", (e) => {
     e.preventDefault();
@@ -540,15 +860,15 @@
     const btn = e.target.closest(".chat-card-action");
     if (!btn) return;
     const accion = btn.dataset.action;
-    const sku = btn.dataset.sku;
+    const sku    = btn.dataset.sku;
     if (!sku) return;
-    if (accion === "agregar") {
-      agregarAlCarrito(btn, sku);
+    if (accion === "agregar") { agregarAlCarrito(btn, sku); return; }
+    if (accion === "info") {
+      const p = productoPorSku(sku);
+      if (p) pdpAbrir(p);
       return;
     }
     const builder = MENSAJE_ACCION[accion];
-    if (!builder) return;
-    const nombre = nombrePorSku(sku);
-    enviarMensaje(builder(sku, nombre));
+    if (builder) enviarMensaje(builder(sku, nombrePorSku(sku)));
   });
 })();

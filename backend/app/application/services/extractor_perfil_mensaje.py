@@ -111,7 +111,10 @@ class ExtractorPerfilMensaje:
         # Si el cliente menciona un precio explícito (ideal), ese puede ser el
         # mínimo que ha considerado — útil para no proponer opciones todavía más baratas.
         presupuesto_min_buscado = ideal if ideal is not None else None
-        capacidad_litros_min = DetectorTamanoFamilia.detectar_litros_min(texto)
+        capacidad_litros_min = (
+            atributos.capacidad_litros_min
+            or DetectorTamanoFamilia.detectar_litros_min(texto)
+        )
         return ActualizarPerfilSesionCommand(
             sesion_id=sesion_id,
             presupuesto_max=techo,
@@ -133,6 +136,21 @@ class ExtractorPerfilMensaje:
             nombre_excluye_nuevas=nombre_excluye_nuevas,
             capacidad_litros_min=capacidad_litros_min,
             ciudad_sesion=DetectorCiudadMencion.detectar(texto),
+            # Atributos técnicos sticky (Fase 1)
+            refresh_hz_min=atributos.refresh_hz_min,
+            bateria_mah_min=atributos.bateria_mah_min,
+            camara_mp_min=atributos.camara_mp_min,
+            soporta_5g=atributos.soporta_5g,
+            sistema_operativo=atributos.sistema_operativo,
+            capacidad_kg_min=atributos.capacidad_kg_min,
+            potencia_w_min=atributos.potencia_w_min,
+            inverter=atributos.inverter,
+            no_frost=atributos.no_frost,
+            smart_tv=atributos.smart_tv,
+            bluetooth_incluido=atributos.bluetooth_incluido,
+            nfc=atributos.nfc,
+            usb_c=atributos.usb_c,
+            hdmi_2_1=atributos.hdmi_2_1,
         )
 
     @staticmethod

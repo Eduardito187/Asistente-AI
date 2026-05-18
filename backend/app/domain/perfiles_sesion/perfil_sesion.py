@@ -36,13 +36,30 @@ class PerfilSesion:
     nombre_excluye_acum: Optional[str] = None  # comma-separated acumulado
     presupuesto_ideal: Optional[float] = None  # techo blando: prefiere no exceder
     presupuesto_min_buscado: Optional[float] = None  # precio más bajo que el cliente ha considerado
+    # --- Atributos técnicos sticky (Fase 1) ---
+    # Booleanos: guardar True/NULL, nunca False. Un cliente que pidió "con NFC"
+    # en turno 2 debe seguir filtrando NFC en turno 5.
+    refresh_hz_min: Optional[int] = None
+    bateria_mah_min: Optional[int] = None
+    camara_mp_min: Optional[int] = None
+    soporta_5g: Optional[bool] = None
+    sistema_operativo: Optional[str] = None
+    capacidad_kg_min: Optional[float] = None
+    potencia_w_min: Optional[int] = None
+    inverter: Optional[bool] = None
+    no_frost: Optional[bool] = None
+    smart_tv: Optional[bool] = None
+    bluetooth_incluido: Optional[bool] = None
+    nfc: Optional[bool] = None
+    usb_c: Optional[bool] = None
+    hdmi_2_1: Optional[bool] = None
     # Acumula señales de frustración detectadas en la sesión (suma, no pick).
-    # Usado por EvaluadorFrustracionAcumulada para escalar más rápido si
-    # el deterioro persiste. Se semilla desde sesiones pasadas del mismo
-    # cliente cuando hay identidad (cross-session memory).
     frustracion_count: Optional[int] = None
     # Ciudad boliviana mencionada por el cliente (solo contexto, no filtra búsquedas).
     ciudad_sesion: Optional[str] = None
+    # Hechos que el cliente pidió recordar: "recuerda que tengo 5000 de presupuesto".
+    # Líneas separadas por \n. Se muestran al LLM en cada turno para no olvidarlos.
+    notas_usuario: Optional[str] = None
 
     @staticmethod
     def vacio(sesion_id: UUID) -> "PerfilSesion":
@@ -108,4 +125,29 @@ class PerfilSesion:
             presupuesto_min_buscado=p(otro.presupuesto_min_buscado, self.presupuesto_min_buscado),
             frustracion_count=self._sumar(otro.frustracion_count, self.frustracion_count),
             ciudad_sesion=p(otro.ciudad_sesion, self.ciudad_sesion),
+            refresh_hz_min=p(otro.refresh_hz_min, self.refresh_hz_min),
+            bateria_mah_min=p(otro.bateria_mah_min, self.bateria_mah_min),
+            camara_mp_min=p(otro.camara_mp_min, self.camara_mp_min),
+            soporta_5g=p(otro.soporta_5g, self.soporta_5g),
+            sistema_operativo=p(otro.sistema_operativo, self.sistema_operativo),
+            capacidad_kg_min=p(otro.capacidad_kg_min, self.capacidad_kg_min),
+            potencia_w_min=p(otro.potencia_w_min, self.potencia_w_min),
+            inverter=p(otro.inverter, self.inverter),
+            no_frost=p(otro.no_frost, self.no_frost),
+            smart_tv=p(otro.smart_tv, self.smart_tv),
+            bluetooth_incluido=p(otro.bluetooth_incluido, self.bluetooth_incluido),
+            nfc=p(otro.nfc, self.nfc),
+            usb_c=p(otro.usb_c, self.usb_c),
+            hdmi_2_1=p(otro.hdmi_2_1, self.hdmi_2_1),
+            notas_usuario=self._acumular_notas(otro.notas_usuario, self.notas_usuario),
         )
+
+    @staticmethod
+    def _acumular_notas(nueva: Optional[str], vieja: Optional[str]) -> Optional[str]:
+        """Las notas se acumulan (append), no se pisan. Máx 2000 chars."""
+        if not nueva:
+            return vieja
+        if not vieja:
+            return nueva
+        combinado = vieja + "\n" + nueva
+        return combinado[-2000:] if len(combinado) > 2000 else combinado

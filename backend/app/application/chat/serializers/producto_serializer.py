@@ -25,6 +25,7 @@ class ProductoSerializer:
             "marca": p.marca,
             "precio_bob": p.precio.monto,
             "precio_anterior_bob": p.precio_anterior.monto if p.precio_anterior else None,
+            "imagen_url": p.imagen_url,
         }
         if p.modelo:
             base["modelo"] = p.modelo

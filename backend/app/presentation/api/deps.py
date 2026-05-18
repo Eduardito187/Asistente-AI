@@ -75,6 +75,7 @@ from ...application.services.detector_mentiras import DetectorMentiras
 from ...application.services.detector_sku_mensaje import DetectorSkuMensaje
 from ...application.services.evaluador_conversacion import EvaluadorConversacion
 from ...application.services.extractor_perfil_mensaje import ExtractorPerfilMensaje
+from ...application.services.gestor_correcciones import GestorCorrecciones
 from ...application.services.gestor_feedback_post_orden import GestorFeedbackPostOrden
 from ...application.services.gestor_follow_ups_contextuales import (
     GestorFollowUpsContextuales,
@@ -116,6 +117,8 @@ from ...application.services.validador_producto_real import ValidadorProductoRea
 from ...application.ports import Cache
 from ...infrastructure.cache import CacheNulo, RedisCache
 from ...infrastructure.config import settings
+from ...infrastructure.llm.anthropic_adapter import AnthropicAdapter
+from ...infrastructure.llm.groq_adapter import GroqAdapter
 from ...infrastructure.llm.llm_cache_adapter import LLMCacheAdapter
 from ...infrastructure.llm.ollama_adapter import OllamaAdapter
 from ...infrastructure.llm.ollama_circuit_breaker import OllamaCircuitBreaker
@@ -131,14 +134,24 @@ def uow_factory() -> SqlAlchemyUnitOfWork:
     return SqlAlchemyUnitOfWork()
 
 
+def _base_llm():
+    """Construye el adapter LLM según LLM_PROVIDER."""
+    provider = settings.llm_provider.lower()
+    if provider == "groq":
+        return GroqAdapter(api_key=settings.groq_api_key, model=settings.groq_model)
+    if provider == "anthropic":
+        return AnthropicAdapter(api_key=settings.anthropic_api_key, model=settings.anthropic_model)
+    # default: ollama (local o tunel)
+    return OllamaAdapter(host=settings.ollama_host, model=settings.ollama_model, max_parallel=6)
+
+
 @lru_cache()
 def llm_port():
-    """LLM con cache de respuestas idénticas (TTL 60s) y circuit breaker.
-    Capas (exterior → interior): OllamaCircuitBreaker → LLMCacheAdapter → OllamaAdapter.
-    El circuit breaker es la capa más externa: corta rápido ante fallos de Ollama
-    antes de intentar cache o llamada HTTP."""
-    base = OllamaAdapter(host=settings.ollama_host, model=settings.ollama_model)
-    cached = LLMCacheAdapter(llm=base, cache=cache_port(), ttl_segundos=60)
+    """LLM con cache de respuestas idénticas (TTL 300s) y circuit breaker.
+    Capas (exterior → interior): OllamaCircuitBreaker → LLMCacheAdapter → <provider>.
+    Provider seleccionado por LLM_PROVIDER env var: ollama | groq | anthropic."""
+    base = _base_llm()
+    cached = LLMCacheAdapter(llm=base, cache=cache_port(), ttl_segundos=300)
     return OllamaCircuitBreaker(cached)
 
 
@@ -269,6 +282,13 @@ def limpiar_perfil_sesion_handler() -> LimpiarPerfilSesionHandler:
     return LimpiarPerfilSesionHandler(uow_factory)
 
 
+def gestor_correcciones_handler() -> GestorCorrecciones:
+    return GestorCorrecciones(
+        obtener_perfil=obtener_perfil_sesion_handler(),
+        actualizar_perfil=actualizar_perfil_sesion_handler(),
+    )
+
+
 def registrar_feedback_orden_handler() -> RegistrarFeedbackOrdenHandler:
     return RegistrarFeedbackOrdenHandler(uow_factory)
 
@@ -367,6 +387,7 @@ def reindexador_embeddings() -> ReindexadorEmbeddings:
     return ReindexadorEmbeddings(embedder=embedder_port(), uow_factory=uow_factory)
 
 
+@lru_cache()
 def procesar_chat_service() -> ProcesarChatService:
     dispatcher = ToolDispatcher(
         buscar=buscar_handler(),
@@ -476,4 +497,5 @@ def procesar_chat_service() -> ProcesarChatService:
         obtener_perfil_historico=obtener_perfil_historico_handler(),
         skill_registry=skill_registry_singleton(),
         limpiar_perfil=limpiar_perfil_sesion_handler(),
+        gestor_correcciones=gestor_correcciones_handler(),
     )

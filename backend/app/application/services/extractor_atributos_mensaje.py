@@ -59,6 +59,11 @@ class AtributosMensaje:
     ipx4: Optional[bool] = None
     tiene_descuento: Optional[bool] = None
 
+    def tiene_alguno(self) -> bool:
+        """True si al menos un atributo tecnico fue detectado en el mensaje."""
+        from dataclasses import fields as dc_fields
+        return any(getattr(self, f.name) is not None for f in dc_fields(self))
+
 
 class ExtractorAtributosMensaje:
     """Extrae atributos tecnicos (pulgadas, panel, resolucion, RAM, SSD) que el
@@ -99,6 +104,18 @@ class ExtractorAtributosMensaje:
         rf"\bm[íi]nimo\s+(\d+)\s*(gb|tb)\s+(?:de\s+)?{_SSD_PALABRAS}\b",
         re.IGNORECASE,
     )
+    # "por lo menos 256gb", "al menos 512gb", "mínimo 256gb" sin keyword de
+    # almacenamiento. Solo valores >= 128 (descarta RAM válidos <= 64) para
+    # evitar ambigüedad. 256/512 en contexto de celulares/laptops = storage.
+    # "por lo menos 256gb", "al menos 512gb", "mínimo 256gb", "desde 256gb"
+    # sin keyword de almacenamiento. Solo valores >= 128 (descarta RAM válidos
+    # <= 64). "desde" cubre correcciones del tipo "dije desde 256gb".
+    _RX_SSD_MINIMO_IMPLICITO = re.compile(
+        r"\b(?:por\s+lo\s+menos|al\s+menos|como\s+m[íi]nimo|m[íi]nimo|"
+        r"por\s+lo\s+m[íi]nimo|m[íi]n(?:imo)?\.?|al\s+m[íi]nimo|desde)\s+"
+        r"(?:de\s+)?(\d{2,4})\s*(?:gb|g)\b",
+        re.IGNORECASE,
+    )
     # SSD sin unidad explicita: "512 disco", "512 ssd", "512 de almacenamiento"
     # — solo aceptamos numeros que coincidan con _SSD_VALIDOS (256/512/1024)
     # para no confundir con precios.
@@ -108,6 +125,12 @@ class ExtractorAtributosMensaje:
     )
     _RX_SSD_NUM_POS = re.compile(
         rf"\b{_SSD_PALABRAS}\s+(?:de\s+)?(\d+)\b",
+        re.IGNORECASE,
+    )
+    # "hay de 512gb", "tiene de 1tb", "hay uno de 512gb", "hay de 512 o 1tb"
+    # Captura el MENOR valor mencionado (piso de la búsqueda).
+    _RX_SSD_CONSULTA = re.compile(
+        r"\b(?:hay|tiene[ns]?|existen?)\s+(?:unos?\s+)?(?:de\s+)?(\d{1,4})\s*(?:gb|tb)\b",
         re.IGNORECASE,
     )
 
@@ -286,22 +309,54 @@ class ExtractorAtributosMensaje:
 
     @classmethod
     def _ssd_gb(cls, texto: str) -> Optional[int]:
+        return (
+            cls._ssd_con_unidad(texto)
+            or cls._ssd_sin_unidad(texto)
+            or cls._ssd_minimo_implicito(texto)
+            or cls._ssd_consulta(texto)
+        )
+
+    @classmethod
+    def _ssd_consulta(cls, texto: str) -> Optional[int]:
+        """'hay de 512gb', 'tienen de 1tb', 'hay de 512gb o 1tb' — toma el menor."""
+        vals = []
+        for m in cls._RX_SSD_CONSULTA.finditer(texto):
+            val = int(m.group(1))
+            if m.group(0).lower().endswith("tb"):
+                val *= 1024
+            if val in cls._SSD_VALIDOS and val >= 128:
+                vals.append(val)
+        return min(vals) if vals else None
+
+    @classmethod
+    def _ssd_con_unidad(cls, texto: str) -> Optional[int]:
         for rx in (cls._RX_SSD_A, cls._RX_SSD_B, cls._RX_SSD_C):
             m = rx.search(texto)
             if not m:
                 continue
             val = int(m.group(1))
-            unit = m.group(2).lower()
-            if unit == "tb":
+            if m.group(2).lower() == "tb":
                 val *= 1024
             if val in cls._SSD_VALIDOS:
                 return val
-        # Variante sin unidad: "512 disco", "ssd 512". Solo acepta valores
-        # canonicos para evitar capturar precios o RAM.
+        return None
+
+    @classmethod
+    def _ssd_sin_unidad(cls, texto: str) -> Optional[int]:
         for rx in (cls._RX_SSD_NUM_PRE, cls._RX_SSD_NUM_POS):
             m = rx.search(texto)
-            if not m:
-                continue
+            if m:
+                val = int(m.group(1))
+                if val in cls._SSD_VALIDOS and val >= 128:
+                    return val
+        return None
+
+    @classmethod
+    def _ssd_minimo_implicito(cls, texto: str) -> Optional[int]:
+        """'por lo menos 256gb' / 'al menos 512gb' sin keyword de almacenamiento.
+        Solo valores >= 128 para no confundir con RAM válido (<= 64)."""
+        m = cls._RX_SSD_MINIMO_IMPLICITO.search(texto)
+        if m:
             val = int(m.group(1))
             if val in cls._SSD_VALIDOS and val >= 128:
                 return val

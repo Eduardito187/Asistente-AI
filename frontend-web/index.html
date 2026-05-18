@@ -20,6 +20,7 @@
         <a href="#">Hogar</a>
         <a href="#">Ofertas</a>
         <a href="#">Sucursales</a>
+        <a href="/admin.html">Admin</a>
       </nav>
       <div class="nav-actions">
         <button class="icon-btn" aria-label="Buscar">🔍</button>
@@ -210,8 +211,82 @@
         </div>
       </div>
     </div>
+    <div id="chat-feedback-overlay" class="chat-feedback-overlay" aria-hidden="true">
+      <div class="chat-feedback-box">
+        <span class="chat-feedback-glyph">🛍️</span>
+        <p class="chat-feedback-title">¿Cómo fue tu experiencia<br>con <strong>Dismi</strong>?</p>
+        <p class="chat-feedback-sub">Tu opinión hace la diferencia ✨</p>
+        <div class="chat-feedback-stars" id="chat-feedback-stars">
+          <button class="star-btn" data-star="1" type="button" aria-label="1 estrella">★</button>
+          <button class="star-btn" data-star="2" type="button" aria-label="2 estrellas">★</button>
+          <button class="star-btn" data-star="3" type="button" aria-label="3 estrellas">★</button>
+          <button class="star-btn" data-star="4" type="button" aria-label="4 estrellas">★</button>
+          <button class="star-btn" data-star="5" type="button" aria-label="5 estrellas">★</button>
+        </div>
+        <div class="chat-feedback-label-row"><span>Pésimo</span><span>Excelente</span></div>
+        <button id="chat-feedback-send" class="chat-feedback-btn-send" type="button" disabled>Enviar calificación</button>
+        <button id="chat-feedback-skip" class="chat-feedback-skip" type="button">Ahora no</button>
+      </div>
+    </div>
   </dialog>
 
-  <script src="/assets/js/chat.js?v=5"></script>
+  <!-- ── Popup detalle de producto ───────────────────────────────────────── -->
+  <dialog id="pdp-overlay" class="pdp-overlay" aria-labelledby="pdp-nombre">
+    <div class="pdp-modal">
+      <!-- Hero -->
+      <div class="pdp-hero">
+        <div class="pdp-img-wrap" id="pdp-img-wrap">
+          <span id="pdp-emoji">🛍️</span>
+        </div>
+        <div class="pdp-hero-info">
+          <div class="pdp-badge" id="pdp-badge">Producto</div>
+          <div class="pdp-nombre" id="pdp-nombre">—</div>
+          <div class="pdp-precio-row">
+            <span class="pdp-precio-main" id="pdp-precio">—</span>
+            <span class="pdp-precio-old" id="pdp-precio-old" hidden></span>
+            <span class="pdp-descuento" id="pdp-descuento" hidden></span>
+          </div>
+        </div>
+        <button class="pdp-close" id="pdp-close" aria-label="Cerrar">✕</button>
+      </div>
+
+      <!-- Cuerpo -->
+      <div class="pdp-body" id="pdp-body">
+        <!-- Atributos técnicos -->
+        <div>
+          <div class="pdp-section-title">✦ Especificaciones</div>
+          <div class="pdp-specs" id="pdp-specs"></div>
+        </div>
+        <!-- Tags rápidos -->
+        <div id="pdp-tags-wrap" hidden>
+          <div class="pdp-section-title">✦ Información adicional</div>
+          <div class="pdp-tags" id="pdp-tags"></div>
+        </div>
+        <!-- Bloque IA -->
+        <div id="pdp-ai-wrap" hidden>
+          <div class="pdp-section-title">✦ Análisis del asistente</div>
+          <div class="pdp-ai-block" id="pdp-ai-block">
+            <div class="pdp-ai-header">
+              <span>✨</span>
+              <span class="pdp-ai-chip" id="pdp-ai-chip">IA</span>
+            </div>
+            <div class="pdp-ai-text" id="pdp-ai-text"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div class="pdp-footer">
+        <button class="pdp-btn-cart" id="pdp-btn-cart">
+          <span>🛒</span><span id="pdp-btn-cart-lbl">Agregar al carrito</span>
+        </button>
+        <button class="pdp-btn-similares" id="pdp-btn-similares">
+          <span>🔍</span> Similares
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/assets/js/chat.js?v=7"></script>
 </body>
 </html>

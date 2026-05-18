@@ -134,7 +134,7 @@ RX_PEDIDO_DETALLE = re.compile(
     r"|\bvelocidad\b|\brendimiento\b|\bperformance\b|\bpotencia\b"
     r"|\bfrecuencia\b|\brpm\b|\bvatios?\b|\bwatts?\b|\bw\b"
     r"|\binverter\b|\bno\s+frost\b|\beficiencia\s+energ"
-    r"|\blitros?\b|\bkg\b|\bcapacidad\s+(?:litros|kg|carga)"
+    r"|\bcapacidad\s+(?:litros|kg|carga)"
 
     # ===== 7. PREGUNTAS DIRECTAS SOBRE ATRIBUTOS =====
     r"|\bqu[ée]\s+(?:procesador|memoria|pantalla|c[áa]mara|"
@@ -154,7 +154,7 @@ RX_PEDIDO_DETALLE = re.compile(
     r"|\bcu[áa]nto(?:s)?\s+(?:gb|tb|mp|hz|w|mah|nucleo|core|ram|"
     r"almacenamiento|memoria|pesa|mide|dura|aguanta)"
     r"|\b(?:tiene|trae|incluye|viene\s+con|posee|cuenta\s+con)\s+\w+"
-    r"|\b(?:de\s+qu[ée])\s+(?:color|marca|modelo|tama[ñn]o|"
+    r"|\b(?:de\s+qu[ée])\s+(?:color|modelo|tama[ñn]o|"
     r"a[ñn]o|material|tipo)"
 
     # ===== 8. COLOQUIALISMOS LATINOS / BOLIVIANOS =====

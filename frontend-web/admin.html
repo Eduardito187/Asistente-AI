@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="es-BO" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dismi Admin — Dashboard</title>
+  <link rel="icon" href="/assets/img/logo-dismi.png" />
+  <link rel="stylesheet" href="/assets/css/styles.css?v=5" />
+  <link rel="stylesheet" href="/assets/css/admin.css?v=1" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+  <!-- ===== NAVBAR ===== -->
+  <header class="navbar">
+    <div class="nav-container">
+      <a href="/" class="brand">
+        <img src="/assets/img/logo-dismi.png" alt="Dismac" />
+      </a>
+      <nav class="nav-links">
+        <a href="/">Tienda</a>
+        <a href="/admin.html" style="color:var(--brand);border-bottom:2px solid var(--brand)">Admin</a>
+      </nav>
+      <div class="nav-actions">
+        <label class="theme-switch" aria-label="Modo oscuro" title="Modo oscuro">
+          <input type="checkbox" id="theme-toggle" />
+          <span class="theme-slider">
+            <span class="theme-icon theme-icon-sun">☀️</span>
+            <span class="theme-icon theme-icon-moon">🌙</span>
+          </span>
+        </label>
+      </div>
+    </div>
+  </header>
+
+  <!-- ===== TAB BAR ===== -->
+  <div class="admin-tabs">
+    <div class="admin-tabs-inner">
+      <div class="admin-tab-group">
+        <button class="admin-tab-btn active" data-tab="metricas">📊 Métricas</button>
+        <button class="admin-tab-btn" data-tab="alertas">🚨 Alertas</button>
+        <button class="admin-tab-btn" data-tab="aprendizaje">🧠 Aprendizaje</button>
+      </div>
+      <div class="admin-refresh-bar">
+        <div class="admin-days">
+          <button class="admin-day-btn" data-dias="1">1d</button>
+          <button class="admin-day-btn active" data-dias="7">7d</button>
+          <button class="admin-day-btn" data-dias="30">30d</button>
+        </div>
+        <span>Actualiza en <strong id="refresh-countdown">30s</strong></span>
+        <button class="refresh-btn" id="btn-refresh" title="Actualizar ahora">↻</button>
+        <span style="color:var(--muted);font-size:12px">
+          Últ: <span id="last-updated">—</span>
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== CONTENT ===== -->
+  <main class="admin-content">
+
+    <!-- Panel Métricas -->
+    <section id="panel-metricas" class="admin-panel active">
+      <div class="skeleton" style="height:120px;margin-bottom:16px"></div>
+      <div class="skeleton" style="height:280px"></div>
+    </section>
+
+    <!-- Panel Alertas -->
+    <section id="panel-alertas" class="admin-panel">
+      <div class="skeleton" style="height:100px;margin-bottom:12px"></div>
+      <div class="skeleton" style="height:80px"></div>
+    </section>
+
+    <!-- Panel Aprendizaje -->
+    <section id="panel-aprendizaje" class="admin-panel">
+      <div class="skeleton" style="height:120px;margin-bottom:16px"></div>
+      <div class="skeleton" style="height:280px"></div>
+    </section>
+
+  </main>
+
+  <script src="/assets/js/admin.js?v=1"></script>
+</body>
+</html>
